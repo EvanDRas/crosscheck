@@ -1,0 +1,8 @@
+node_modules/
+.env
+npm-debug.log*
+
+# Personal data stays personal: the verdict ledger is the owner's forward
+# test, batch logs are machine-local. The pre-committed universe DOES ship.
+data/*
+!data/universe.json

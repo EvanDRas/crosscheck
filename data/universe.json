@@ -1,0 +1,19 @@
+{
+  "_what": "The fixed universe the daily batch logger (scripts/batch_log.js) analyzes and logs to the verdict ledger.",
+  "_rule": "PRE-COMMITTED 2026-08-04, before any grading results existed: 50 liquid US mega/large caps spanning all 11 GICS sectors, deliberately including out-of-favor names (INTC, BA, PFE, NKE, T) so the verdict spectrum gets exercised. NEVER add or drop tickers because of how their calls are grading — that contaminates the forward test. If the list must change for a structural reason (delisting, merger), note the date and reason in _changes and keep the old entries' ledger rows untouched.",
+  "_changes": [],
+  "asOf": "2026-08-04",
+  "tickers": [
+    "AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "CRM", "AMD", "INTC",
+    "GOOGL", "META", "NFLX", "DIS", "T",
+    "AMZN", "TSLA", "HD", "MCD", "NKE",
+    "BRK.B", "JPM", "BAC", "WFC", "GS", "V", "MA",
+    "LLY", "UNH", "JNJ", "ABBV", "MRK", "PFE", "TMO",
+    "CAT", "BA", "HON", "UPS", "GE",
+    "WMT", "COST", "PG", "KO", "PEP",
+    "XOM", "CVX", "COP",
+    "NEE", "DUK",
+    "LIN",
+    "PLD", "AMT"
+  ]
+}

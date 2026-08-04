@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Verdict Ledger — Stock Analyzer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">📊 Stock&nbsp;Analyzer</a>
+      <nav class="topnav">
+        <a href="/">Analyzer</a>
+        <a class="here" href="/ledger.html">Verdict ledger</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="card">
+      <h2>Verdict Ledger — a forward test of this app's calls</h2>
+      <p class="sub" style="margin-bottom:0">
+        Every real analysis logs its verdict, price, and the S&amp;P 500 (SPY) level at that moment —
+        first call per ticker per day, append-only, never edited. This page grades those frozen calls
+        against what actually happened since. Days are noise; judge this in months.
+        A fair benchmark question: do the BUYs actually beat SPY, and by more than the SELLs?
+      </p>
+    </section>
+
+    <div id="status" class="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Grading logged calls against current prices…</span>
+    </div>
+    <div id="error" class="error-banner" role="alert" hidden></div>
+    <div id="warning" class="warn-banner" hidden></div>
+
+    <div id="content" hidden>
+      <section class="card" id="summaryCard"></section>
+      <section class="card" id="aggCard"></section>
+      <section class="card" id="callsCard"></section>
+    </div>
+  </main>
+
+  <footer class="disclaimer">
+    <strong>Not financial advice.</strong> This ledger is a research exercise in honest,
+    forward-only record keeping. Small samples over short horizons are mostly noise, returns
+    shown ignore trading costs, and a mechanical formula's past calls — good or
+    bad — are not a reason to trade.
+  </footer>
+
+  <script src="ledger.js"></script>
+</body>
+</html>
