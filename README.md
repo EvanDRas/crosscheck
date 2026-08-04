@@ -165,3 +165,9 @@ Both hosts set `PORT` themselves; the server reads it.
   current ratio 2 ≈ healthy). They are opinions frozen in code — read
   `lib/scoring.js` and disagree with them; that's the point of transparent
   scoring.
+- **The formula has been tested, and the results ship with the app** — see
+  [EVIDENCE.md](EVIDENCE.md): 23 years of momentum data, five graded
+  point-in-time case studies, and 18,150 point-in-time calls over 2011–2024.
+  Short version: the testable components showed no predictive power, so the
+  verdict is presented as a description of current fundamentals, never a
+  forecast. The Verdict Ledger is the ongoing out-of-sample test.

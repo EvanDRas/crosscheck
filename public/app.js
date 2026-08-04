@@ -223,12 +223,20 @@ function renderVerdict(d) {
        <div class="verdict-pill ${verdictClass(s.verdict)}">${esc(s.verdict)}</div>
        <div class="verdict-conf">Confidence: ${esc(s.confidence)} (${s.availableCount}/${s.totalCategories} categories)</div>`;
 
+  // Honest-evidence line (see EVIDENCE.md): backtests of the testable
+  // components found no predictive power, and the very highest scores
+  // historically leaned the wrong way (glamour effect). Description, not
+  // forecast — the ledger is the ongoing test.
+  const evidence = s.insufficientData
+    ? ""
+    : `<div class="scoring-note evidence-note">Backtested honestly: the testable components of this formula showed <b>no predictive power</b>${s.score >= 72 ? ", and historically the very highest scores slightly <b>underperformed</b> the index" : ""} — a score describes current fundamentals, it does not forecast returns (see EVIDENCE.md; the <a href="/ledger.html">ledger</a> is the live test).</div>`;
+
   el.verdict.innerHTML = `
     <h2>Verdict</h2>
     <p class="sub">A mechanical score from the numbers below — transparent, not advice.${d.logged ? ` Call logged to the <a href="/ledger.html">verdict ledger</a>.` : ""}</p>
     <div class="verdict-wrap">
       <div class="verdict-hero">${hero}</div>
-      <div>${meters}<div class="scoring-note">${note}</div></div>
+      <div>${meters}<div class="scoring-note">${note}</div>${evidence}</div>
     </div>
     ${horizonBlockHtml(s)}`;
 }
