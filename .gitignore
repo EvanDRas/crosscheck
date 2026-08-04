@@ -6,3 +6,4 @@ npm-debug.log*
 # test, batch logs are machine-local. The pre-committed universe DOES ship.
 data/*
 !data/universe.json
+__pycache__/
