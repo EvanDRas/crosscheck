@@ -257,6 +257,24 @@ def main():
             top = q[q["quint"] == 4].groupby("asof")["excess"].mean()
             print(f"  {name:<32} STRONG-BUY n={len(sb):>5} excess {g.mean() * 100:+6.2f}% t={tstat(g):+5.2f} | "
                   f"topQ {top.mean() * 100:+6.2f}% t={tstat(top):+5.2f} | Q5-Q1 {spread.mean() * 100:+6.2f}% t={tstat(spread):+5.2f}")
+        # Accuracy, the intuitive way: when the FULL formula makes a call, how
+        # often is the stock's forward move "right"? Base rates included —
+        # accuracy only means something relative to picking at random.
+        sub = df.dropna(subset=["full"]).copy()
+        sub["ret_abs"] = sub["excess"]  # excess is vs bench; recover absolute below
+        base_beat = (sub["excess"] > 0).mean()
+        print(f"\n  ACCURACY (full formula) — base rate: a random pick beat the benchmark {base_beat * 100:.0f}% of the time")
+        print(f"  {'band':<12} {'n':>6} {'beat bench':>11} {'avg excess':>11}")
+        for band in ["STRONG BUY", "BUY", "HOLD", "SELL", "STRONG SELL"]:
+            b = sub[sub["vf"] == band]
+            if len(b) < 30:
+                continue
+            beat = (b["excess"] > 0).mean()
+            # For SELL bands, the "correct" call is trailing the benchmark.
+            correct = 1 - beat if band in ("SELL", "STRONG SELL") else beat
+            tag = "correct=trail" if band in ("SELL", "STRONG SELL") else ""
+            print(f"  {band:<12} {len(b):>6} {beat * 100:>10.0f}% {b['excess'].mean() * 100:>+10.2f}%   {'accuracy ' + format(correct * 100, '.0f') + '%' if band != 'HOLD' else ''} {tag}")
+
         for lo, hi in [(2011, 2017), (2018, 2024)]:
             sub = df[(pd.to_datetime(df["asof"]).dt.year >= lo) & (pd.to_datetime(df["asof"]).dt.year <= hi)]
             if sub.empty:

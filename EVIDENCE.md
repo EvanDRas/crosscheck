@@ -78,6 +78,20 @@ were tested honestly and neither earned its keep. A formula change without
 evidence would be cosmetics pretending to be improvement; the discipline is
 the feature.
 
+**Accuracy, in plain terms** (same 16,497 calls; "accurate" = the stock beat
+the benchmark after a BUY-family call, or trailed it after a SELL-family
+call; base rate = accuracy of a random pick):
+
+| call | 3-month accuracy (base 48%) | 12-month accuracy (base 45%) |
+|---|---|---|
+| STRONG BUY | 46% | 42% |
+| BUY | 49% | 46% |
+| SELL | 54% | 59% (n=264, not significant) |
+
+A coin flip, minus a few points at the formula's most confident. A real edge
+would look like 53–55% sustained across eras on thousands of calls, net of
+costs. The Verdict Ledger accumulates this same table live, out of sample.
+
 ## What we deliberately do NOT conclude
 
 - We do not trade the inverse. The negative tilt failed to appear in
