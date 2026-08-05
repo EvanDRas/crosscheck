@@ -368,6 +368,30 @@ a:hover { text-decoration: underline; }
 .kn-value.na { color: var(--muted); font-weight: 400; }
 .evidence-note { margin-top: 6px; border-top: 1px dashed var(--border, #333); padding-top: 6px; }
 
+/* first-run setup */
+.setup-card { border: 1px solid var(--accent, #4a7dcf); }
+.setup-steps { margin: 10px 0 14px 20px; line-height: 1.7; font-size: 14px; }
+.setup-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.setup-form input { flex: 1 1 220px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--bg-input, #16161a); color: inherit; font-size: 14px; }
+.setup-form button { padding: 9px 16px; border-radius: 8px; border: none; background: var(--accent, #4a7dcf); color: #fff; font-weight: 600; cursor: pointer; }
+.setup-form button:disabled { opacity: 0.6; cursor: wait; }
+
+/* personal pick logging */
+.pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border, #333); font-size: 13.5px; }
+.pick-label { color: var(--muted); }
+.pick-row button { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border, #333); background: transparent; color: inherit; cursor: pointer; font-size: 13px; }
+.pick-row button:hover { border-color: var(--accent, #4a7dcf); }
+.pick-msg { color: var(--muted); font-size: 12.5px; }
+.pick-note { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--muted); }
+
+/* evidence page */
+.evidence-doc h2 { margin: 18px 0 8px; }
+.evidence-doc h3 { margin: 16px 0 6px; font-size: 16px; }
+.evidence-doc p, .evidence-doc li { font-size: 14px; line-height: 1.65; color: var(--text-soft, #cfcdc7); }
+.evidence-doc ul { margin: 6px 0 6px 20px; }
+.evidence-doc code { background: var(--bg-input, #16161a); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+.evidence-doc table { margin: 10px 0; }
+
 .live-dot {
   display: inline-block;
   width: 7px;

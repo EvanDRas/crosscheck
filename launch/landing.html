@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Candor — the honest stock analyzer</title>
+  <meta name="description" content="A stock analyzer that verifies every number against SEC filings, publishes its own backtests (including the failed ones), and tracks your real accuracy. Free, open source, runs on your machine." />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #0f0f12; color: #e8e6e1; line-height: 1.65; }
+    main { max-width: 780px; margin: 0 auto; padding: 48px 20px 80px; }
+    h1 { font-size: 42px; line-height: 1.15; margin-bottom: 14px; }
+    h2 { font-size: 24px; margin: 44px 0 12px; }
+    p { color: #b9b6af; margin-bottom: 12px; }
+    .tag { color: #7aa2f7; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; font-size: 13px; }
+    .hero-claim { font-size: 19px; color: #e8e6e1; }
+    .cta { display: inline-block; margin: 18px 12px 0 0; padding: 12px 22px; border-radius: 10px; font-weight: 700; text-decoration: none; }
+    .cta-main { background: #4a7dcf; color: #fff; }
+    .cta-side { border: 1px solid #3a3a42; color: #e8e6e1; }
+    ul { margin: 8px 0 8px 22px; color: #b9b6af; }
+    li { margin-bottom: 8px; }
+    .quote { border-left: 3px solid #4a7dcf; padding: 10px 16px; background: #16161c; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 15px; }
+    .fine { font-size: 13px; color: #8a8781; margin-top: 40px; border-top: 1px solid #2a2a30; padding-top: 16px; }
+    b { color: #e8e6e1; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="tag">Candor · free & open source</div>
+  <h1>The stock analyzer honest enough to publish its own failed backtests.</h1>
+  <p class="hero-claim">Type a ticker. Get the live quote, fundamentals <b>cross-checked against SEC
+  filings</b>, analyst ratings, earnings, filtered news, and a transparent 0–100 verdict —
+  along with the one thing no other tool will show you: <b>proof of exactly what that verdict
+  can and cannot do.</b></p>
+
+  <a class="cta cta-main" href="#GITHUB_URL#">Get Candor free →</a>
+  <a class="cta cta-side" href="#GUMROAD_URL#">$19 supporter license</a>
+
+  <h2>Every number, verified against the government's copy</h2>
+  <p>Market-data vendors are wrong more often than anyone admits. Candor recomputes margins,
+  growth, and leverage straight from SEC EDGAR filings and flags every disagreement on the
+  page. In its first week it caught a vendor claiming a fintech grew revenue <b>205%</b> —
+  the actual filings say <b>15%</b>.</p>
+
+  <h2>A verdict that tells you the truth about itself</h2>
+  <div class="quote">"Backtested honestly: this formula (16,497 point-in-time calls, 2011–2024)
+  showed no predictive power — a score describes current fundamentals, it does not forecast
+  returns."<br/>— printed on Candor's own verdict card</div>
+  <p>We backtested the scoring formula with no look-ahead — only filings submitted by each
+  date — across 14 years. It's a coin flip, like every free screener ever tested. The
+  difference: Candor ships the evidence and never pretends otherwise. The score is what it
+  honestly is — the fastest way to see what a company's numbers look like right now.</p>
+
+  <h2>The feature nobody else will sell you: your real accuracy</h2>
+  <p>Log your own calls — <i>I'd buy this here</i> — and Candor freezes them at that moment's
+  price, append-only, then grades them against the S&amp;P on split- and dividend-adjusted
+  returns. Not the wins you remember. The number that's true.</p>
+
+  <h2>Yours, actually</h2>
+  <ul>
+    <li>Runs on your machine; your lookups never touch our servers (there are no servers).</li>
+    <li>Your own free API keys — guided 5-minute setup, no subscription, nobody can turn it off.</li>
+    <li>MIT-licensed source. Read the formula. Disagree with it. Change it.</li>
+    <li>Live streaming prices, price-history charts, one-click AI research brief.</li>
+  </ul>
+
+  <a class="cta cta-main" href="#GITHUB_URL#">Get Candor free →</a>
+  <a class="cta cta-side" href="#GUMROAD_URL#">Support development — $19</a>
+
+  <p class="fine"><b>Not financial advice.</b> Candor is a research tool. Its scoring formula
+  has no demonstrated predictive power — that's measured, published, and printed on the
+  product. Data comes from third-party sources and can be wrong (that's why we cross-check
+  it). Nothing here is a recommendation to buy or sell any security.</p>
+</main>
+</body>
+</html>

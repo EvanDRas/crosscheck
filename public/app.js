@@ -10,6 +10,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   form: $("searchForm"),
   input: $("tickerInput"),
+  setup: $("setupCard"),
   btn: $("analyzeBtn"),
   intro: $("intro"),
   status: $("status"),
@@ -231,6 +232,19 @@ function renderVerdict(d) {
     ? ""
     : `<div class="scoring-note evidence-note">Backtested honestly: this formula (16,497 point-in-time calls, 2011–2024) showed <b>no predictive power</b>${s.score >= 72 ? ", and its most confident calls historically <b>underperformed</b> the index" : ""} — a score describes current fundamentals, it does not forecast returns (see EVIDENCE.md; the <a href="/ledger.html">ledger</a> is the live test).</div>`;
 
+  // Your call, not the formula's: logged to a private, append-only track
+  // record and graded against the index over time — the feature that tells
+  // you your real accuracy instead of letting you remember the wins.
+  const pickRow = d.demo || !hasKey
+    ? ""
+    : `<div class="pick-row" id="pickRow">
+         <span class="pick-label">Your call on ${esc(d.ticker)} (logged to <a href="/ledger.html">your track record</a>, graded vs SPY):</span>
+         <button type="button" data-dir="buy">I'd buy</button>
+         <button type="button" data-dir="avoid">I'd pass</button>
+         <button type="button" data-dir="sell">I'd sell</button>
+         <span class="pick-msg" id="pickMsg"></span>
+       </div>`;
+
   el.verdict.innerHTML = `
     <h2>Verdict</h2>
     <p class="sub">A mechanical score from the numbers below — transparent, not advice.${d.logged ? ` Call logged to the <a href="/ledger.html">verdict ledger</a>.` : ""}</p>
@@ -238,7 +252,26 @@ function renderVerdict(d) {
       <div class="verdict-hero">${hero}</div>
       <div>${meters}<div class="scoring-note">${note}</div>${evidence}</div>
     </div>
-    ${horizonBlockHtml(s)}`;
+    ${horizonBlockHtml(s)}
+    ${pickRow}`;
+
+  el.verdict.querySelectorAll("#pickRow button").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const msg = $("pickMsg");
+      msg.textContent = "…";
+      try {
+        const res = await fetch("/api/picks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticker: d.ticker, direction: b.dataset.dir }),
+        });
+        const body = await res.json();
+        msg.textContent = res.ok ? body.message : body.error ?? "Failed.";
+      } catch {
+        msg.textContent = "Could not reach the server.";
+      }
+    })
+  );
 }
 
 // ---------- price history chart (local research data) ----------
@@ -802,6 +835,55 @@ window.addEventListener("hashchange", () => {
   const t = location.hash.slice(1);
   if (t) analyze(t);
 });
+
+// ---------- first-run setup ----------
+
+let hasKey = true; // optimistic until /api/health says otherwise
+
+async function checkSetup() {
+  try {
+    const res = await fetch("/api/health");
+    const h = await res.json();
+    hasKey = Boolean(h.hasKey);
+    el.setup.hidden = hasKey;
+  } catch {
+    /* server unreachable — the analyze path will surface it */
+  }
+}
+
+$("setupSaveBtn").addEventListener("click", async () => {
+  const errEl = $("setupError");
+  errEl.hidden = true;
+  const btn = $("setupSaveBtn");
+  btn.disabled = true;
+  btn.textContent = "Validating with Finnhub…";
+  try {
+    const res = await fetch("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        finnhubKey: $("setupFinnhub").value,
+        tiingoKey: $("setupTiingo").value,
+        contact: $("setupContact").value,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error ?? "Setup failed.");
+    btn.textContent = "✓ Saved — you're live";
+    hasKey = true;
+    setTimeout(() => {
+      el.setup.hidden = true;
+      el.input.focus();
+    }, 900);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+    btn.disabled = false;
+    btn.textContent = "Validate & save";
+  }
+});
+
+checkSetup();
 
 // Deep link: /#AAPL analyzes on load.
 if (location.hash.length > 1) analyze(location.hash.slice(1));

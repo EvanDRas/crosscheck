@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Evidence — Candor</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔎</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">🔎 Candor</a>
+      <nav class="topnav">
+        <a href="/">Analyzer</a>
+        <a href="/ledger.html">Track record</a>
+        <a class="here" href="/evidence.html">Evidence</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="card">
+      <h2>The tests this formula was put through — and what they found</h2>
+      <p class="sub" style="margin-bottom:0">
+        Most analysis tools imply prediction and publish nothing. Candor ships its own test
+        results, including the unflattering ones. Every study below is reproducible from the
+        scripts in the repo with free data.
+      </p>
+    </section>
+    <section class="card"><div id="evidence" class="evidence-doc">Loading…</div></section>
+  </main>
+
+  <footer class="disclaimer">
+    <strong>Not financial advice.</strong> Research and education only.
+  </footer>
+
+  <script>
+    // Minimal, safe markdown rendering: escape everything, then re-introduce
+    // only the constructs EVIDENCE.md actually uses.
+    const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const inline = (s) => esc(s)
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/`(.+?)`/g, "<code>$1</code>")
+      .replace(/\[(.+?)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    fetch("/api/evidence").then((r) => r.text()).then((md) => {
+      const out = [];
+      const lines = md.split(/\r?\n/);
+      let list = false;
+      let table = null;
+      const closeList = () => { if (list) { out.push("</ul>"); list = false; } };
+      const closeTable = () => {
+        if (table) {
+          out.push('<div class="ledger-table-wrap"><table class="ledger-table"><thead><tr>'
+            + table.head.map((h) => `<th>${inline(h)}</th>`).join("") + "</tr></thead><tbody>"
+            + table.rows.map((r) => "<tr>" + r.map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>").join("")
+            + "</tbody></table></div>");
+          table = null;
+        }
+      };
+      for (const line of lines) {
+        if (/^\|/.test(line)) {
+          const cells = line.split("|").slice(1, -1).map((c) => c.trim());
+          if (cells.every((c) => /^-+$/.test(c))) continue;
+          if (!table) table = { head: cells, rows: [] };
+          else table.rows.push(cells);
+          continue;
+        }
+        closeTable();
+        if (/^# /.test(line)) { closeList(); out.push(`<h2>${inline(line.slice(2))}</h2>`); }
+        else if (/^## /.test(line)) { closeList(); out.push(`<h3>${inline(line.slice(3))}</h3>`); }
+        else if (/^- /.test(line)) { if (!list) { out.push("<ul>"); list = true; } out.push(`<li>${inline(line.slice(2))}</li>`); }
+        else if (line.trim() === "") { closeList(); out.push(""); }
+        else { closeList(); out.push(`<p>${inline(line)}</p>`); }
+      }
+      closeList();
+      closeTable();
+      document.getElementById("evidence").innerHTML = out.join("\n");
+    }).catch(() => {
+      document.getElementById("evidence").textContent = "Could not load the evidence document.";
+    });
+  </script>
+</body>
+</html>

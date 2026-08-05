@@ -1,9 +1,15 @@
-# Stock Analyzer
+# Candor — the honest stock analyzer
 
-Type a ticker, get the whole picture: live quote, company profile, fundamentals,
-analyst ratings, earnings history, peers, news merged from multiple sources —
-and a transparent 0–100 verdict (STRONG BUY → STRONG SELL) you can pick apart
-category by category.
+Type a ticker, get the whole picture: live quote, company profile, fundamentals
+cross-checked against SEC filings, analyst ratings, earnings history, peers,
+relevance-filtered news — and a transparent 0–100 verdict (STRONG BUY → STRONG
+SELL) you can pick apart category by category, from the only analyzer that
+publishes its own backtests ([EVIDENCE.md](EVIDENCE.md) — including the ones
+that came back null).
+
+Free and MIT-licensed; runs on your machine with your own free API keys.
+If it's useful, there's a $19 supporter license. Non-programmer setup guide:
+[FRIENDS_SETUP.md](FRIENDS_SETUP.md).
 
 **Not financial advice.** Research/education only. Data can be delayed,
 incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.

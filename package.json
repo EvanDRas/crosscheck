@@ -1,7 +1,8 @@
 {
-  "name": "stock-analyzer",
+  "name": "candor",
   "version": "1.0.0",
-  "description": "Full-stack stock research dashboard: Finnhub fundamentals + multi-source news + transparent 0-100 scoring.",
+  "description": "Candor — the honest stock analyzer. SEC-verified fundamentals, transparent scoring, a private track record that grades you, and published backtests of its own formula.",
+  "license": "MIT",
   "type": "module",
   "main": "server.js",
   "engines": {

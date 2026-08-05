@@ -112,10 +112,63 @@ function renderCalls(data) {
     </div>`;
 }
 
+function renderMyPicks(data) {
+  const card = $("myPicksCard");
+  if (!data.entries.length) {
+    card.innerHTML = `
+      <h2>Your calls</h2>
+      <p class="sub" style="margin-bottom:0">None logged yet. On any analysis page, hit
+      <b>I'd buy / I'd pass / I'd sell</b> under the verdict — your call freezes at that
+      moment's price and gets graded here against SPY. Your real accuracy, measured,
+      instead of remembered.</p>`;
+    return;
+  }
+  const s = data.summary;
+  const acc = s ? `${s.correct} of ${s.graded} right (${Math.round(s.accuracy * 100)}%)` : "— (calls need at least a day of age)";
+  const dirLabel = { buy: "BUY", avoid: "PASS", sell: "SELL" };
+  const dirClass = { buy: "v-buy", avoid: "v-hold", sell: "v-sell" };
+  card.innerHTML = `
+    <h2>Your calls</h2>
+    <p class="sub">A buy is right if it beat SPY; a pass/sell is right if the stock trailed SPY.
+    Accuracy so far: <b>${esc(acc)}</b>. For calibration: a coin flip scores ~50%.</p>
+    <div class="ledger-table-wrap">
+      <table class="ledger-table">
+        <thead><tr>
+          <th>Date</th><th>Ticker</th><th>Your call</th><th>Note</th>
+          <th class="num">Price then</th><th class="num">Now</th>
+          <th class="num">Return</th><th class="num">vs SPY</th><th>Right?</th>
+        </tr></thead>
+        <tbody>
+          ${data.entries.map((e) => {
+            const graded = e.excess != null && e.ageDays > 0;
+            const right = !graded ? "—" : (e.direction === "buy" ? e.excess > 0 : e.excess < 0) ? "✓" : "✗";
+            return `
+            <tr>
+              <td>${esc(e.date)}</td>
+              <td><a href="/#${esc(e.ticker)}">${esc(e.ticker)}</a></td>
+              <td><span class="pill-sm ${dirClass[e.direction] ?? ""}">${esc(dirLabel[e.direction] ?? e.direction)}</span></td>
+              <td class="pick-note">${esc(e.note ?? "")}</td>
+              <td class="num">${money(e.price)}</td>
+              <td class="num">${money(e.nowPrice)}</td>
+              <td class="num">${deltaCell(e.ret)}</td>
+              <td class="num">${deltaCell(e.excess)}</td>
+              <td>${right}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
 async function load() {
   try {
-    const res = await fetch("/api/ledger");
+    const [res, picksRes] = await Promise.all([fetch("/api/ledger"), fetch("/api/picks")]);
     const data = await res.json();
+    try {
+      renderMyPicks(await picksRes.json());
+    } catch {
+      $("myPicksCard").hidden = true;
+    }
     $("status").hidden = true;
     if (!res.ok) {
       $("error").textContent = data?.error ?? `Request failed (${res.status}).`;

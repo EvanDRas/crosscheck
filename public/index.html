@@ -4,17 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
-  <title>Stock Analyzer</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>" />
+  <title>Candor — the honest stock analyzer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔎</text></svg>" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="#" id="brandLink">📊 Stock&nbsp;Analyzer</a>
+      <a class="brand" href="#" id="brandLink">🔎 Candor</a>
       <nav class="topnav">
         <a class="here" href="/">Analyzer</a>
-        <a href="/ledger.html">Verdict ledger</a>
+        <a href="/ledger.html">Track record</a>
+        <a href="/evidence.html">Evidence</a>
       </nav>
       <form id="searchForm" autocomplete="off">
         <input id="tickerInput" type="text" inputmode="latin" maxlength="10" spellcheck="false"
@@ -25,10 +26,32 @@
   </header>
 
   <main id="main">
+    <section id="setupCard" class="card setup-card" hidden>
+      <h2>Welcome to Candor — two free keys and you're live</h2>
+      <p class="sub">Candor runs on your machine with your own free API keys: your lookups stay
+      yours, and nobody can turn the service off. Try the <b>DEMO</b> ticker first if you like —
+      it needs no keys at all.</p>
+      <ol class="setup-steps">
+        <li>Create a free account at <a href="https://finnhub.io" target="_blank" rel="noopener noreferrer">finnhub.io</a>
+            and copy the API key from the dashboard. <b>Required</b> — powers quotes, fundamentals, analysts, earnings.</li>
+        <li>Optional but recommended: a free key from <a href="https://www.tiingo.com" target="_blank" rel="noopener noreferrer">tiingo.com</a>
+            (Account → API) — powers price charts and 52-week history.</li>
+        <li>Optional: an email for SEC EDGAR's fair-access policy (their servers like to know who's calling).</li>
+      </ol>
+      <div class="setup-form">
+        <input id="setupFinnhub" type="text" spellcheck="false" placeholder="Finnhub API key (required)" />
+        <input id="setupTiingo" type="text" spellcheck="false" placeholder="Tiingo API key (optional)" />
+        <input id="setupContact" type="email" spellcheck="false" placeholder="Email for SEC EDGAR (optional)" />
+        <button id="setupSaveBtn" type="button">Validate &amp; save</button>
+      </div>
+      <div id="setupError" class="error-banner" hidden></div>
+    </section>
+
     <section id="intro" class="intro">
-      <h1>Type a ticker. Get the whole picture.</h1>
-      <p>Live quote, fundamentals, analyst ratings, earnings history, peers, and news merged
-         from multiple sources — plus a transparent 0–100 verdict you can pick apart.</p>
+      <h1>Type a ticker. Get the whole truth we could find.</h1>
+      <p>Live quote, fundamentals cross-checked against SEC filings, analyst ratings, earnings,
+         peers, relevance-filtered news — and a transparent 0–100 verdict that
+         <a href="/evidence.html">tells you exactly what it can't do</a>.</p>
       <div class="intro-chips" id="introChips">
         <button data-t="AAPL">AAPL</button>
         <button data-t="MSFT">MSFT</button>
@@ -69,9 +92,10 @@
   </main>
 
   <footer class="disclaimer">
-    <strong>Not financial advice.</strong> This tool is for research and education only.
+    <strong>Not financial advice.</strong> Candor is for research and education only.
     Data comes from third-party sources, can be delayed, incomplete, or wrong, and the
     verdict is a mechanical formula — not a recommendation to buy or sell anything.
+    Its own backtests are published on the <a href="/evidence.html">evidence page</a>.
     Always do your own research.
   </footer>
 
