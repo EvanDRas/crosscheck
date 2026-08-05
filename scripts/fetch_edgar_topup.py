@@ -18,8 +18,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "data", "edgar_topup.parquet")
 FACTS = r"C:\Users\evand\OneDrive\Desktop\systematic cross-sectional equity strategy\experiments\claude_tests\edgar_facts.parquet"
 
-CONTACT = "evan.rasmussen.us@gmail.com"
-UA = {"User-Agent": f"StockAnalyzer research (personal; {CONTACT})", "Accept-Encoding": "gzip"}
+CONTACT = os.environ.get("SEC_EDGAR_CONTACT", "your-email@example.com")
+UA = {"User-Agent": f"Candor research (personal; {CONTACT})", "Accept-Encoding": "gzip"}
 
 CONCEPTS = {
     "us-gaap": {
