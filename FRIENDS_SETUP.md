@@ -45,10 +45,11 @@ This app is a **research dashboard**, not a stock picker. Straight facts:
   information the entire market already has — a good score means "this
   company currently looks healthy by conventional rules of thumb," **not**
   "this stock will go up."
-- The formula's testable components have been backtested honestly — 23 years
-  of momentum data and 18,150 point-in-time calls over 2011–2024: **zero
-  predictive power**, and the very highest scores historically leaned slightly
-  *behind* the index. Full numbers and methods: `EVIDENCE.md` in this repo.
+- The formula has been backtested honestly — 23 years of momentum data plus
+  16,497 full-formula point-in-time calls over 2011–2024: **zero predictive
+  power**, and its most confident calls historically leaned *behind* the
+  index. Two candidate "fixes" were also tested and rejected for lack of
+  evidence. Full numbers and methods: `EVIDENCE.md` in this repo.
 - The Verdict Ledger page is the app being honest about this: it freezes
   every call and lets time grade it against the S&P. Until that page shows
   BUYs beating SELLs over many months and hundreds of calls, the verdicts

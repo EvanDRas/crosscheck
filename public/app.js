@@ -229,7 +229,7 @@ function renderVerdict(d) {
   // forecast — the ledger is the ongoing test.
   const evidence = s.insufficientData
     ? ""
-    : `<div class="scoring-note evidence-note">Backtested honestly: the testable components of this formula showed <b>no predictive power</b>${s.score >= 72 ? ", and historically the very highest scores slightly <b>underperformed</b> the index" : ""} — a score describes current fundamentals, it does not forecast returns (see EVIDENCE.md; the <a href="/ledger.html">ledger</a> is the live test).</div>`;
+    : `<div class="scoring-note evidence-note">Backtested honestly: this formula (16,497 point-in-time calls, 2011–2024) showed <b>no predictive power</b>${s.score >= 72 ? ", and its most confident calls historically <b>underperformed</b> the index" : ""} — a score describes current fundamentals, it does not forecast returns (see EVIDENCE.md; the <a href="/ledger.html">ledger</a> is the live test).</div>`;
 
   el.verdict.innerHTML = `
     <h2>Verdict</h2>

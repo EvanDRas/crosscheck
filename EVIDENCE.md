@@ -49,13 +49,42 @@ consistently-signed evidence that the HIGHEST scores slightly underperform**
 (the classic glamour effect — high margin + growth + momentum is what
 "already fully priced" looks like).
 
+## Study 4 — the FULL formula, 16,497 point-in-time calls (scripts/backtest_pit_full.py)
+
+After Study 3, two hypotheses were pre-registered and then tested (EDGAR
+balance-sheet top-up: 466k filed-dated facts, 614 tickers — see
+scripts/fetch_edgar_topup.py):
+
+**Hypothesis A — "adding Valuation + Health (the glamour brakes) removes the
+negative tilt in the top band": REJECTED.** On the identical call sample
+(5 of 6 categories, ~85% of formula weight; only Analyst untestable):
+
+| variant | STRONG BUY excess (qtr) | annual view |
+|---|---|---|
+| 3-category composite | −0.87%/qtr (t = −2.74) | −3.38%/yr (t = −4.06) |
+| **full v1 formula** | **−0.92%/qtr (t = −1.98)** | **−2.57%/yr (t = −2.86)** |
+
+The tilt is concentrated in 2011–2017; 2018–2024 is statistical zero for
+every variant. No version of this formula showed positive predictive power
+anywhere.
+
+**Hypothesis B — "excluding the health category for financials fixes sector
+skew": NEGLIGIBLE.** It moves Finance/RE's average score by 0.7 points
+(cross-sector spread 8.1 → 7.4). The full formula's sector skew is real but
+moderate (Finance/RE 61.9 vs Utilities 53.8).
+
+**Decision: v1 stands — no formula change shipped.** Both candidate "fixes"
+were tested honestly and neither earned its keep. A formula change without
+evidence would be cosmetics pretending to be improvement; the discipline is
+the feature.
+
 ## What we deliberately do NOT conclude
 
-- We do not trade the inverse. The negative tilt is suggestive (spread
-  t = −1.23), not proven, and flipping a signal after seeing the data is the
-  overfitting trap this project exists to avoid.
-- Valuation, Health, and Analyst categories (50% of weight) remain untested —
-  no free point-in-time source. The owner's separate, more rigorous research
+- We do not trade the inverse. The negative tilt failed to appear in
+  2018–2024, and flipping a signal after seeing the data is the overfitting
+  trap this project exists to avoid.
+- The Analyst category (15% of weight) remains untested — no free
+  point-in-time ratings history. The owner's separate, more rigorous research
   on fundamental cross-sectional signals in large caps ended in a full null
   after costs.
 
