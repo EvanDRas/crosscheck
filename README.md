@@ -1,6 +1,6 @@
-# Candor — the honest stock analyzer
+# Verdict — the honest stock analyzer
 
-![tests](https://github.com/evandras/candor/actions/workflows/test.yml/badge.svg)
+![tests](https://github.com/evandras/verdict/actions/workflows/test.yml/badge.svg)
 
 Type a ticker, get the whole picture: live quote, company profile, fundamentals
 cross-checked against SEC filings, analyst ratings, earnings history, peers,
@@ -117,8 +117,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
    ```
 
    Open `.env` and paste your key into `FINNHUB_API_KEY`.
-4. Install and run — either double-click **Start Candor.bat** (Windows) /
-   **start-candor.command** (Mac), or from a terminal:
+4. Install and run — either double-click **Start Verdict.bat** (Windows) /
+   **start-verdict.command** (Mac), or from a terminal:
 
    ```
    npm install
@@ -126,7 +126,7 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
    ```
 
 5. Open http://localhost:3000 and type a ticker — or a company name;
-   Candor will find the symbol. First run with no key shows a guided
+   Verdict will find the symbol. First run with no key shows a guided
    in-app setup instead of asking you to edit files.
 
 No key yet? The ticker `DEMO` renders the full UI with clearly-labeled fake

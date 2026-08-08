@@ -368,7 +368,7 @@ app.get("/api/picks", async (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Candor running at http://localhost:${PORT}`);
+  console.log(`Verdict running at http://localhost:${PORT}`);
   if (!process.env.FINNHUB_API_KEY) {
     console.log("NOTE: FINNHUB_API_KEY is not set — open the app in a browser to run first-time setup, or see .env.example.");
   }

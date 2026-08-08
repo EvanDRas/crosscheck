@@ -1,4 +1,4 @@
-# Stock Analyzer — setup for friends
+# Verdict — setup for friends
 
 Ten minutes, all free, runs on your own computer with your own free API keys.
 Nothing is shared with anyone — your lookups, your keys, your machine.

@@ -3,7 +3,7 @@
 ## Title (pick one — 80-char HN limit)
 
 1. `Show HN: I backtested my stock analyzer on 16k dated calls. It's a coin flip`
-2. `Show HN: Candor – a stock analyzer that publishes its own failed backtests`
+2. `Show HN: Verdict – a stock analyzer that publishes its own failed backtests`
 3. `Show HN: My stock scorer is 46% accurate. I shipped the evidence inside it`
 
 Recommendation: #1 — the confession is the hook; "Show HN" posts that admit
@@ -72,7 +72,7 @@ strong.
 ## Rules of engagement for comments
 
 - Never claim or imply predictive value — the nulls are the story.
-- "Why not just use Finviz?" → agree Finviz is great for screening; Candor's
+- "Why not just use Finviz?" → agree Finviz is great for screening; Verdict's
   lane is verified data + honest evidence + personal track record.
 - Someone will find a bug within an hour. Thank them, fix it live, reply
   with the commit link. That IS the marketing.

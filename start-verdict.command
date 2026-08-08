@@ -1,9 +1,9 @@
 #!/bin/bash
-# Double-click launcher for Candor (macOS). If macOS blocks it, right-click
-# the file, choose Open, and confirm once. Linux: run ./start-candor.command
+# Double-click launcher for Verdict (macOS). If macOS blocks it, right-click
+# the file, choose Open, and confirm once. Linux: run ./start-verdict.command
 cd "$(dirname "$0")"
 if ! command -v node >/dev/null 2>&1; then
-  echo "Candor needs Node.js (free): https://nodejs.org — install the LTS version, then run this again."
+  echo "Verdict needs Node.js (free): https://nodejs.org — install the LTS version, then run this again."
   read -r -p "Press Enter to close."
   exit 1
 fi
@@ -12,5 +12,5 @@ if [ ! -d node_modules ]; then
   npm install
 fi
 (sleep 2 && (open http://localhost:3000 2>/dev/null || xdg-open http://localhost:3000 2>/dev/null)) &
-echo "Candor is starting — your browser will open. Keep this window open while you use it."
+echo "Verdict is starting — your browser will open. Keep this window open while you use it."
 node server.js

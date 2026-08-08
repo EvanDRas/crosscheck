@@ -1,23 +1,23 @@
 # Gumroad supporter-license listing (copy-paste)
 
-**Product name:** Candor — supporter license
+**Product name:** Verdict — supporter license
 
 **Price:** $19 (one-time)
 
-**URL slug suggestion:** candor
+**URL slug suggestion:** verdict
 
 **Description:**
 
 ---
 
-Candor is the honest stock analyzer: free, open source, runs on your machine.
+Verdict is the honest stock analyzer: free, open source, runs on your machine.
 
 Every fundamental cross-checked against SEC filings. A transparent 0–100
 verdict that publishes its own backtests — including the ones that came back
 null. An append-only track record that measures your real accuracy instead of
 letting you remember the wins.
 
-Candor will always be free (MIT license, github.com/evandras/candor). This
+Verdict will always be free (MIT license, github.com/evandras/verdict). This
 supporter license is for people who want tools like this to exist: honest
 about what they can't do, verifiable down to the formula, and owned by the
 person running them.
