@@ -20,15 +20,15 @@ test("piecewise clamps outside the anchor range and rejects non-numbers", () => 
   assert.equal(piecewise(NaN, anchors), null);
 });
 
-test("verdict band boundaries are exact", () => {
-  assert.equal(verdictForScore(72), "STRONG BUY");
-  assert.equal(verdictForScore(71.9), "BUY");
-  assert.equal(verdictForScore(58), "BUY");
-  assert.equal(verdictForScore(57.9), "HOLD");
-  assert.equal(verdictForScore(42), "HOLD");
-  assert.equal(verdictForScore(41.9), "SELL");
-  assert.equal(verdictForScore(28), "SELL");
-  assert.equal(verdictForScore(27.9), "STRONG SELL");
+test("verdict band boundaries are exact (v2 percentile-calibrated)", () => {
+  assert.equal(verdictForScore(74), "STRONG BUY");
+  assert.equal(verdictForScore(73.9), "BUY");
+  assert.equal(verdictForScore(66), "BUY");
+  assert.equal(verdictForScore(65.9), "HOLD");
+  assert.equal(verdictForScore(55), "HOLD");
+  assert.equal(verdictForScore(54.9), "SELL");
+  assert.equal(verdictForScore(47), "SELL");
+  assert.equal(verdictForScore(46.9), "STRONG SELL");
 });
 
 test("analyst tilt: unanimous strong buy maps to 100, unanimous strong sell to 0", () => {

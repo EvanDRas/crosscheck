@@ -92,6 +92,27 @@ A coin flip, minus a few points at the formula's most confident. A real edge
 would look like 53–55% sustained across eras on thousands of calls, net of
 costs. The Verdict Ledger accumulates this same table live, out of sample.
 
+## Calibration update — formula v2 (2026-08-08)
+
+Live usage exposed a calibration flaw: the median S&P large cap scores ~60-62
+on these anchors, and v1's hand-set BUY threshold was 58 — so "BUY" fired for
+roughly two-thirds of all companies. The label described "is a normal healthy
+large cap," which discriminates nothing (161 live ledger calls: ~68%
+BUY-or-better, ~2% SELL).
+
+**v2 changes the verdict BANDS only — scores, anchors, and weights are
+untouched.** New cutoffs are percentile-calibrated against the empirical
+score distribution (16,497 point-in-time calls above, cross-checked against
+live ledger scores): STRONG BUY ≥74 (top ~10% of large caps on these
+metrics), BUY ≥66 (top ~30%), HOLD ≥55 (middle ~40%), SELL ≥47,
+STRONG SELL <47 (bottom ~10%). A verdict now states *rank among large caps*,
+which is also how professional relative-grade systems produce their SELLs.
+
+This is a measurement fix, not a prediction claim — ranking companies by
+these metrics still carries no demonstrated forward-return power (see the
+studies above; the quintile results ARE the v2 bands' predictive test, and
+they were null). Ledger entries are stamped v1/v2 so eras stay separable.
+
 ## What we deliberately do NOT conclude
 
 - We do not trade the inverse. The negative tilt failed to appear in

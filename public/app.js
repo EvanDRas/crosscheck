@@ -99,9 +99,9 @@ function verdictClass(verdict) {
 }
 
 function scoreBand(score) {
-  if (score >= 58) return "good";
-  if (score >= 42) return "warning";
-  if (score >= 28) return "serious";
+  if (score >= 66) return "good";
+  if (score >= 55) return "warning";
+  if (score >= 47) return "serious";
   return "critical";
 }
 
@@ -216,7 +216,7 @@ function renderVerdict(d) {
   const missing = s.categories.filter((c) => !c.available).length;
   const note = s.insufficientData
     ? "Too little data to score responsibly — no verdict is shown rather than a fake one."
-    : `Weighted average of the ${s.availableCount} categories with data${missing ? ` (${missing} missing — weights renormalized)` : ""}. Bands: ≥72 STRONG BUY · ≥58 BUY · ≥42 HOLD · ≥28 SELL · <28 STRONG SELL.`;
+    : `Weighted average of the ${s.availableCount} categories with data${missing ? ` (${missing} missing — weights renormalized)` : ""}. Bands are percentile-calibrated against 16,497 historical S&P scores — a verdict states rank, not prophecy: ≥74 STRONG BUY (top ~10%) · ≥66 BUY (top ~30%) · ≥55 HOLD · ≥47 SELL · <47 STRONG SELL (bottom ~10%).`;
 
   const hero = s.insufficientData
     ? `<div class="verdict-score">–<small>/100</small></div>
@@ -613,7 +613,7 @@ function buildBrief(d) {
     L.push(`- NOT ENOUGH DATA — only ${s.availableCount}/${s.totalCategories} scoring categories had data.`);
   } else {
     L.push(`- Overall ${Math.round(s.score)}/100 → ${s.verdict} (confidence ${s.confidence}, ${s.availableCount}/${s.totalCategories} categories)`);
-    L.push(`- Bands: >=72 STRONG BUY, >=58 BUY, >=42 HOLD, >=28 SELL, <28 STRONG SELL. Weights renormalize over categories with data.`);
+    L.push(`- Bands (percentile-calibrated vs 16,497 historical S&P scores; a verdict states rank among large caps): >=74 STRONG BUY (top ~10%), >=66 BUY (top ~30%), >=55 HOLD, >=47 SELL, <47 STRONG SELL. Weights renormalize over categories with data.`);
   }
   for (const c of s.categories) {
     const detail = c.details.map((x) => `${x.label} ${fmtDetailValue(x) ?? "N/A"}${x.score != null ? ` (sub-score ${x.score})` : ""}`).join(", ");

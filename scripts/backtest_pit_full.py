@@ -294,6 +294,13 @@ def main():
     dfq = run(q_dates, 91, "QUARTERLY, 3-month forward")
     run(a_dates, 365, "ANNUAL, 12-month forward")
 
+    if not dfq.empty and os.environ.get("PRINT_PERCENTILES"):
+        print("\n=== score distribution (for band calibration) ===")
+        for col in ("full", "comp3"):
+            s = dfq[col].dropna()
+            pcts = {p: round(float(np.percentile(s, p)), 1) for p in (5, 10, 30, 50, 70, 90, 95)}
+            print(f"  {col}: n={len(s)}, mean={s.mean():.1f}, percentiles {pcts}")
+
     if not dfq.empty:
         print("\n=== Hypothesis B: sector fairness (avg score, quarterly sample) ===")
         sec = dfq.groupby("sector").agg(n=("full", "size"), v1_full=("full", "mean"), v2=("v2", "mean")).query("n >= 200")

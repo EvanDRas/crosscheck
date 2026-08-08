@@ -293,6 +293,10 @@ app.get("/api/ledger", async (_req, res) => {
       return res.json({ entries: [], aggregates: [], asOf: new Date().toISOString(), warning: null });
     }
     const { rows, warnings } = await gradeEntries(entries);
+    const eras = [...new Set(entries.map((e) => e.formulaVersion ?? "v1"))];
+    if (eras.length > 1) {
+      warnings.push(`Ledger spans formula eras (${eras.join(", ")}) — v2 recalibrated the verdict bands, so band labels mean different ranks across eras; use the version stamp for clean reads.`);
+    }
     res.json({
       entries: rows,
       aggregates: aggregateLedger(rows),
