@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import dotenv from "dotenv";
-import { FinnhubError, getQuote } from "./lib/finnhub.js";
+import { FinnhubError, getQuote, searchSymbols } from "./lib/finnhub.js";
 import { addViewer, viewerCount } from "./lib/stream.js";
 import { analyzeTicker, NotFoundError } from "./lib/analyze.js";
 import { demoPayload } from "./lib/demo.js";
@@ -66,6 +66,46 @@ app.post("/api/setup", async (req, res) => {
     if (err instanceof FinnhubError) return res.status(400).json({ error: err.message });
     console.error("setup failed:", err);
     res.status(500).json({ error: "Could not save the configuration." });
+  }
+});
+
+// Company-name search: "apple" -> AAPL. Cached per query; common stocks first.
+const searchCache = new Map();
+app.get("/api/search", async (req, res) => {
+  try {
+    const apiKey = process.env.FINNHUB_API_KEY;
+    const q = String(req.query.q ?? "").trim().slice(0, 60);
+    if (!apiKey || q.length < 2) return res.json({ results: [] });
+    const hit = searchCache.get(q.toLowerCase());
+    if (hit && Date.now() - hit.at < 3_600_000) return res.json({ results: hit.results });
+    // US-listed shapes only (AAPL, BRK.A) — foreign suffixes like .SN/.T and
+    // exchange-prefixed symbols are beyond the free tier's useful coverage.
+    // Dotted suffixes are class shares only (BRK.A) — .L/.T/.SN etc. are
+    // foreign listings the free tier can't really serve.
+    const usListed = (doc) => (Array.isArray(doc?.result) ? doc.result : [])
+      .filter((r) => r.symbol && /^[A-Z]{1,6}(\.[AB])?$/.test(r.symbol) && (r.type === "Common Stock" || r.type === ""))
+      .slice(0, 6)
+      .map((r) => ({ symbol: r.symbol, name: r.description ?? "" }));
+    // Finnhub's matching is literal about spaces: "coca cola" misses KO but
+    // "coca-cola" hits, "jp morgan" misses but "jpmorgan" hits. Try variants;
+    // a rate-limited variant is skipped rather than aborting the search.
+    let results = [];
+    for (const variant of [...new Set([q, q.replace(/\s+/g, "-"), q.replace(/\s+/g, "")])]) {
+      try {
+        results = usListed(await searchSymbols(variant, apiKey));
+        if (results.length) break;
+      } catch {
+        /* try the next variant */
+      }
+    }
+    // Empty can mean "rate limited right now" — never cache that for an hour.
+    if (results.length) {
+      searchCache.set(q.toLowerCase(), { at: Date.now(), results });
+      if (searchCache.size > 200) searchCache.delete(searchCache.keys().next().value);
+    }
+    res.json({ results });
+  } catch {
+    res.json({ results: [] }); // search is best-effort, never an error page
   }
 });
 

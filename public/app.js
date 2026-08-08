@@ -16,6 +16,7 @@ const el = {
   status: $("status"),
   statusText: $("statusText"),
   error: $("error"),
+  suggest: $("suggest"),
   demoNote: $("demoNote"),
   warnings: $("warnings"),
   results: $("results"),
@@ -70,6 +71,7 @@ function setLoading(ticker) {
   el.intro.hidden = true;
   el.results.hidden = true;
   el.error.hidden = true;
+  el.suggest.hidden = true;
   el.demoNote.hidden = true;
   el.warnings.hidden = true;
   el.status.hidden = false;
@@ -775,6 +777,29 @@ function render(d) {
 
 let inFlight = null;
 
+// Company-name fallback: when the input isn't a ticker (or the ticker isn't
+// found), search by name and offer clickable matches instead of a dead end.
+async function suggestFor(query, contextMsg) {
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const { results } = await res.json();
+    el.status.hidden = true;
+    el.btn.disabled = false;
+    if (!results?.length) {
+      setError(contextMsg ?? `Nothing found for "${query}".`);
+      return;
+    }
+    setError(contextMsg ?? `No exact ticker "${query}" — did you mean:`);
+    el.suggest.innerHTML = results
+      .map((r) => `<button type="button" data-t="${esc(r.symbol)}">${esc(r.symbol)}<span>${esc(r.name)}</span></button>`)
+      .join("");
+    el.suggest.hidden = false;
+    el.suggest.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(b.dataset.t)));
+  } catch {
+    setError(contextMsg ?? `Nothing found for "${query}".`);
+  }
+}
+
 async function analyze(ticker) {
   ticker = String(ticker ?? "").trim().toUpperCase();
   if (!ticker) return;
@@ -788,6 +813,10 @@ async function analyze(ticker) {
     let body = null;
     try { body = await res.json(); } catch { /* non-JSON error page */ }
     if (!res.ok) {
+      if (res.status === 404) {
+        await suggestFor(ticker, `No data for "${ticker}" — closest matches:`);
+        return;
+      }
       setError(body?.error ?? `Request failed (${res.status}). Try again in a moment.`);
       return;
     }
@@ -807,7 +836,17 @@ function go(ticker) {
 
 el.form.addEventListener("submit", (e) => {
   e.preventDefault();
-  go(el.input.value);
+  const raw = el.input.value.trim();
+  if (!raw) return;
+  // A ticker goes straight through; anything else ("apple", "berkshire
+  // hathaway") becomes a name search.
+  if (/^[A-Za-z0-9.\-^]{1,10}$/.test(raw)) go(raw);
+  else {
+    setLoading(raw);
+    suggestFor(raw, `Searching for "${raw}"…`).then(() => {
+      if (!el.suggest.hidden) el.error.textContent = `Matches for "${raw}":`;
+    });
+  }
 });
 
 $("copyBriefBtn").addEventListener("click", copyBrief);
