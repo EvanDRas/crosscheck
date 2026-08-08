@@ -690,10 +690,10 @@ async function copyBrief() {
     ta.remove();
   }
   btn.classList.add("copied");
-  btn.textContent = "✓ Copied — paste it into an AI chat";
+  btn.textContent = "Copied — paste it into an AI chat";
   setTimeout(() => {
     btn.classList.remove("copied");
-    btn.textContent = "📋 Copy AI brief";
+    btn.textContent = "Copy AI brief";
   }, 2200);
 }
 
