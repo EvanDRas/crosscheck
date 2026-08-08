@@ -51,8 +51,7 @@ Instead of quietly deleting all that, I made it the product:
 
 It's free and MIT-licensed; you run it locally with your own free API keys
 (Finnhub + optionally Tiingo — the data licenses don't allow me to host it
-for you, which I document). There's a supporter license if you want to fund
-it.
+for you, which I document).
 
 Things I'd love feedback on: the point-in-time methodology (scripts are in
 the repo), and whether an "honesty-first" research tool is something people
@@ -63,8 +62,8 @@ strong.
 
 ## Prep checklist (before submitting)
 
-- [ ] Repo pushed PUBLIC on GitHub with README, EVIDENCE.md, FRIENDS_SETUP.md
-- [ ] Gumroad/Lemon Squeezy "supporter license" product live ($19) — link in README, NOT spammed in the post
+- [x] Repo pushed PUBLIC on GitHub with README, EVIDENCE.md, FRIENDS_SETUP.md
+- [ ] (Later, only if traction: a supporter license — plan in GUMROAD.md. Launch is pure free/open source.)
 - [ ] Run `npm install && npm start` from a FRESH clone on a machine without your .env to prove first-run setup works
 - [ ] Screenshots in README use the DEMO ticker only (fictional data — no license exposure)
 - [ ] Best posting window: weekday morning US time; reply to every comment fast for the first 3 hours

@@ -10,8 +10,7 @@ publishes its own backtests ([EVIDENCE.md](EVIDENCE.md) — including the ones
 that came back null).
 
 Free and MIT-licensed; runs on your machine with your own free API keys.
-If it's useful, there's a $19 supporter license. Non-programmer setup guide:
-[FRIENDS_SETUP.md](FRIENDS_SETUP.md).
+Non-programmer setup guide: [FRIENDS_SETUP.md](FRIENDS_SETUP.md).
 
 **Not financial advice.** Research/education only. Data can be delayed,
 incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
