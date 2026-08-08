@@ -1,7 +1,7 @@
 {
-  "name": "verdict",
+  "name": "crosscheck",
   "version": "1.0.0",
-  "description": "Verdict — the honest stock analyzer. SEC-verified fundamentals, transparent scoring, a private track record that grades you, and published backtests of its own formula.",
+  "description": "Crosscheck — the honest stock analyzer. SEC-verified fundamentals, transparent scoring, a private track record that grades you, and published backtests of its own formula.",
   "license": "MIT",
   "type": "module",
   "main": "server.js",

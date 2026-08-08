@@ -19,7 +19,7 @@ OUT = os.path.join(ROOT, "data", "edgar_topup.parquet")
 FACTS = r"C:\Users\evand\OneDrive\Desktop\systematic cross-sectional equity strategy\experiments\claude_tests\edgar_facts.parquet"
 
 CONTACT = os.environ.get("SEC_EDGAR_CONTACT", "your-email@example.com")
-UA = {"User-Agent": f"Verdict research (personal; {CONTACT})", "Accept-Encoding": "gzip"}
+UA = {"User-Agent": f"Crosscheck research (personal; {CONTACT})", "Accept-Encoding": "gzip"}
 
 CONCEPTS = {
     "us-gaap": {

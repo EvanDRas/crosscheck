@@ -1,23 +1,23 @@
 # Gumroad supporter-license listing (copy-paste)
 
-**Product name:** Verdict — supporter license
+**Product name:** Crosscheck — supporter license
 
 **Price:** $19 (one-time)
 
-**URL slug suggestion:** verdict
+**URL slug suggestion:** crosscheck
 
 **Description:**
 
 ---
 
-Verdict is the honest stock analyzer: free, open source, runs on your machine.
+Crosscheck is the honest stock analyzer: free, open source, runs on your machine.
 
 Every fundamental cross-checked against SEC filings. A transparent 0–100
 verdict that publishes its own backtests — including the ones that came back
 null. An append-only track record that measures your real accuracy instead of
 letting you remember the wins.
 
-Verdict will always be free (MIT license, github.com/evandras/verdict). This
+Crosscheck will always be free (MIT license, github.com/evandras/crosscheck). This
 supporter license is for people who want tools like this to exist: honest
 about what they can't do, verifiable down to the formula, and owned by the
 person running them.
