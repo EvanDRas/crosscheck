@@ -32,7 +32,14 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-ROOT = r"C:\Users\evand\OneDrive\Desktop\systematic cross-sectional equity strategy"
+try:
+    from local_paths import RESEARCH_ROOT as ROOT  # author's machine, gitignored
+except ImportError:
+    ROOT = os.environ.get("CROSSCHECK_RESEARCH_ROOT", "")
+if not ROOT:
+    import sys
+    sys.exit("Needs the research data root (price panel, membership history, benchmark): "
+             "set CROSSCHECK_RESEARCH_ROOT. See EVIDENCE.md for which inputs are required.")
 FACTS = os.path.join(ROOT, "experiments", "claude_tests", "edgar_facts.parquet")
 PRICES = os.path.join(ROOT, "cache", "prices_v2.parquet")
 MEMBERS = os.path.join(ROOT, "cache", "sp500_history.csv")

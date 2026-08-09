@@ -54,7 +54,7 @@ test("healthy large-cap sample lands in BUY territory with high confidence", () 
   assert.equal(r.insufficientData, false);
   assert.equal(r.availableCount, 6);
   assert.equal(r.confidence, "High");
-  assert.ok(r.score >= 58 && r.score <= 90, `score ${r.score} should be in BUY+ range`);
+  assert.ok(r.score >= 58 && r.score <= 90, `score ${r.score} should land in the upper bands`);
   assert.ok(["BUY", "STRONG BUY"].includes(r.verdict));
 });
 
@@ -67,7 +67,7 @@ test("distressed sample lands in SELL territory", () => {
     pricePosition: 0.05,
     analystTilt: -1.1,
   });
-  assert.ok(r.score < 42, `score ${r.score} should be below HOLD`);
+  assert.ok(r.score < 42, `score ${r.score} should land in the bottom bands`);
   assert.ok(["SELL", "STRONG SELL"].includes(r.verdict));
 });
 

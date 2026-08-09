@@ -4,11 +4,12 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import dotenv from "dotenv";
 import { FinnhubError, getQuote, getMetrics, getPeers, searchSymbols } from "./lib/finnhub.js";
-import { addViewer, viewerCount } from "./lib/stream.js";
-import { analyzeTicker, NotFoundError } from "./lib/analyze.js";
+import { addViewer, viewerCount, streamingSupported } from "./lib/stream.js";
+import { analyzeTicker, NotFoundError, marketDate } from "./lib/analyze.js";
 import { demoPayload } from "./lib/demo.js";
 import { gradeFromPanel } from "./lib/history.js";
 import { readLedger, aggregateLedger } from "./lib/ledger.js";
+import { SCORING_VERSION } from "./lib/scoring.js";
 import { readPicks, logPick, PICK_DIRECTIONS } from "./lib/picks.js";
 import { getQuoteCached } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
@@ -18,8 +19,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
 dotenv.config({ path: ENV_FILE });
 
+// A copied-but-unedited .env.example leaves placeholder "keys" that would
+// hide the in-app setup while every API call 401s — treat them as no key.
+for (const k of ["FINNHUB_API_KEY", "TIINGO_API_KEY"]) {
+  if (process.env[k] && /your_.*_here/i.test(process.env[k])) delete process.env[k];
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+// Localhost by default — this is a personal tool; nothing on your Wi-Fi
+// should be able to spend your API quota or write to your ledgers. Set
+// HOST=0.0.0.0 explicitly if you truly want LAN access.
+const HOST = process.env.HOST || "127.0.0.1";
+
+// DNS-rebinding guard: a hostile website can point its own domain at
+// 127.0.0.1 and become same-origin with this app; requiring a localhost
+// Host header shuts that down.
+app.use((req, res, next) => {
+  const host = String(req.headers.host ?? "").split(":")[0];
+  if (HOST === "127.0.0.1" && !["localhost", "127.0.0.1", "[::1]"].includes(host)) {
+    return res.status(403).send("Forbidden");
+  }
+  next();
+});
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json({ limit: "16kb" }));
@@ -46,17 +68,33 @@ app.post("/api/setup", async (req, res) => {
     const finnhub = String(req.body?.finnhubKey ?? "").trim();
     const tiingo = String(req.body?.tiingoKey ?? "").trim();
     const contact = String(req.body?.contact ?? "").trim();
+    // Every field is validated before it touches .env — values are written
+    // verbatim as env lines, so control characters would be line injection.
     if (!/^[A-Za-z0-9]{20,60}$/.test(finnhub)) {
       return res.status(400).json({ error: "That doesn't look like a Finnhub API key. Copy it from the finnhub.io dashboard." });
     }
-    const q = await getQuote("AAPL", finnhub);
+    if (tiingo && !/^[A-Za-z0-9]{10,80}$/.test(tiingo)) {
+      return res.status(400).json({ error: "That doesn't look like a Tiingo API key — leave the field empty if you don't have one." });
+    }
+    if (contact && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+      return res.status(400).json({ error: "That doesn't look like an email address — leave the field empty if you'd rather not give one." });
+    }
+    let q;
+    try {
+      q = await getQuote("AAPL", finnhub);
+    } catch (err) {
+      if (err instanceof FinnhubError && [401, 403].includes(err.status)) {
+        return res.status(400).json({ error: "Finnhub did not accept that key. Double-check it and try again." });
+      }
+      throw err;
+    }
     if (!q || (!q.c && !q.pc)) {
       return res.status(400).json({ error: "Finnhub did not accept that key. Double-check it and try again." });
     }
     const lines = [`FINNHUB_API_KEY=${finnhub}`];
     if (tiingo) lines.push(`TIINGO_API_KEY=${tiingo}`);
     if (contact) lines.push(`SEC_EDGAR_CONTACT=${contact}`);
-    lines.push(`PORT=${PORT}`);
+    if (String(PORT) !== "3000") lines.push(`PORT=${PORT}`);
     fs.writeFileSync(ENV_FILE, lines.join("\n") + "\n");
     process.env.FINNHUB_API_KEY = finnhub;
     if (tiingo) process.env.TIINGO_API_KEY = tiingo;
@@ -194,8 +232,12 @@ app.get("/api/analyze", async (req, res) => {
   try {
     const payload = await analyzeTicker(ticker, { apiKey: process.env.FINNHUB_API_KEY });
 
-    cache.set(ticker, { at: Date.now(), payload });
-    if (cache.size > 100) cache.delete(cache.keys().next().value);
+    // Never cache a degraded (partially rate-limited) payload — a retry
+    // should get a fresh shot at the full data, not 90s of the gutted page.
+    if (!payload.degraded) {
+      cache.set(ticker, { at: Date.now(), payload });
+      if (cache.size > 100) cache.delete(cache.keys().next().value);
+    }
 
     res.json(payload);
   } catch (err) {
@@ -219,6 +261,7 @@ app.get("/api/stream", (req, res) => {
   if (!apiKey || !TICKER_RE.test(ticker) || ticker === "DEMO") {
     return res.status(400).end();
   }
+  if (!streamingSupported()) return res.status(501).end(); // Node < 21: no live stream, page stays static
   if (viewerCount() >= 25) return res.status(503).end();
   res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
   res.flushHeaders();
@@ -293,7 +336,8 @@ async function gradeEntries(entries) {
   }
 
   const rows = [...entries].reverse().map((e) => {
-    const g = grades[`${e.ticker}|${e.date}`] ?? tGrades[`${e.ticker}|${e.date}`];
+    const gp = grades[`${e.ticker}|${e.date}`];
+    const g = gp ?? tGrades[`${e.ticker}|${e.date}`];
     let ret = null;
     let spyRet = null;
     let nowPrice = null;
@@ -303,7 +347,9 @@ async function gradeEntries(entries) {
       basis = "tr";
       ret = (g.latestClose - g.anchorClose) / g.anchorClose;
       nowPrice = Math.round(g.latestClose * 100) / 100;
-      frozen = Boolean(latestPanelDate && g.latestDate < latestPanelDate);
+      // "Left the index" is a PANEL concept — a Tiingo-graded ticker lagging
+      // the panel's calendar by a session is alive, not frozen.
+      frozen = Boolean(gp && latestPanelDate && g.latestDate < latestPanelDate);
       // Matched window: the stock leg ends at its last panel/Tiingo close, so
       // SPY must end there too — Yahoo's series includes today's intraday
       // bar, which would otherwise give SPY a head start on every row.
@@ -314,9 +360,11 @@ async function gradeEntries(entries) {
       basis = "raw";
       nowPrice = quotes[e.ticker];
       ret = e.price ? (nowPrice - e.price) / e.price : null;
-      spyRet = spySeries
-        ? spyTrReturn(spySeries, e.date)
-        : spyNow != null && e.spy ? (spyNow - e.spy) / e.spy : null;
+      // Raw rows are price-only on the stock leg, so the SPY leg must be
+      // price-only too (logged level vs live quote) — mixing a total-return
+      // benchmark against a price-only stock return biases every raw row.
+      spyRet = spyNow != null && e.spy ? (spyNow - e.spy) / e.spy
+        : spySeries ? spyTrReturn(spySeries, e.date) : null;
     }
     return {
       ...e,
@@ -345,11 +393,14 @@ app.get("/api/ledger", async (_req, res) => {
     const { rows, warnings } = await gradeEntries(entries);
     const eras = [...new Set(entries.map((e) => e.formulaVersion ?? "v1"))];
     if (eras.length > 1) {
-      warnings.push(`Ledger spans formula eras (${eras.join(", ")}) — v2 recalibrated the verdict bands, so band labels mean different ranks across eras; use the version stamp for clean reads.`);
+      warnings.push(`Ledger spans formula eras (${eras.join(", ")}) — v2 recalibrated the verdict bands, so the By-verdict table covers the current era (${SCORING_VERSION}) only; older rows remain listed below with their stamps.`);
     }
+    // Aggregates: current-era rows only — v1 "BUY" and v2 "BUY" are
+    // different claims and must not share a bucket.
+    const currentEra = rows.filter((r) => (r.formulaVersion ?? "v1") === SCORING_VERSION);
     res.json({
       entries: rows,
-      aggregates: aggregateLedger(rows),
+      aggregates: aggregateLedger(currentEra),
       asOf: new Date().toISOString(),
       warning: warnings.length ? warnings.join(" ") : null,
     });
@@ -382,7 +433,7 @@ app.post("/api/picks", async (req, res) => {
     const now = new Date().toISOString();
     const added = logPick({
       t: now,
-      date: now.slice(0, 10),
+      date: marketDate(),
       ticker,
       direction,
       note,
@@ -421,9 +472,17 @@ app.get("/api/picks", async (_req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`Crosscheck running at http://localhost:${PORT}`);
   if (!process.env.FINNHUB_API_KEY) {
-    console.log("NOTE: FINNHUB_API_KEY is not set — open the app in a browser to run first-time setup, or see .env.example.");
+    console.log("NOTE: no API key yet — open the app in a browser and the setup screen will walk you through it (or try the DEMO ticker).");
   }
+});
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`\nPort ${PORT} is already in use (something else is running there).`);
+    console.error(`Fix: close the other program, or add a line like PORT=3010 to the .env file and start Crosscheck again (then open http://localhost:3010).\n`);
+    process.exit(1);
+  }
+  throw err;
 });

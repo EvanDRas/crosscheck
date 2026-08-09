@@ -24,17 +24,24 @@ function deltaCell(v) {
 }
 
 function renderSummary(data) {
-  const graded = data.entries.filter((e) => e.excess != null);
+  // Same hygiene as the aggregates: aged, total-return-graded rows only.
+  const graded = data.entries.filter((e) => e.excess != null && e.ageDays > 0 && e.basis === "tr");
   const dates = data.entries.map((e) => e.date).sort();
   const avgExcess = graded.length ? graded.reduce((a, e) => a + e.excess, 0) / graded.length : null;
   const wins = graded.length ? graded.filter((e) => e.excess > 0).length : 0;
+  const eraCounts = {};
+  for (const e of data.entries) {
+    const v = e.formulaVersion ?? "v1";
+    eraCounts[v] = (eraCounts[v] ?? 0) + 1;
+  }
+  const eras = Object.entries(eraCounts).map(([v, n]) => `${v} ×${n}`).join(" · ");
   const tiles = [
     ["Calls logged", String(data.entries.length)],
     ["First call", dates[0] ?? "—"],
-    ["Graded (re-priced)", String(graded.length)],
-    ["Avg vs SPY (graded calls)", graded.length ? pct(avgExcess) : "—"],
+    ["Graded (aged, TR-basis)", String(graded.length)],
+    ["Avg vs SPY (graded)", graded.length ? pct(avgExcess) : "—"],
     ["Beat SPY", graded.length ? `${wins} of ${graded.length}` : "—"],
-    ["Formula", data.entries[0]?.formulaVersion ?? "—"],
+    ["Formula eras", eras || "—"],
   ];
   $("summaryCard").innerHTML = `
     <h2>Summary</h2>
@@ -53,7 +60,8 @@ function renderAggregates(data) {
   }
   $("aggCard").innerHTML = `
     <h2>By verdict</h2>
-    <p class="sub">The test the formula has to pass over time: buys above SPY, sells below.</p>
+    <p class="sub">The test the formula has to pass over time: buys above SPY, sells below.
+    Current formula era only; aged, total-return-graded rows only.</p>
     <div class="ledger-table-wrap">
       <table class="ledger-table">
         <thead><tr>

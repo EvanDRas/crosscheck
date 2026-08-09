@@ -16,7 +16,14 @@ import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "data", "edgar_topup.parquet")
-FACTS = r"C:\Users\evand\OneDrive\Desktop\systematic cross-sectional equity strategy\experiments\claude_tests\edgar_facts.parquet"
+try:
+    from local_paths import RESEARCH_ROOT  # author's machine, gitignored
+except ImportError:
+    RESEARCH_ROOT = os.environ.get("CROSSCHECK_RESEARCH_ROOT", "")
+FACTS = os.path.join(RESEARCH_ROOT, "experiments", "claude_tests", "edgar_facts.parquet") if RESEARCH_ROOT else ""
+if not FACTS or not os.path.exists(FACTS):
+    sys.exit("Needs the ticker list source (edgar_facts.parquet): set CROSSCHECK_RESEARCH_ROOT, "
+             "or adapt the tickers list below to your own universe.")
 
 CONTACT = os.environ.get("SEC_EDGAR_CONTACT", "your-email@example.com")
 UA = {"User-Agent": f"Crosscheck research (personal; {CONTACT})", "Accept-Encoding": "gzip"}

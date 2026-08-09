@@ -53,13 +53,10 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   stay end-of-day on purpose — grading is close-to-close by design.
 - Sources are fetched in parallel; any single source failing degrades that
   section to N/A and adds a warning — it never breaks the page.
-- **Price history chart** comes from local research datasets when available
-  (see `.env.example`): an S&P 500 daily panel (kept current by a separate
-  research project on this PC) with a ~15k-ticker Tiingo archive as fallback
-  (static snapshot — the chart label says which source and how fresh it is).
-  This also lets the app run keyless in a useful mode: chart + news + an honest
-  "not enough data" verdict. On a cloud deploy without these files the chart
-  section simply doesn't render.
+- **Price history chart**: with a Tiingo key, any US ticker gets a live
+  split/dividend-adjusted chart. Optionally, local parquet datasets can serve
+  as a chart source instead (see `.env.example`) — without either, the chart
+  section simply doesn't render and everything else still works.
 - **Horizon views** — alongside the overall verdict, the same categories are
   regrouped by the horizon they usually speak to: *Near-term (weeks–months)* =
   momentum + analyst tilt + earnings execution (beat rate and average surprise
@@ -94,10 +91,11 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   for the free-tier rate limit (~8.5s/ticker ≈ 7 minutes per run), news
   fetches skipped (scoring never uses news), re-runs harmless (first call per
   ticker per day wins), every run appends a summary to `data/batch_runs.log`.
-  A Windows scheduled task ("Stock Analyzer batch log") runs it each weekday
-  morning; edit or remove it in Task Scheduler.
-  Don't tune the anchors while the test runs — if the formula changes, bump
-  `SCORING_VERSION` in `lib/scoring.js` so eras stay separable.
+  Your ledger starts fresh on your machine — schedule the batch daily (Task
+  Scheduler / cron) if you want it to accumulate on its own, like the
+  maintainer's does. Don't tune the anchors while the test runs — if the
+  formula changes, bump `SCORING_VERSION` in `lib/scoring.js` so eras stay
+  separable.
 - **Copy AI brief** (button, top of results) formats the entire analysis —
   profile, quote, verdict breakdown, fundamentals, analysts, earnings, peers,
   and the news feed with summaries and links — as markdown, ready to paste into
@@ -106,30 +104,29 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
 
 ## Setup
 
-1. Install [Node.js](https://nodejs.org) 18 or newer.
-2. Get a free API key: sign up at [finnhub.io](https://finnhub.io), copy the key
-   from the dashboard.
-3. In this folder:
-
-   ```
-   copy .env.example .env
-   ```
-
-   Open `.env` and paste your key into `FINNHUB_API_KEY`.
-4. Install and run — either double-click **Start Crosscheck.bat** (Windows) /
-   **start-crosscheck.command** (Mac), or from a terminal:
+1. Install [Node.js](https://nodejs.org) — the LTS version (22) is
+   recommended. Anything 18+ works; live price streaming needs 21+.
+2. Start it — double-click **Start Crosscheck.bat** (Windows) or
+   **start-crosscheck.command** (Mac; if macOS blocks it, right-click →
+   Open — and if it says permission denied, run `chmod +x` on it once),
+   or from a terminal:
 
    ```
    npm install
    npm start
    ```
 
-5. Open http://localhost:3000 and type a ticker — or a company name;
-   Crosscheck will find the symbol. First run with no key shows a guided
-   in-app setup instead of asking you to edit files.
+3. Your browser opens to the app. Try the `DEMO` ticker immediately (no key
+   needed, clearly-labeled fictional data), and when you're ready, the
+   **setup screen in the app** walks you through pasting your free
+   [finnhub.io](https://finnhub.io) key (required) and
+   [tiingo.com](https://www.tiingo.com) key (optional, powers charts) —
+   no file editing needed. Prefer files? Copy `.env.example` to `.env`
+   and fill it in instead.
+4. Type a ticker — or a company name; Crosscheck will find the symbol.
 
-No key yet? The ticker `DEMO` renders the full UI with clearly-labeled fake
-sample data.
+Keyless, real tickers still work in a reduced mode: fundamentals and the
+verdict come from SEC filings alone (no quote, no chart, nothing logged).
 
 ## Tests
 
@@ -145,29 +142,25 @@ news dedupe logic. There's also a live smoke test for the news aggregator:
 node lib/news.js AAPL "Apple Inc"
 ```
 
-## Deploying (free hosts)
+## Why there's no hosted version
 
-The app is a single Node process serving both API and frontend — any Node host
-works.
-
-**Render** (free web service):
-1. Push this folder to a GitHub repo.
-2. Render dashboard → New → Web Service → connect the repo.
-3. Build command `npm install`, start command `npm start`.
-4. Add environment variable `FINNHUB_API_KEY` = your key.
-5. Deploy. (Free instances sleep when idle; the first request after a while
-   takes ~30s to wake.)
-
-**Railway**: New Project → Deploy from GitHub repo → add `FINNHUB_API_KEY`
-under Variables. Railway detects `npm start` automatically.
-
-Both hosts set `PORT` themselves; the server reads it.
+On purpose. The free data tiers this app runs on (Finnhub, Tiingo) are
+licensed for **personal use** — their terms prohibit redistributing the data
+or serving it to third parties. A public hosted Crosscheck would violate
+that, so the only honest architecture is the one you're holding: everyone
+runs their own copy, with their own free keys, on their own machine. Don't
+deploy this to a public host with your key in it — that's both against the
+data licenses and a fast way to have strangers burn your rate limit.
+(A side benefit: your lookups, your picks, and your track record never leave
+your computer. The server binds to localhost only.)
 
 ## Notes & limits
 
-- Finnhub free tier = 60 API calls/min; one analysis uses ~7 calls. The server
-  caches each ticker for 90 seconds, so repeated lookups and peer-clicking are
-  cheap. If you hit the limit anyway, the app says so plainly — wait a minute.
+- Finnhub free tier = 60 API calls/min; a fresh interactive analysis uses
+  ~10 calls (the batch logger's leaner path uses ~7). The server caches each
+  ticker for 90 seconds and re-fetches only the quote on repeats, so
+  peer-clicking is cheap. If you hit the limit anyway, the app says so
+  plainly — wait a minute.
 - Free-tier fundamentals are best for US-listed stocks; some fields are simply
   missing for smaller/foreign names. Those show as N/A and the verdict's
   confidence drops accordingly.
@@ -177,7 +170,8 @@ Both hosts set `PORT` themselves; the server reads it.
   scoring.
 - **The formula has been tested, and the results ship with the app** — see
   [EVIDENCE.md](EVIDENCE.md): 23 years of momentum data, five graded
-  point-in-time case studies, and 18,150 point-in-time calls over 2011–2024.
+  point-in-time case studies, and 16,497 full-formula point-in-time calls
+  over 2011–2024 (plus an 18,150-call component study).
   Short version: the testable components showed no predictive power, so the
   verdict is presented as a description of current fundamentals, never a
   forecast. The Verdict Ledger is the ongoing out-of-sample test.

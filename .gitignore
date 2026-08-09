@@ -7,3 +7,4 @@ npm-debug.log*
 data/*
 !data/universe.json
 __pycache__/
+scripts/local_paths.py

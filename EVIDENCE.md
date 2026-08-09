@@ -1,8 +1,18 @@
 # Evidence: what testing this formula actually found
 
-Every claim here is reproducible from scripts in this repo plus free data.
-Last updated 2026-08-04. If the formula (lib/scoring.js) ever changes, these
-results describe formula v1 only.
+Last updated 2026-08-08. Studies 1–4 describe formula **v1** scores; the
+2026-08-08 **v2** update changed the verdict bands only (percentile
+calibration — see the final section), so every result below applies
+unchanged to v2's scores.
+
+Reproducibility, honestly stated: Study 2 (point-in-time case studies) runs
+anywhere — `scripts/pit_verdict.mjs` needs only free EDGAR + Tiingo data.
+Studies 1, 3, and 4 additionally need a daily adjusted-close S&P price panel
+(and index-membership history) that lives on the author's machine and is not
+redistributable; the scripts are in the repo (`scripts/backtest_*.py`) and
+run against any equivalent panel you supply (set `CROSSCHECK_RESEARCH_ROOT`).
+The EDGAR fundamentals input is rebuilt from scratch by
+`scripts/fetch_edgar_topup.py` (public-domain data).
 
 ## Study 1 — momentum component, 23 years (scripts/backtest_momentum.py)
 

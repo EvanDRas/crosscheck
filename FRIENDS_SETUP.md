@@ -3,38 +3,42 @@
 Ten minutes, all free, runs on your own computer with your own free API keys.
 Nothing is shared with anyone — your lookups, your keys, your machine.
 
-## Setup
+## Setup — four steps, no file editing, no terminal
 
-1. Install [Node.js](https://nodejs.org) (the LTS version, default options).
-2. Get the code (green **Code** button → Download ZIP, or `git clone` if you
-   know git) and unzip it somewhere.
-3. Get a **free Finnhub key**: sign up at [finnhub.io](https://finnhub.io),
-   copy the API key from the dashboard.
-4. Optional but recommended — a **free Tiingo key** from
-   [tiingo.com](https://www.tiingo.com) (Account → API): powers price charts
-   and 52-week data for most US tickers.
-5. In the project folder, copy `.env.example` to a file named `.env`, open it
-   in Notepad, and paste your key(s):
+1. Install [Node.js](https://nodejs.org) (the LTS version, default options,
+   just keep clicking Next).
+2. Get the code: green **Code** button → **Download ZIP**, then **extract
+   it** (right-click → Extract All) — don't run things from inside the ZIP
+   preview window.
+3. In the extracted folder, double-click **`Start Crosscheck.bat`**
+   (Windows) or **`start-crosscheck.command`** (Mac — if macOS blocks it,
+   right-click it and choose Open; if it says "permission denied", open
+   Terminal in that folder and run `chmod +x start-crosscheck.command`
+   once). Windows may show a security warning for a downloaded script —
+   choose "Run anyway"; it's the code you just downloaded.
+4. Your browser opens to the app. Try the **DEMO** ticker first — it works
+   with no keys at all. When you're ready for real stocks, the blue setup
+   screen walks you through it: create a free account at
+   [finnhub.io](https://finnhub.io), copy the API key from its dashboard,
+   paste it in, done. (A second free key from
+   [tiingo.com](https://www.tiingo.com) is optional — it powers the price
+   charts.)
 
-   ```
-   FINNHUB_API_KEY=your_key_here
-   TIINGO_API_KEY=your_key_here
-   SEC_EDGAR_CONTACT=your_email_here
-   ```
+That's it. Keep the black window open while you use the app; close it to
+stop. Your keys and your lookups never leave your computer.
 
-6. In a terminal in that folder:
+<details>
+<summary>Prefer doing it by hand? (optional)</summary>
 
-   ```
-   npm install
-   npm start
-   ```
+Copy `.env.example` to a file named exactly `.env` (careful: Notepad likes
+to save it as `.env.txt`, which won't work), paste your keys into it, then
+run `npm install` and `npm start` in a terminal in that folder.
+</details>
 
-7. Open http://localhost:3000 and type a ticker.
-
-You can ignore anything in the README about a "local research panel" or the
-"batch logger" — those use datasets on the owner's PC. Without them the app
-simply uses your Tiingo key for charts, and your Verdict Ledger starts fresh
-from your own first lookup.
+You can ignore anything in the README about a "local research panel" —
+that's an optional data source on the maintainer's PC. Your charts come from
+your Tiingo key, and your Verdict Ledger starts fresh from your own first
+lookup.
 
 ## Read this before you trade off it — seriously
 

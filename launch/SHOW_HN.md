@@ -50,8 +50,10 @@ Instead of quietly deleting all that, I made it the product:
   the whole point.
 
 It's free and MIT-licensed; you run it locally with your own free API keys
-(Finnhub + optionally Tiingo — the data licenses don't allow me to host it
-for you, which I document).
+(Finnhub + optionally Tiingo). There's no hosted version on purpose: the
+free data tiers are licensed for personal use, so everyone running their own
+copy with their own keys is the only honest architecture — the README's
+"Why there's no hosted version" section covers it.
 
 Things I'd love feedback on: the point-in-time methodology (scripts are in
 the repo), and whether an "honesty-first" research tool is something people
@@ -71,7 +73,7 @@ strong.
 ## Rules of engagement for comments
 
 - Never claim or imply predictive value — the nulls are the story.
-- "Why not just use Finviz?" → agree Finviz is great for screening; Verdict's
+- "Why not just use Finviz?" → agree Finviz is great for screening; Crosscheck's
   lane is verified data + honest evidence + personal track record.
 - Someone will find a bug within an hour. Thank them, fix it live, reply
   with the commit link. That IS the marketing.

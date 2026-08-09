@@ -24,10 +24,17 @@ import sys
 import numpy as np
 import pandas as pd
 
-PANEL = os.environ.get(
-    "HISTORY_PRICES_PARQUET",
-    r"C:\Users\evand\OneDrive\Desktop\systematic cross-sectional equity strategy\cache\prices_v2.parquet",
+try:
+    from local_paths import RESEARCH_ROOT  # author's machine, gitignored
+except ImportError:
+    RESEARCH_ROOT = os.environ.get("CROSSCHECK_RESEARCH_ROOT", "")
+
+PANEL = os.environ.get("HISTORY_PRICES_PARQUET") or (
+    os.path.join(RESEARCH_ROOT, "cache", "prices_v2.parquet") if RESEARCH_ROOT else ""
 )
+if not PANEL or not os.path.exists(PANEL):
+    sys.exit("Needs a daily S&P price panel (adjusted closes): set HISTORY_PRICES_PARQUET "
+             "or CROSSCHECK_RESEARCH_ROOT. See EVIDENCE.md for the required shape.")
 
 # lib/scoring.js ANCHORS.pricePosition, replicated exactly.
 ANCHORS = [(0.0, 5.0), (0.2, 25.0), (0.5, 52.0), (0.85, 88.0), (1.0, 100.0)]

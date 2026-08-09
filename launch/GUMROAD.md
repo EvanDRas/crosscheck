@@ -37,5 +37,4 @@ Not financial advice. Research and education only.
 **Settings:** enable "I want this!" without requiring an address; quantity
 unlimited; no files needed (or attach a thank-you PDF later).
 
-**After creating:** paste the Gumroad URL into launch/landing.html
-(#GUMROAD_URL#) and add a one-line supporter link at the bottom of README.md.
+**After creating:** add a supporter link/button to launch/landing.html and the bottom of README.md (the free-only launch removed the old placeholders).

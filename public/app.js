@@ -5,6 +5,10 @@
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// esc() blocks attribute breakout but not scheme smuggling — an href from an
+// untrusted feed could be javascript: . Only real web URLs get through.
+const safeHref = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? u : "#");
+
 const $ = (id) => document.getElementById(id);
 
 const el = {
@@ -116,7 +120,7 @@ function renderCompany(d) {
   const factBits = [
     p.marketCap != null ? `Market cap ${fmtMarketCap(p.marketCap)}` : null,
     p.ipo ? `IPO ${esc(p.ipo)}` : null,
-    p.website ? `<a href="${esc(p.website)}" target="_blank" rel="noopener noreferrer">${esc(p.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a>` : null,
+    p.website ? `<a href="${esc(safeHref(p.website))}" target="_blank" rel="noopener noreferrer">${esc(p.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a>` : null,
   ].filter(Boolean).join(" · ");
 
   let priceHtml = `<div class="price-now">${NA}</div><div class="price-sub">Live quote unavailable</div>`;
@@ -773,7 +777,7 @@ function renderNews(d) {
     <ul class="news-list">
       ${items.map((n) => `
         <li class="news-item">
-          <a class="news-headline" href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
+          <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
           <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}</div>
           ${n.summary ? `<p class="news-summary">${esc(n.summary)}</p>` : ""}
         </li>`).join("")}
@@ -791,7 +795,7 @@ function buildBrief(d) {
 
   L.push(`# ${p.name ?? d.ticker} (${d.ticker}) — research brief`);
   L.push("");
-  L.push(`Generated ${new Date(d.asOf).toLocaleString("en-US")} by a personal stock-analyzer app (sources: Finnhub API; news merged from Google News RSS, Yahoo Finance RSS, Finnhub). Data may be delayed, incomplete, or wrong. Research/education only — not financial advice.`);
+  L.push(`Generated ${new Date(d.asOf).toLocaleString("en-US")} by Crosscheck (github.com/EvanDRas/crosscheck) — sources: Finnhub API, SEC EDGAR filings; news merged from Google News RSS, Yahoo Finance RSS, Finnhub. Data may be delayed, incomplete, or wrong. Research/education only — not financial advice.`);
   if (d.demo) L.push("", "**WARNING: this is the app's DEMO ticker — every number and headline below is fictional sample data.**");
   if (d.warnings?.length) L.push("", `Partial data — failed sources: ${d.warnings.join("; ")}`);
 
@@ -991,25 +995,33 @@ function render(d) {
 let inFlight = null;
 
 // Company-name fallback: when the input isn't a ticker (or the ticker isn't
-// found), search by name and offer clickable matches instead of a dead end.
-async function suggestFor(query, contextMsg) {
+// found), search by name and offer clickable matches. Terminal states are
+// always real messages — never a stuck "Searching…" and never an empty
+// "did you mean:" with nothing after the colon.
+async function suggestFor(query, { foundMsg, fallbackMsg } = {}) {
+  const deadEnd = fallbackMsg
+    ?? (hasKey
+      ? `Nothing found for "${query}". Double-check the spelling, or try the ticker symbol directly.`
+      : `Search needs an API key — use the setup card above to add your free Finnhub key, or try the DEMO ticker.`);
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
     const { results } = await res.json();
     el.status.hidden = true;
     el.btn.disabled = false;
     if (!results?.length) {
-      setError(contextMsg ?? `Nothing found for "${query}".`);
+      setError(deadEnd);
       return;
     }
-    setError(contextMsg ?? `No exact ticker "${query}" — did you mean:`);
+    setError(foundMsg ?? `Matches for "${query}":`);
     el.suggest.innerHTML = results
       .map((r) => `<button type="button" data-t="${esc(r.symbol)}">${esc(r.symbol)}<span>${esc(r.name)}</span></button>`)
       .join("");
     el.suggest.hidden = false;
     el.suggest.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(b.dataset.t)));
   } catch {
-    setError(contextMsg ?? `Nothing found for "${query}".`);
+    el.status.hidden = true;
+    el.btn.disabled = false;
+    setError(deadEnd);
   }
 }
 
@@ -1027,7 +1039,12 @@ async function analyze(ticker) {
     try { body = await res.json(); } catch { /* non-JSON error page */ }
     if (!res.ok) {
       if (res.status === 404) {
-        await suggestFor(ticker, `No data for "${ticker}" — closest matches:`);
+        // Offer close matches, but never discard the server's guidance —
+        // keyless users need the "add a key" message, not an empty list.
+        await suggestFor(ticker, {
+          foundMsg: `No data for "${ticker}" — closest matches:`,
+          fallbackMsg: body?.error ?? `Nothing found for "${ticker}".`,
+        });
         return;
       }
       setError(body?.error ?? `Request failed (${res.status}). Try again in a moment.`);
@@ -1056,9 +1073,7 @@ el.form.addEventListener("submit", (e) => {
   if (/^[A-Za-z0-9.\-^]{1,10}$/.test(raw)) go(raw);
   else {
     setLoading(raw);
-    suggestFor(raw, `Searching for "${raw}"…`).then(() => {
-      if (!el.suggest.hidden) el.error.textContent = `Matches for "${raw}":`;
-    });
+    suggestFor(raw, { foundMsg: `Matches for "${raw}":` });
   }
 });
 
