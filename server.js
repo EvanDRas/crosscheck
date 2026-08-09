@@ -14,6 +14,7 @@ import { readPicks, logPick, PICK_DIRECTIONS } from "./lib/picks.js";
 import { getQuoteCached } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGrade, hasTiingoKey } from "./lib/tiingo.js";
+import { pointInTimeCall } from "./lib/timemachine.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
@@ -194,6 +195,61 @@ app.get("/api/compare", async (req, res) => {
     if (err instanceof FinnhubError) return res.status(err.status === 429 ? 429 : 502).json({ error: err.message });
     console.error("compare failed:", err);
     res.status(500).json({ error: "Could not build the peer comparison." });
+  }
+});
+
+// The Time Machine: what the formula would have said on a past date, using
+// only information filed and priced by that day, graded against everything
+// since. The feature that makes the honesty claim interactive.
+const tmCache = new Map();
+app.get("/api/timemachine", async (req, res) => {
+  try {
+    const ticker = String(req.query.ticker ?? "").trim().toUpperCase();
+    const date = String(req.query.date ?? "").trim();
+    if (!TICKER_RE.test(ticker) || ticker === "DEMO") {
+      return res.status(400).json({ error: "Enter a real ticker symbol." });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < "2010-01-01" || date > marketDate(new Date(Date.now() - 7 * 86_400_000))) {
+      return res.status(400).json({ error: "Pick a date between 2010-01-01 (when SEC XBRL data starts) and about a week ago." });
+    }
+    if (!hasTiingoKey()) {
+      return res.status(400).json({ error: "The Time Machine needs a (free) Tiingo API key for historical prices — add one via the setup screen or .env." });
+    }
+    const ck = `${ticker}|${date}`;
+    const hit = tmCache.get(ck);
+    if (hit && Date.now() - hit.at < 3_600_000) return res.json(hit.payload);
+
+    const r = await pointInTimeCall(ticker, date);
+    const payload = {
+      ticker: r.ticker,
+      date: r.D,
+      requestedDate: date,
+      scoring: r.scoring,
+      inputs: {
+        pe: r.m.pe ?? null,
+        ps: r.m.ps ?? null,
+        netMargin: r.m.netMargin ?? null,
+        revenueGrowth: r.m.revenueGrowth ?? null,
+        epsGrowth: r.m.epsGrowth ?? null,
+        currentRatio: r.m.currentRatio ?? null,
+        debtEquity: r.m.debtEquity ?? null,
+        pricePosition: r.pricePosition,
+      },
+      edgarThrough: r.edgarThrough,
+      outcome: {
+        ret: r.ret,
+        spyRet: r.spyRet,
+        excess: r.ret != null && r.spyRet != null ? r.ret - r.spyRet : null,
+        through: r.latest,
+        years: r.years,
+      },
+      notes: r.notes,
+    };
+    tmCache.set(ck, { at: Date.now(), payload });
+    if (tmCache.size > 100) tmCache.delete(tmCache.keys().next().value);
+    res.json(payload);
+  } catch (err) {
+    res.status(422).json({ error: `Time Machine couldn't grade that one: ${err.message}` });
   }
 });
 

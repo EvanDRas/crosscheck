@@ -24,6 +24,8 @@ const el = {
   demoNote: $("demoNote"),
   warnings: $("warnings"),
   results: $("results"),
+  tmResults: $("tmResults"),
+  dateInput: $("dateInput"),
   company: $("companyCard"),
   history: $("historyCard"),
   verdict: $("verdictCard"),
@@ -77,6 +79,7 @@ function setLoading(ticker) {
   stopLive();
   el.intro.hidden = true;
   el.results.hidden = true;
+  el.tmResults.hidden = true;
   el.error.hidden = true;
   el.suggest.hidden = true;
   el.demoNote.hidden = true;
@@ -990,6 +993,87 @@ function render(d) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// ---------- time machine ----------
+
+// What the formula would have said on a past date — only information filed
+// and priced by that day — graded against everything since. The honesty
+// claim, made interactive.
+async function timeMachine(ticker, date) {
+  setLoading(`${ticker} on ${date}`);
+  el.statusText.textContent = `Rewinding to ${date} — filings and prices as known that day…`;
+  try {
+    const res = await fetch(`/api/timemachine?ticker=${encodeURIComponent(ticker)}&date=${encodeURIComponent(date)}`);
+    const p = await res.json();
+    el.status.hidden = true;
+    el.btn.disabled = false;
+    if (!res.ok) {
+      setError(p.error ?? "Time machine failed.");
+      return;
+    }
+    renderTimeMachine(p);
+  } catch {
+    el.btn.disabled = false;
+    setError("Could not reach the server. Is it still running?");
+  }
+}
+
+function renderTimeMachine(p) {
+  const s = p.scoring;
+  const meters = s.categories.map((c) => {
+    if (!c.available) {
+      return `<div class="meter-row"><div class="meter-head"><span class="meter-label">${esc(c.label)}</span><span class="meter-val na">no data then</span></div><div class="meter-track"></div></div>`;
+    }
+    const band = scoreBand(c.score);
+    return `<div class="meter-row"><div class="meter-head"><span class="meter-label">${esc(c.label)}</span><span class="meter-val">${c.score}</span></div><div class="meter-track band-${band}"><div class="meter-fill band-${band}" style="width:${c.score}%"></div></div></div>`;
+  }).join("");
+
+  const i = p.inputs;
+  const fmtIn = (v, suffix = "", digits = 1) => (isNum(v) ? `${fmtNum(v, digits)}${suffix}` : "n/a");
+  const inputsLine = [
+    `P/E ${fmtIn(i.pe, "×")}`,
+    `P/S ${fmtIn(i.ps, "×")}`,
+    `margin ${fmtIn(i.netMargin, "%")}`,
+    `rev YoY ${fmtIn(i.revenueGrowth, "%")}`,
+    `D/E ${fmtIn(i.debtEquity, "", 2)}`,
+    i.pricePosition == null ? "52w pos n/a" : `52w pos ${Math.round(i.pricePosition * 100)}%`,
+  ].join(" · ");
+
+  const o = p.outcome;
+  const cell = (v) => (v == null ? "—" : `<span class="${v > 0.0001 ? "delta-up" : v < -0.0001 ? "delta-down" : "delta-flat"}">${v > 0 ? "+" : ""}${(v * 100).toFixed(1)}%</span>`);
+  const hero = s.insufficientData
+    ? `<div class="verdict-score">–<small>/100</small></div><div class="verdict-pill v-nodata">NOT ENOUGH DATA</div>`
+    : `<div class="verdict-score">${Math.round(s.score)}<small>/100</small></div>
+       <div class="verdict-pill ${verdictClass(s.verdict)}">${esc(s.verdict)}</div>
+       <div class="verdict-conf">${s.availableCount}/6 categories knowable then</div>`;
+
+  el.tmResults.innerHTML = `
+    <section class="card">
+      <h2>Time machine — ${esc(p.ticker)} on ${esc(p.date)}</h2>
+      <p class="sub">Reconstructed from information available THAT day: SEC filings <b>submitted</b> by ${esc(p.date)}
+      (latest covered period ${esc(p.edgarThrough)}) and prices through the close. Filing lags included, no hindsight.
+      Analyst ratings and estimates have no free history, so those categories are missing — weights renormalize, same as live.</p>
+      <div class="verdict-wrap">
+        <div class="verdict-hero">${hero}</div>
+        <div>${meters}<div class="scoring-note">${esc(inputsLine)}</div></div>
+      </div>
+      ${p.notes?.length ? `<p class="sub" style="margin-top:10px">${esc(p.notes.join(" "))}</p>` : ""}
+    </section>
+    <section class="card">
+      <h2>What actually happened since</h2>
+      <p class="sub">${o.years.toFixed(1)} years, ${esc(p.date)} → ${esc(o.through)}, split- and dividend-adjusted.</p>
+      <div class="tm-outcome">
+        <div class="tm-stat"><div class="tm-label">${esc(p.ticker)}</div><div class="tm-val">${cell(o.ret)}</div></div>
+        <div class="tm-stat"><div class="tm-label">S&P (SPY)</div><div class="tm-val">${cell(o.spyRet)}</div></div>
+        <div class="tm-stat"><div class="tm-label">Excess</div><div class="tm-val">${cell(o.excess)}</div></div>
+      </div>
+      <p class="scoring-note evidence-note">One graded call is an anecdote — the point is that you can run this on ANY
+      ticker and date and the formula can't hide from its history. Full methodology and 16,497-call results:
+      <a href="/evidence.html">Evidence</a>.</p>
+    </section>`;
+  el.tmResults.hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 // ---------- fetch & routing ----------
 
 let inFlight = null;
@@ -1068,6 +1152,12 @@ el.form.addEventListener("submit", (e) => {
   e.preventDefault();
   const raw = el.input.value.trim();
   if (!raw) return;
+  const date = el.dateInput.value;
+  if (date) {
+    if (/^[A-Za-z0-9.\-^]{1,10}$/.test(raw)) timeMachine(raw.toUpperCase(), date);
+    else setError("The time machine needs a ticker symbol (e.g. NVDA) — clear the date to search by company name.");
+    return;
+  }
   // A ticker goes straight through; anything else ("apple", "berkshire
   // hathaway") becomes a name search.
   if (/^[A-Za-z0-9.\-^]{1,10}$/.test(raw)) go(raw);
@@ -1081,7 +1171,15 @@ $("copyBriefBtn").addEventListener("click", copyBrief);
 
 $("introChips").addEventListener("click", (e) => {
   const t = e.target?.dataset?.t;
-  if (t) go(t);
+  const d = e.target?.dataset?.d;
+  if (t && d) {
+    el.input.value = t;
+    el.dateInput.value = d;
+    timeMachine(t, d);
+  } else if (t) {
+    el.dateInput.value = "";
+    go(t);
+  }
 });
 
 $("brandLink").addEventListener("click", (e) => {
@@ -1089,6 +1187,8 @@ $("brandLink").addEventListener("click", (e) => {
   stopLive();
   history.replaceState(null, "", location.pathname);
   el.results.hidden = true;
+  el.tmResults.hidden = true;
+  el.dateInput.value = "";
   el.error.hidden = true;
   el.demoNote.hidden = true;
   el.warnings.hidden = true;

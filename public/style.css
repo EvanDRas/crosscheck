@@ -410,6 +410,24 @@ a:hover { text-decoration: underline; }
 .cmp-table .cmp-me { background: var(--surface); }
 .cmp-table .cmp-me td:first-child a { color: var(--ink); }
 
+/* time machine */
+#dateInput { background: var(--surface); border: 1px solid var(--baseline); border-radius: 3px; color: var(--ink-2); padding: 6px 9px; font-size: 12.5px; font-family: var(--mono); color-scheme: dark; }
+.tm-chip { border-color: var(--accent) !important; color: var(--accent) !important; font-family: var(--font) !important; }
+.tm-outcome { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 8px; max-width: 520px; }
+.tm-stat { background: var(--surface); border: 1px solid var(--hairline); border-radius: 3px; padding: 10px 12px; }
+.tm-label { font-size: 11px; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; }
+.tm-val { font-size: 22px; font-weight: 600; font-family: var(--mono); font-variant-numeric: tabular-nums; margin-top: 3px; }
+
+/* calls map */
+.calls-map { display: block; width: 100%; min-width: 560px; }
+.map-zero { stroke: var(--ink-2); stroke-width: 1; opacity: 0.55; }
+.calls-map circle { opacity: 0.85; }
+.dot-sb { fill: var(--good); }
+.dot-b { fill: color-mix(in srgb, var(--good) 60%, var(--surface-2)); }
+.dot-h { fill: var(--baseline); }
+.dot-s { fill: color-mix(in srgb, var(--critical) 60%, var(--surface-2)); }
+.dot-ss { fill: var(--critical); }
+
 /* volatility note */
 .vol-note { font-size: 12.5px; color: var(--ink-2); margin: 12px 0 0; border-top: 1px dashed var(--baseline); padding-top: 10px; }
 

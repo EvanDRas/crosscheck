@@ -168,6 +168,48 @@ function renderMyPicks(data) {
     </div>`;
 }
 
+// Every graded call as a dot: x = when the call was made, y = its excess
+// vs SPY so far. The spread IS the honesty — wins and losses in one glance.
+function renderCallsMap(data) {
+  const card = $("mapCard");
+  const rows = data.entries.filter((e) => e.excess != null && e.ageDays > 0 && e.basis === "tr");
+  if (rows.length < 5) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const W = 720;
+  const H = 200;
+  const pad = { l: 46, r: 12, t: 10, b: 24 };
+  const ts = rows.map((r) => Date.parse(r.date));
+  const t0 = Math.min(...ts);
+  const t1 = Math.max(...ts) || t0 + 1;
+  const maxAbs = Math.max(0.02, ...rows.map((r) => Math.abs(r.excess)));
+  const X = (t) => pad.l + (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0)) * (W - pad.l - pad.r);
+  const Y = (v) => pad.t + (1 - (v + maxAbs) / (2 * maxAbs)) * (H - pad.t - pad.b);
+  const dotClass = { "STRONG BUY": "dot-sb", BUY: "dot-b", HOLD: "dot-h", SELL: "dot-s", "STRONG SELL": "dot-ss" };
+  const dots = rows.map((r) =>
+    `<circle class="${dotClass[r.verdict] ?? "dot-h"}" cx="${X(Date.parse(r.date)).toFixed(1)}" cy="${Y(r.excess).toFixed(1)}" r="3.4">` +
+    `<title>${esc(r.ticker)} ${esc(r.verdict)} · ${esc(r.date)} · ${(r.excess * 100).toFixed(1)}% vs SPY</title></circle>`
+  ).join("");
+  const yTick = (v) => `<line class="hist-grid" x1="${pad.l}" x2="${W - pad.r}" y1="${Y(v)}" y2="${Y(v)}"></line>` +
+    `<text class="hist-axis-text" x="${pad.l - 6}" y="${Y(v) + 3.5}" text-anchor="end">${v > 0 ? "+" : ""}${(v * 100).toFixed(0)}%</text>`;
+  const xLabel = (f) => {
+    const t = t0 + f * (t1 - t0);
+    return `<text class="hist-axis-text" x="${X(t)}" y="${H - 6}" text-anchor="${f > 0.9 ? "end" : f < 0.1 ? "start" : "middle"}">${new Date(t).toISOString().slice(5, 10)}</text>`;
+  };
+  card.innerHTML = `
+    <h2>Calls map</h2>
+    <p class="sub">Every aged, total-return-graded call: when it was made vs how it stands against SPY today.
+    Dots above the line beat the index. Hover any dot.</p>
+    <div class="ledger-table-wrap"><svg class="calls-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graded calls vs SPY over time">
+      ${yTick(maxAbs * 0.66)}${yTick(0)}${yTick(-maxAbs * 0.66)}
+      <line class="map-zero" x1="${pad.l}" x2="${W - pad.r}" y1="${Y(0)}" y2="${Y(0)}"></line>
+      ${t1 > t0 ? xLabel(0.02) + xLabel(0.5) + xLabel(0.98) : xLabel(0.5)}
+      ${dots}
+    </svg></div>`;
+}
+
 async function load() {
   try {
     const [res, picksRes] = await Promise.all([fetch("/api/ledger"), fetch("/api/picks")]);
@@ -198,6 +240,7 @@ async function load() {
       return;
     }
     renderSummary(data);
+    renderCallsMap(data);
     renderAggregates(data);
     renderCalls(data);
     $("content").hidden = false;
