@@ -12,7 +12,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "batch": "node scripts/batch_log.js",
-    "test": "node --test test/scoring.test.js test/ledger.test.js test/edgar.test.js"
+    "test": "node --test test/scoring.test.js test/ledger.test.js test/edgar.test.js test/snapshots.test.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

@@ -11,6 +11,7 @@ import { gradeFromPanel } from "./lib/history.js";
 import { readLedger, aggregateLedger } from "./lib/ledger.js";
 import { SCORING_VERSION } from "./lib/scoring.js";
 import { readPicks, logPick, PICK_DIRECTIONS } from "./lib/picks.js";
+import { updateSnapshot } from "./lib/snapshots.js";
 import { getQuoteCached } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGrade, hasTiingoKey } from "./lib/tiingo.js";
@@ -287,6 +288,16 @@ app.get("/api/analyze", async (req, res) => {
 
   try {
     const payload = await analyzeTicker(ticker, { apiKey: process.env.FINNHUB_API_KEY });
+
+    // "Since you last looked": diff against the previous different-day
+    // snapshot of this ticker. Degraded payloads don't update the baseline.
+    if (!payload.degraded) {
+      try {
+        const { changes, lastSeen } = updateSnapshot(ticker, payload);
+        payload.changes = changes;
+        payload.lastSeen = lastSeen;
+      } catch {}
+    }
 
     // Never cache a degraded (partially rate-limited) payload — a retry
     // should get a fresh shot at the full data, not 90s of the gutted page.

@@ -410,6 +410,12 @@ a:hover { text-decoration: underline; }
 .cmp-table .cmp-me { background: var(--surface); }
 .cmp-table .cmp-me td:first-child a { color: var(--ink); }
 
+/* since you last looked */
+#changesCard { border-left: 3px solid var(--accent); padding-left: 14px; }
+.changes-list { list-style: none; margin: 0; padding: 0; }
+.changes-list li { padding: 3px 0; font-size: 13.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.changes-list li::before { content: "→ "; color: var(--accent); }
+
 /* time machine */
 #dateInput { background: var(--surface); border: 1px solid var(--baseline); border-radius: 3px; color: var(--ink-2); padding: 6px 9px; font-size: 12.5px; font-family: var(--mono); color-scheme: dark; }
 .tm-chip { border-color: var(--accent) !important; color: var(--accent) !important; font-family: var(--font) !important; }

@@ -26,6 +26,7 @@ const el = {
   results: $("results"),
   tmResults: $("tmResults"),
   dateInput: $("dateInput"),
+  changes: $("changesCard"),
   company: $("companyCard"),
   history: $("historyCard"),
   verdict: $("verdictCard"),
@@ -113,6 +114,21 @@ function scoreBand(score) {
   if (score >= 55) return "warning";
   if (score >= 47) return "serious";
   return "critical";
+}
+
+// "Since you last looked" — the diff banner, shown only when a previous
+// different-day snapshot exists and something actually moved.
+function renderChanges(d) {
+  if (!Array.isArray(d.changes) || !d.changes.length || !d.lastSeen) {
+    el.changes.hidden = true;
+    return;
+  }
+  el.changes.hidden = false;
+  el.changes.innerHTML = `
+    <h2>Since you last looked — ${esc(d.lastSeen)}</h2>
+    <ul class="changes-list">
+      ${d.changes.map((c) => `<li>${esc(c)}</li>`).join("")}
+    </ul>`;
 }
 
 function renderCompany(d) {
@@ -962,6 +978,128 @@ function startLive(d) {
   };
 }
 
+// ---------- share card: the verdict as an image, honesty baked in ----------
+
+const BAND_COLORS = { "STRONG BUY": "#3d9c6b", BUY: "#63a97f", HOLD: "#c0912f", SELL: "#c07048", "STRONG SELL": "#bf4d4d" };
+
+function drawShareCard(d) {
+  const s = d.scoring;
+  const W = 1000;
+  const H = 560;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const x = c.getContext("2d");
+  const mono = '600 (px) ui-monospace, Consolas, monospace';
+
+  x.fillStyle = "#0c0d0f";
+  x.fillRect(0, 0, W, H);
+  x.strokeStyle = "#33373e";
+  x.lineWidth = 2;
+  x.strokeRect(1, 1, W - 2, H - 2);
+
+  // Wordmark
+  x.fillStyle = "#4f86c6";
+  x.fillRect(40, 42, 12, 12);
+  x.fillStyle = "#e9eaec";
+  x.font = "800 22px system-ui, sans-serif";
+  x.fillText("C R O S S C H E C K", 64, 54);
+  x.fillStyle = "#7d828b";
+  x.font = "13px system-ui, sans-serif";
+  x.textAlign = "right";
+  x.fillText(new Date(d.asOf).toISOString().slice(0, 10), W - 40, 54);
+  x.textAlign = "left";
+
+  // Ticker + name
+  x.fillStyle = "#e9eaec";
+  x.font = mono.replace("(px)", "44px");
+  x.fillText(d.ticker, 40, 130);
+  x.fillStyle = "#b9bcc2";
+  x.font = "16px system-ui, sans-serif";
+  x.fillText((d.profile?.name ?? "").slice(0, 60), 40, 158);
+
+  // Score + band
+  const band = s.insufficientData ? null : (s.verdict ?? null);
+  x.fillStyle = "#e9eaec";
+  x.font = mono.replace("(px)", "96px");
+  x.fillText(s.insufficientData ? "–" : String(Math.round(s.score)), 40, 290);
+  x.fillStyle = "#7d828b";
+  x.font = mono.replace("(px)", "24px");
+  x.fillText("/100", 40 + x.measureText(" ").width + (s.insufficientData ? 60 : String(Math.round(s.score)).length * 58), 290);
+  if (band) {
+    const col = BAND_COLORS[band] ?? "#7d828b";
+    x.strokeStyle = col;
+    x.lineWidth = 1.5;
+    x.font = "700 20px system-ui, sans-serif";
+    const tw = x.measureText(band).width;
+    x.strokeRect(42, 315, tw + 28, 40);
+    x.fillStyle = col;
+    x.fillText(band, 56, 342);
+  }
+
+  // Category bars (right column)
+  const cats = s.categories ?? [];
+  let cy = 110;
+  for (const cat of cats) {
+    x.fillStyle = "#b9bcc2";
+    x.font = "13px system-ui, sans-serif";
+    x.fillText(cat.label, 560, cy);
+    x.fillStyle = "#e9eaec";
+    x.font = mono.replace("(px)", "14px");
+    x.textAlign = "right";
+    x.fillText(cat.available ? String(cat.score) : "—", W - 40, cy);
+    x.textAlign = "left";
+    x.fillStyle = "#1b1e22";
+    x.fillRect(560, cy + 8, 400, 5);
+    if (cat.available) {
+      const bandCls = cat.score >= 66 ? "#3d9c6b" : cat.score >= 55 ? "#c0912f" : cat.score >= 47 ? "#c07048" : "#bf4d4d";
+      x.fillStyle = bandCls;
+      x.fillRect(560, cy + 8, 4 * cat.score, 5);
+    }
+    cy += 46;
+  }
+
+  // The honesty line — the whole point of sharing this instead of a hot tip.
+  x.strokeStyle = "#33373e";
+  x.setLineDash([3, 4]);
+  x.beginPath();
+  x.moveTo(40, 420);
+  x.lineTo(W - 40, 420);
+  x.stroke();
+  x.setLineDash([]);
+  x.fillStyle = "#7d828b";
+  x.font = "14px system-ui, sans-serif";
+  const disclaimer = "Backtested honestly: this formula (16,497 point-in-time calls, 2011–2024) showed no predictive power. A score states rank among large caps on these metrics — it does not forecast returns. Not financial advice.";
+  let line = "";
+  let ly = 448;
+  for (const word of disclaimer.split(" ")) {
+    if (x.measureText(line + word).width > W - 80) {
+      x.fillText(line, 40, ly);
+      line = "";
+      ly += 22;
+    }
+    line += word + " ";
+  }
+  x.fillText(line, 40, ly);
+  x.fillStyle = "#4f86c6";
+  x.font = "13px system-ui, sans-serif";
+  x.fillText("crosscheck — the honest stock analyzer · github.com/EvanDRas/crosscheck", 40, H - 28);
+
+  return c;
+}
+
+function shareCard() {
+  if (!lastPayload || lastPayload.demo || !lastPayload.scoring) return;
+  const canvas = drawShareCard(lastPayload);
+  canvas.toBlob((blob) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${lastPayload.ticker}-crosscheck.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }, "image/png");
+}
+
 let lastPayload = null;
 
 function render(d) {
@@ -977,6 +1115,7 @@ function render(d) {
 
   // Unhide before rendering: the chart measures its container's width.
   el.results.hidden = false;
+  renderChanges(d);
   renderCompany(d);
   renderHistory(d);
   renderVerdict(d);
@@ -1170,6 +1309,16 @@ el.form.addEventListener("submit", (e) => {
 });
 
 $("copyBriefBtn").addEventListener("click", copyBrief);
+$("shareCardBtn").addEventListener("click", shareCard);
+
+// Terminal muscle memory: "/" anywhere jumps to the search box.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+    e.preventDefault();
+    el.input.focus();
+    el.input.select();
+  }
+});
 
 $("introChips").addEventListener("click", (e) => {
   const t = e.target?.dataset?.t;
