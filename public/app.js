@@ -1051,7 +1051,9 @@ function renderTimeMachine(p) {
       <h2>Time machine — ${esc(p.ticker)} on ${esc(p.date)}</h2>
       <p class="sub">Reconstructed from information available THAT day: SEC filings <b>submitted</b> by ${esc(p.date)}
       (latest covered period ${esc(p.edgarThrough)}) and prices through the close. Filing lags included, no hindsight.
-      Analyst ratings and estimates have no free history, so those categories are missing — weights renormalize, same as live.</p>
+      Analyst ratings and estimates have no free history, so those categories are missing — weights renormalize, same as live.
+      Known limit: mostly today's tickers resolve — companies since delisted or renamed usually can't be summoned,
+      so browsing history here skews toward survivors.</p>
       <div class="verdict-wrap">
         <div class="verdict-hero">${hero}</div>
         <div>${meters}<div class="scoring-note">${esc(inputsLine)}</div></div>
