@@ -545,6 +545,12 @@ a:hover { text-decoration: underline; }
 }
 .an-legend b { color: var(--ink); }
 
+/* analyst drift: one mini stacked column per month, oldest -> newest */
+.an-drift { margin-top: 12px; border-top: 1px dashed var(--baseline); padding-top: 10px; font-size: 12.5px; color: var(--ink-2); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.an-mini-row { display: flex; gap: 4px; align-items: flex-end; }
+.an-mini { width: 12px; height: 34px; display: flex; flex-direction: column; justify-content: flex-end; background: var(--surface); border-radius: 2px; overflow: hidden; }
+.an-mini .an-seg { width: 100%; min-width: 0; }
+
 /* ---------- earnings ---------- */
 
 .earn-grid {

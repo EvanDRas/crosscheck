@@ -600,11 +600,41 @@ function renderAnalyst(d) {
   const legend = segs
     .map(([cls, label, n]) => `<span><span class="swatch an-seg ${cls}"></span>${esc(label)} <b>${n}</b></span>`)
     .join("");
+  // Drift over the last few months: the level is always buy-skewed, so the
+  // direction of change is the informative part.
+  let driftHtml = "";
+  const hist = d.analystHistory;
+  if (Array.isArray(hist) && hist.length >= 2) {
+    const first = hist[0];
+    const last = hist[hist.length - 1];
+    const buys = (m) => (m.strongBuy ?? 0) + (m.buy ?? 0);
+    const sells = (m) => (m.sell ?? 0) + (m.strongSell ?? 0);
+    const dTilt = (last.tilt ?? 0) - (first.tilt ?? 0);
+    const word = dTilt > 0.08 ? '<span class="delta-up">drifting more bullish</span>'
+      : dTilt < -0.08 ? '<span class="delta-down">drifting more bearish</span>'
+      : '<span class="delta-flat">holding steady</span>';
+    const months = hist.map((m) => {
+      const total = buys(m) + (m.hold ?? 0) + sells(m);
+      const seg = (n, cls) => (total && n > 0 ? `<div class="an-seg ${cls}" style="height:${Math.max(6, (n / total) * 100)}%"></div>` : "");
+      return `<div class="an-mini" title="${esc(String(m.period ?? "").slice(0, 7))}: ${buys(m)} buy / ${m.hold ?? 0} hold / ${sells(m)} sell">
+        ${seg(sells(m), "ssell")}${seg(m.hold ?? 0, "hold")}${seg(buys(m), "buy")}
+      </div>`;
+    }).join("");
+    driftHtml = `
+      <div class="an-drift">
+        <div class="an-mini-row">${months}</div>
+        <span>Drift, ${esc(String(first.period ?? "").slice(0, 7))} → ${esc(String(last.period ?? "").slice(0, 7))}:
+        buys ${buys(first)} → ${buys(last)}, sells ${sells(first)} → ${sells(last)} — ${word}.
+        The level is always buy-skewed; watch the direction.</span>
+      </div>`;
+  }
+
   el.analyst.innerHTML = `
     <h2>Analyst ratings</h2>
     <p class="sub">${a.total} analysts · ${esc(String(a.period ?? "").slice(0, 7))}</p>
     <div class="an-bar">${bar}</div>
-    <div class="an-legend">${legend}</div>`;
+    <div class="an-legend">${legend}</div>
+    ${driftHtml}`;
 }
 
 function nextEarningsLine(d) {
