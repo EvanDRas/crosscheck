@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import dotenv from "dotenv";
-import { FinnhubError, getQuote, searchSymbols } from "./lib/finnhub.js";
+import { FinnhubError, getQuote, getMetrics, getPeers, searchSymbols } from "./lib/finnhub.js";
 import { addViewer, viewerCount } from "./lib/stream.js";
 import { analyzeTicker, NotFoundError } from "./lib/analyze.js";
 import { demoPayload } from "./lib/demo.js";
@@ -106,6 +106,56 @@ app.get("/api/search", async (req, res) => {
     res.json({ results });
   } catch {
     res.json({ results: [] }); // search is best-effort, never an error page
+  }
+});
+
+// Peer comparison, on demand only (a click, never automatic — it costs one
+// API call per peer). Answers the question a lone number can't: is this P/E
+// high FOR ITS GROUP, or just high?
+const compareCache = new Map();
+app.get("/api/compare", async (req, res) => {
+  try {
+    const apiKey = process.env.FINNHUB_API_KEY;
+    const ticker = String(req.query.ticker ?? "").trim().toUpperCase();
+    if (!apiKey || !TICKER_RE.test(ticker) || ticker === "DEMO") {
+      return res.status(400).json({ error: "Peer comparison needs an API key and a real ticker." });
+    }
+    const hit = compareCache.get(ticker);
+    if (hit && Date.now() - hit.at < 600_000) return res.json({ rows: hit.rows });
+
+    const peersRaw = await getPeers(ticker, apiKey);
+    const symbols = [ticker, ...(Array.isArray(peersRaw) ? peersRaw : [])
+      .filter((p) => typeof p === "string" && p && p !== ticker).slice(0, 7)];
+    const settled = await Promise.allSettled(symbols.map((s) => getMetrics(s, apiKey)));
+
+    const pick = (m, ...keys) => {
+      for (const k of keys) {
+        const v = m?.[k];
+        if (typeof v === "number" && Number.isFinite(v)) return v;
+      }
+      return null;
+    };
+    const rows = symbols.map((s, i) => {
+      const m = settled[i].status === "fulfilled" ? settled[i].value?.metric ?? {} : {};
+      const de = pick(m, "totalDebt/totalEquityQuarterly", "totalDebt/totalEquityAnnual");
+      return {
+        symbol: s,
+        marketCap: pick(m, "marketCapitalization"),
+        pe: pick(m, "peTTM", "peBasicExclExtraTTM", "peAnnual"),
+        ps: pick(m, "psTTM", "psAnnual"),
+        netMargin: pick(m, "netProfitMarginTTM", "netProfitMarginAnnual"),
+        roe: pick(m, "roeTTM", "roeRfy", "roeAnnual"),
+        revenueGrowth: pick(m, "revenueGrowthTTMYoy", "revenueGrowthQuarterlyYoy"),
+        debtEquity: de == null ? null : de > 20 ? de / 100 : de,
+      };
+    }).filter((r) => Object.values(r).some((v) => v != null && v !== r.symbol));
+    compareCache.set(ticker, { at: Date.now(), rows });
+    if (compareCache.size > 50) compareCache.delete(compareCache.keys().next().value);
+    res.json({ rows });
+  } catch (err) {
+    if (err instanceof FinnhubError) return res.status(err.status === 429 ? 429 : 502).json({ error: err.message });
+    console.error("compare failed:", err);
+    res.status(500).json({ error: "Could not build the peer comparison." });
   }
 });
 

@@ -402,6 +402,14 @@ a:hover { text-decoration: underline; }
 .filing-form { font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--ink-2); background: var(--surface); border: 1px solid var(--baseline); border-radius: 3px; padding: 1px 7px; white-space: nowrap; }
 .filing-date { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 
+/* insiders + peer compare */
+.ins-table { min-width: 560px; }
+.ins-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-btn { font-family: var(--font); color: var(--accent); border-color: var(--accent); }
+.cmp-table { min-width: 640px; }
+.cmp-table .cmp-me { background: var(--surface); }
+.cmp-table .cmp-me td:first-child a { color: var(--ink); }
+
 /* volatility note */
 .vol-note { font-size: 12.5px; color: var(--ink-2); margin: 12px 0 0; border-top: 1px dashed var(--baseline); padding-top: 10px; }
 

@@ -25,6 +25,7 @@ const el = {
   verdict: $("verdictCard"),
   keyNumbers: $("keyNumbersCard"),
   trajectory: $("trajectoryCard"),
+  insiders: $("insidersCard"),
   filings: $("filingsCard"),
   range: $("rangeCard"),
   analyst: $("analystCard"),
@@ -606,15 +607,24 @@ function renderAnalyst(d) {
     <div class="an-legend">${legend}</div>`;
 }
 
+function nextEarningsLine(d) {
+  const n = d.nextEarnings;
+  if (!n?.date) return "";
+  const days = Math.round((Date.parse(n.date) - Date.now()) / 86_400_000);
+  const when = { amc: "after the close", bmo: "before the open", dmh: "during market hours" }[n.hour] ?? "";
+  const est = isNum(n.epsEstimate) ? ` — street expects EPS ${fmtNum(n.epsEstimate)}` : "";
+  return ` <b>Next report: ${esc(n.date)}${days >= 0 ? ` (in ${days} day${days === 1 ? "" : "s"}${when ? `, ${when}` : ""})` : ""}${est}.</b> Earnings days are the year's biggest single-day moves — know the date before money moves.`;
+}
+
 function renderEarnings(d) {
   const rows = d.earnings ?? [];
   if (!rows.length) {
-    el.earnings.innerHTML = `<h2>Earnings — last 4 quarters</h2><p class="sub">No earnings history available.</p>`;
+    el.earnings.innerHTML = `<h2>Earnings — last 4 quarters</h2><p class="sub">No earnings history available.${nextEarningsLine(d)}</p>`;
     return;
   }
   el.earnings.innerHTML = `
     <h2>Earnings — last 4 quarters</h2>
-    <p class="sub">Reported EPS vs analyst estimate.</p>
+    <p class="sub">Reported EPS vs analyst estimate.${nextEarningsLine(d)}</p>
     <div class="earn-grid">
       ${rows.map((e) => {
         const chip = e.beat == null
@@ -633,19 +643,92 @@ function renderEarnings(d) {
     </div>`;
 }
 
+// Insider open-market activity — honestly framed: sales have a hundred
+// mundane explanations; clusters of open-market BUYING are the rarer tell.
+function renderInsiders(d) {
+  const ins = d.insiders;
+  if (!ins || (!ins.buys.count && !ins.sells.count)) {
+    el.insiders.hidden = true;
+    return;
+  }
+  el.insiders.hidden = false;
+  const money = (v) => (isNum(v) && v > 0 ? fmtBillions(v) : "—");
+  const rows = ins.recent.map((t) => `
+    <tr>
+      <td>${esc(t.date ?? "")}</td>
+      <td class="ins-name">${esc(t.name ?? "")}</td>
+      <td><span class="${t.action === "BUY" ? "delta-up" : "delta-down"}">${t.action}</span></td>
+      <td class="num">${isNum(t.shares) ? t.shares.toLocaleString("en-US") : "—"}</td>
+      <td class="num">${t.price ? esc(fmtMoney(t.price)) : "—"}</td>
+    </tr>`).join("");
+  el.insiders.innerHTML = `
+    <h2>Insider activity — last 3 months</h2>
+    <p class="sub">Open-market trades only (SEC Form 4; gifts and option exercises excluded).
+    <span class="delta-up">${ins.buys.count} buy${ins.buys.count === 1 ? "" : "s"} (${money(ins.buys.value)})</span> vs
+    <span class="delta-down">${ins.sells.count} sell${ins.sells.count === 1 ? "" : "s"} (${money(ins.sells.value)})</span>.
+    Insiders sell for many reasons — taxes, diversification, houses; clusters of open-market <b>buying</b> are the rarer signal.</p>
+    <div class="ledger-table-wrap">
+      <table class="ledger-table ins-table">
+        <thead><tr><th>Date</th><th>Insider</th><th>Action</th><th class="num">Shares</th><th class="num">Price</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
 function renderPeers(d) {
   const peers = d.peers ?? [];
   if (!peers.length) {
     el.peers.innerHTML = `<h2>Peers</h2><p class="sub">No peer list available.</p>`;
     return;
   }
+  const canCompare = !d.demo && hasKey;
   el.peers.innerHTML = `
     <h2>Peers</h2>
     <p class="sub">Companies Finnhub groups with ${esc(d.ticker)} — click one to analyze it.</p>
     <div class="peer-list">
       ${peers.map((p) => `<button class="peer-chip" data-t="${esc(p)}">${esc(p)}</button>`).join("")}
-    </div>`;
-  el.peers.querySelectorAll(".peer-chip").forEach((b) => b.addEventListener("click", () => go(b.dataset.t)));
+      ${canCompare ? `<button class="peer-chip cmp-btn" id="compareBtn">Compare key numbers →</button>` : ""}
+    </div>
+    <div id="compareOut"></div>`;
+  el.peers.querySelectorAll(".peer-chip:not(.cmp-btn)").forEach((b) => b.addEventListener("click", () => go(b.dataset.t)));
+  const btn = $("compareBtn");
+  if (btn) {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "Comparing…";
+      try {
+        const res = await fetch(`/api/compare?ticker=${encodeURIComponent(d.ticker)}`);
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error ?? "Comparison failed.");
+        const f = (v, suffix = "", digits = 1) => (isNum(v) ? `${fmtNum(v, digits)}${suffix}` : "—");
+        $("compareOut").innerHTML = `
+          <div class="ledger-table-wrap" style="margin-top:12px">
+            <table class="ledger-table cmp-table">
+              <thead><tr><th>Symbol</th><th class="num">Mkt cap</th><th class="num">P/E</th><th class="num">P/S</th><th class="num">Net margin</th><th class="num">ROE</th><th class="num">Rev YoY</th><th class="num">D/E</th></tr></thead>
+              <tbody>
+                ${body.rows.map((r) => `
+                  <tr class="${r.symbol === d.ticker ? "cmp-me" : ""}">
+                    <td><a href="/#${esc(r.symbol)}">${esc(r.symbol)}</a></td>
+                    <td class="num">${isNum(r.marketCap) ? esc(fmtMarketCap(r.marketCap)) : "—"}</td>
+                    <td class="num">${f(r.pe, "×")}</td>
+                    <td class="num">${f(r.ps, "×")}</td>
+                    <td class="num">${f(r.netMargin, "%")}</td>
+                    <td class="num">${f(r.roe, "%")}</td>
+                    <td class="num">${f(r.revenueGrowth, "%")}</td>
+                    <td class="num">${f(r.debtEquity, "", 2)}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+          <p class="sub" style="margin:8px 0 0">Same vendor data as the tiles above — the point is context: high FOR THIS GROUP is information; high in the abstract is noise.</p>`;
+        btn.remove();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = "Compare key numbers →";
+        $("compareOut").innerHTML = `<p class="sub" style="margin-top:8px">${esc(err.message)}</p>`;
+      }
+    });
+  }
 }
 
 function renderNews(d) {
@@ -862,6 +945,7 @@ function render(d) {
   renderVerdict(d);
   renderKeyNumbers(d);
   renderTrajectory(d);
+  renderInsiders(d);
   renderFilings(d);
   renderRange(d);
   renderAnalyst(d);
