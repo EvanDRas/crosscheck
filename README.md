@@ -51,6 +51,16 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   Finnhub's free websocket (relayed server-side over SSE, throttled to 1
   update/sec, auto-quiet outside market hours). Charts and ledger grading
   stay end-of-day on purpose — grading is close-to-close by design.
+- **Time Machine**: pick any ticker and any date back to 2010 (date field
+  next to search) and see exactly what the formula would have said with only
+  that day's filings and prices — filing lags included, no hindsight — then
+  how the frozen call aged against SPY. Try the landing-page chip: NVDA on
+  2023-01-03 reads SELL… followed by +1,400%+. The honesty claim, interactive.
+- **Since you last looked**: revisit a ticker on a later day and the page
+  opens with what moved — score, filings, insider activity, earnings date.
+- **Share card**: one click renders the verdict as a PNG with the
+  no-predictive-power evidence line baked into the pixels, so a shared
+  screenshot carries its own disclaimer. Press `/` anywhere to search.
 - Sources are fetched in parallel; any single source failing degrades that
   section to N/A and adds a warning — it never breaks the page.
 - **Price history chart**: with a Tiingo key, any US ticker gets a live
@@ -70,8 +80,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   Every real analysis logs its call (verdict, score, price, and SPY's level at
   that moment) to `data/verdict_ledger.json`: first call per ticker per day,
   append-only, never edited, stamped with the scoring-formula version. The
-  ledger page grades those frozen calls — do the BUYs actually beat SPY, and
-  by more than the SELLs? This is deliberately *not* a historical backtest:
+  ledger page charts every graded call (the calls map) and grades them —
+  do the BUYs actually beat SPY, and by more than the SELLs? This is deliberately *not* a historical backtest:
   backtesting a hand-tuned formula on data you can re-run until it looks good
   is how people fool themselves. Logging calls first and letting time grade
   them is the version that can't cheat. Expect months, not days, before the

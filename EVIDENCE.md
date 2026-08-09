@@ -1,9 +1,12 @@
 # Evidence: what testing this formula actually found
 
-Last updated 2026-08-08. Studies 1–4 describe formula **v1** scores; the
-2026-08-08 **v2** update changed the verdict bands only (percentile
-calibration — see the final section), so every result below applies
-unchanged to v2's scores.
+Last updated 2026-08-09. Studies 1, 3, and 4 were run on formula **v1**
+scores; the **v2** update (2026-08-08) changed the verdict bands only, so
+those statistical results carry over to v2's scores as-is. Study 2 below is
+**refreshed to the current engine** (2026-08-09): a post-audit correctness
+fix to EDGAR revenue-concept selection shifted some point-in-time scores
+slightly, and labels now use the v2 bands — the in-app Time Machine
+reproduces this table exactly. The conclusions did not move.
 
 Reproducibility, honestly stated: Study 2 (point-in-time case studies) runs
 anywhere — `scripts/pit_verdict.mjs` needs only free EDGAR + Tiingo data.
@@ -25,19 +28,22 @@ The 52-week-position score (the whole Momentum category), computed monthly
 ## Study 2 — five famous dates, full point-in-time (scripts/pit_verdict.mjs)
 
 Only filings submitted and prices printed by each date (filing lag included);
-graded vs SPY total-return through 2026-08-04:
+graded vs SPY total-return, current engine + v2 band labels (refreshed
+2026-08-09 — reproduce any row with the in-app Time Machine or
+`node scripts/pit_verdict.mjs`):
 
 | Call | Outcome vs SPY |
 |---|---|
-| META 2022-11: HOLD 57 | +424% (missed the bottom; momentum scored 6) |
-| NVDA 2023-01: HOLD 44 | +1,285% (called it expensive and shrinking) |
-| TSLA 2022-01: BUY 66 | −100% (momentum 96 outvoted valuation 0 at the peak) |
-| INTC 2021-04: STRONG BUY 75 | −27% (the only STRONG BUY — a value trap) |
-| KO 2020-06: BUY 62 | −49% |
+| META 2022-11: HOLD 57 | +428% (missed the bottom; momentum scored 6) |
+| NVDA 2023-01: SELL 50 | +1,369% (called it expensive with dead momentum) |
+| TSLA 2022-01: HOLD 63 | −100% (momentum 96 and growth 100 masked valuation 0 at the peak) |
+| INTC 2021-04: STRONG BUY 75 | −26% (the only STRONG BUY — a value trap) |
+| KO 2020-06: HOLD 62 | −49% |
 
 **0 for 5** — anecdotes, not statistics, but the *pattern* matters: the
-formula rewards "great numbers after the run-up" and shrugs at "great
-business temporarily hated," which is where the big future returns lived.
+formula rewards "great numbers after the run-up" and shrugs at (or now
+outright SELLs) "great business temporarily hated," which is where the big
+future returns lived.
 
 ## Study 3 — 18,150 point-in-time calls, 2011–2024 (scripts/backtest_pit_local.py)
 

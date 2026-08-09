@@ -48,6 +48,11 @@ Instead of quietly deleting all that, I made it the product:
 - You can log your OWN calls ("I'd buy this here") and it grades you the
   same way. Turns out most of us would rather not know; I think knowing is
   the whole point.
+- The demo to try: the "Time machine" chip on the landing page reruns NVDA
+  on 2023-01-03 using only what was knowable that day — the formula said
+  SELL; the stock then did over +1,400%. You can run that on any ticker and
+  any date back to 2010. The formula can't hide from its own history, and
+  that's the feature.
 
 It's free and MIT-licensed; you run it locally with your own free API keys
 (Finnhub + optionally Tiingo). There's no hosted version on purpose: the

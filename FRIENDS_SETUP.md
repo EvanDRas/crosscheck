@@ -22,7 +22,7 @@ Nothing is shared with anyone — your lookups, your keys, your machine.
    [finnhub.io](https://finnhub.io), copy the API key from its dashboard,
    paste it in, done. (A second free key from
    [tiingo.com](https://www.tiingo.com) is optional — it powers the price
-   charts.)
+   charts and the Time Machine.)
 
 That's it. Keep the black window open while you use the app; close it to
 stop. Your keys and your lookups never leave your computer.

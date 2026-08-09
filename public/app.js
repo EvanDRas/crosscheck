@@ -76,7 +76,13 @@ function relTime(iso) {
 
 // ---------- state transitions ----------
 
+// View generation counter: analyze and time-machine requests can overlap
+// (chip clicked mid-analysis, hashchange mid-time-machine); only the newest
+// request is allowed to render.
+let viewSeq = 0;
+
 function setLoading(ticker) {
+  viewSeq++;
   stopLive();
   el.intro.hidden = true;
   el.results.hidden = true;
@@ -1107,6 +1113,7 @@ function render(d) {
   el.status.hidden = true;
   el.btn.disabled = false;
   el.demoNote.hidden = !d.demo;
+  $("shareCardBtn").hidden = Boolean(d.demo); // a share card of fictional data helps no one
 
   if (d.warnings?.length) {
     el.warnings.textContent = `Partial data — some sources failed: ${d.warnings.join("; ")}`;
@@ -1139,19 +1146,26 @@ function render(d) {
 // claim, made interactive.
 async function timeMachine(ticker, date) {
   setLoading(`${ticker} on ${date}`);
+  const seq = viewSeq;
   el.statusText.textContent = `Rewinding to ${date} — filings and prices as known that day…`;
   try {
     const res = await fetch(`/api/timemachine?ticker=${encodeURIComponent(ticker)}&date=${encodeURIComponent(date)}`);
     const p = await res.json();
+    if (seq !== viewSeq) return; // a newer view took over while we fetched
     el.status.hidden = true;
     el.btn.disabled = false;
     if (!res.ok) {
+      // Clear the date so the NEXT search isn't poisoned into re-failing —
+      // especially the keyless user who clicked the demo chip.
+      el.dateInput.value = "";
       setError(p.error ?? "Time machine failed.");
       return;
     }
     renderTimeMachine(p);
   } catch {
+    if (seq !== viewSeq) return;
     el.btn.disabled = false;
+    el.dateInput.value = "";
     setError("Could not reach the server. Is it still running?");
   }
 }
@@ -1258,10 +1272,12 @@ async function analyze(ticker) {
   inFlight?.abort();
   const ctrl = new AbortController();
   inFlight = ctrl;
+  const seq = viewSeq;
   try {
     const res = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}`, { signal: ctrl.signal });
     let body = null;
     try { body = await res.json(); } catch { /* non-JSON error page */ }
+    if (seq !== viewSeq) return; // a newer view (e.g. time machine) took over
     if (!res.ok) {
       if (res.status === 404) {
         // Offer close matches, but never discard the server's guidance —
@@ -1285,6 +1301,9 @@ async function analyze(ticker) {
 function go(ticker) {
   const t = String(ticker ?? "").trim().toUpperCase();
   if (!t) return;
+  // Any normal navigation (peer chip, suggestion, hash link) is a "today"
+  // view — a leftover time-machine date must not silently ride along.
+  el.dateInput.value = "";
   if (location.hash.slice(1) === t) analyze(t);
   else location.hash = t; // hashchange handler runs analyze
 }

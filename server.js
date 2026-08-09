@@ -78,6 +78,9 @@ app.post("/api/setup", async (req, res) => {
     if (tiingo && !/^[A-Za-z0-9]{10,80}$/.test(tiingo)) {
       return res.status(400).json({ error: "That doesn't look like a Tiingo API key — leave the field empty if you don't have one." });
     }
+    if (/[\x00-\x1f\x7f]/.test(finnhub + tiingo + contact)) {
+      return res.status(400).json({ error: "Control characters aren't allowed in any field." });
+    }
     if (contact && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
       return res.status(400).json({ error: "That doesn't look like an email address — leave the field empty if you'd rather not give one." });
     }
@@ -186,7 +189,8 @@ app.get("/api/compare", async (req, res) => {
         netMargin: pick(m, "netProfitMarginTTM", "netProfitMarginAnnual"),
         roe: pick(m, "roeTTM", "roeRfy", "roeAnnual"),
         revenueGrowth: pick(m, "revenueGrowthTTMYoy", "revenueGrowthQuarterlyYoy"),
-        debtEquity: de == null ? null : de > 20 ? de / 100 : de,
+        debtEquity: de == null || de > 20 ? null : de, // >20 is unit-ambiguous — same policy as the analyzer
+
       };
     }).filter((r) => Object.values(r).some((v) => v != null && v !== r.symbol));
     compareCache.set(ticker, { at: Date.now(), rows });
@@ -428,10 +432,9 @@ async function gradeEntries(entries) {
       nowPrice = quotes[e.ticker];
       ret = e.price ? (nowPrice - e.price) / e.price : null;
       // Raw rows are price-only on the stock leg, so the SPY leg must be
-      // price-only too (logged level vs live quote) — mixing a total-return
-      // benchmark against a price-only stock return biases every raw row.
-      spyRet = spyNow != null && e.spy ? (spyNow - e.spy) / e.spy
-        : spySeries ? spyTrReturn(spySeries, e.date) : null;
+      // price-only too (logged level vs live quote). No TR fallback: a
+      // mixed-basis excess is worse than an ungraded row.
+      spyRet = spyNow != null && e.spy ? (spyNow - e.spy) / e.spy : null;
     }
     return {
       ...e,
