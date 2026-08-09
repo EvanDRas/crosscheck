@@ -24,6 +24,8 @@ const el = {
   history: $("historyCard"),
   verdict: $("verdictCard"),
   keyNumbers: $("keyNumbersCard"),
+  trajectory: $("trajectoryCard"),
+  filings: $("filingsCard"),
   range: $("rangeCard"),
   analyst: $("analystCard"),
   earnings: $("earningsCard"),
@@ -455,6 +457,79 @@ function renderKeyNumbers(d) {
     </div>`;
 }
 
+function fmtBillions(v) {
+  if (!isNum(v)) return "—";
+  if (Math.abs(v) >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+  if (Math.abs(v) >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
+  return `$${Math.round(v).toLocaleString("en-US")}`;
+}
+
+// Trajectory: 8 quarters of revenue/margin plus share-count drift — the
+// direction of the business, and whether ownership is being diluted away.
+function renderTrajectory(d) {
+  const t = d.trajectory;
+  if (!t?.quarters?.length) {
+    el.trajectory.hidden = true;
+    return;
+  }
+  el.trajectory.hidden = false;
+  const maxRev = Math.max(...t.quarters.map((q) => q.revenue ?? 0), 1);
+  const rows = t.quarters.map((q) => `
+    <tr>
+      <td>${esc(String(q.end).slice(0, 7))}</td>
+      <td class="num">${fmtBillions(q.revenue)}</td>
+      <td class="traj-bar-cell"><div class="traj-bar" style="width:${Math.max(2, (q.revenue / maxRev) * 100)}%"></div></td>
+      <td class="num">${q.revYoY == null ? "—" : `<span class="${q.revYoY >= 0 ? "delta-up" : "delta-down"}">${q.revYoY > 0 ? "+" : ""}${q.revYoY.toFixed(1)}%</span>`}</td>
+      <td class="num">${q.margin == null ? "—" : `${q.margin.toFixed(1)}%`}</td>
+    </tr>`).join("");
+
+  let dilutionHtml = "";
+  const dil = t.dilution;
+  if (dil && isNum(dil.annualPct)) {
+    const pct = dil.annualPct;
+    const cls = pct > 2 ? "delta-down" : pct < -0.5 ? "delta-up" : "delta-flat";
+    const verdict = pct > 2
+      ? `diluting ~${pct.toFixed(1)}%/yr — your ownership share shrinks that fast before returns start`
+      : pct < -0.5
+        ? `buying back ~${Math.abs(pct).toFixed(1)}%/yr — your ownership share grows without you doing anything`
+        : `roughly flat (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%/yr)`;
+    dilutionHtml = `<p class="traj-dilution">Share count ${esc(String(dil.from).slice(0, 7))} → ${esc(String(dil.to).slice(0, 7))}:
+      <span class="${cls}">${esc(verdict)}</span></p>`;
+  }
+
+  el.trajectory.innerHTML = `
+    <h2>Trajectory — last ${t.quarters.length} quarters</h2>
+    <p class="sub">Straight from SEC filings: is the business growing, shrinking, or treading water — and is the share count working for you or against you.</p>
+    <div class="ledger-table-wrap">
+      <table class="ledger-table traj-table">
+        <thead><tr><th>Quarter</th><th class="num">Revenue</th><th></th><th class="num">YoY</th><th class="num">Net margin</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${dilutionHtml}`;
+}
+
+// What the company has told the SEC lately — 8-Ks are material events.
+function renderFilings(d) {
+  const f = d.filings;
+  if (!Array.isArray(f) || !f.length) {
+    el.filings.hidden = true;
+    return;
+  }
+  el.filings.hidden = false;
+  el.filings.innerHTML = `
+    <h2>Recent SEC filings</h2>
+    <p class="sub">Primary sources, newest first. An 8-K means the company was required to disclose a material event — often before the news writes it up.</p>
+    <ul class="filing-list">
+      ${f.map((x) => `
+        <li class="filing-item">
+          <span class="filing-form">${esc(x.form)}</span>
+          <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.label)}</a>
+          <span class="filing-date">${esc(x.filed)}</span>
+        </li>`).join("")}
+    </ul>`;
+}
+
 function renderRange(d) {
   const m = d.metrics ?? {};
   const usingLocalPrice = !isNum(d.quote?.price) && isNum(d.history?.last?.close);
@@ -466,6 +541,27 @@ function renderRange(d) {
   const pos = Math.min(1, Math.max(0, (price - m.low52) / (m.high52 - m.low52)));
   const pct = pos * 100;
   const labelPct = Math.min(91, Math.max(9, pct)); // keep the price label inside the card
+
+  // Volatility reality check from the past year of daily closes: what a
+  // normal day looks like, and the worst peak-to-trough already survived.
+  let volHtml = "";
+  const series = d.history?.series;
+  if (Array.isArray(series) && series.length > 60) {
+    const yearAgo = Date.parse(series[series.length - 1][0]) - 366 * 86_400_000;
+    const daily = series.filter(([ds]) => Date.parse(ds) >= yearAgo).map(([, c]) => c).filter(isNum);
+    if (daily.length > 60) {
+      const rets = daily.slice(1).map((c, i) => c / daily[i] - 1);
+      const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+      const sd = Math.sqrt(rets.reduce((a, r) => a + (r - mean) ** 2, 0) / (rets.length - 1)) * 100;
+      let peak = daily[0];
+      let maxDd = 0;
+      for (const c of daily) {
+        if (c > peak) peak = c;
+        maxDd = Math.min(maxDd, c / peak - 1);
+      }
+      volHtml = `<p class="vol-note">Reality check: this stock typically moves <b>±${sd.toFixed(1)}%</b> a day; its worst peak-to-trough drop in the past year was <b>${(maxDd * 100).toFixed(0)}%</b>. Swings inside that range are noise, not news.</p>`;
+    }
+  }
   el.range.innerHTML = `
     <h2>52-week range</h2>
     <p class="sub">Price sits at ${Math.round(pct)}% of the year's range.${usingLocalPrice ? " (Using last local close — no live quote.)" : ""}</p>
@@ -479,7 +575,8 @@ function renderRange(d) {
     <div class="range-ends">
       <span>Low <b>${esc(fmtMoney(m.low52))}</b>${m.low52Date ? ` <span>(${esc(String(m.low52Date).slice(0, 10))})</span>` : ""}</span>
       <span>High <b>${esc(fmtMoney(m.high52))}</b>${m.high52Date ? ` <span>(${esc(String(m.high52Date).slice(0, 10))})</span>` : ""}</span>
-    </div>`;
+    </div>
+    ${volHtml}`;
 }
 
 function renderAnalyst(d) {
@@ -764,6 +861,8 @@ function render(d) {
   renderHistory(d);
   renderVerdict(d);
   renderKeyNumbers(d);
+  renderTrajectory(d);
+  renderFilings(d);
   renderRange(d);
   renderAnalyst(d);
   renderEarnings(d);

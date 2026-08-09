@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { quarterlySeries, ttm, latestInstant, computeEdgarMetrics, mergeMetrics } from "../lib/edgar.js";
+import { quarterlySeries, ttm, latestInstant, computeEdgarMetrics, computeTrajectory, mergeMetrics } from "../lib/edgar.js";
 
 const DAY = 86_400_000;
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * DAY).toISOString().slice(0, 10);
@@ -85,6 +85,24 @@ test("computeEdgarMetrics returns null for stale filers", () => {
     }
   }
   assert.equal(computeEdgarMetrics(facts, {}), null);
+});
+
+test("computeTrajectory yields quarterly rev/margin rows and annualized dilution", () => {
+  const facts = syntheticFacts();
+  // Shares: 1000 -> 1100 over ~2 years = ~+4.9%/yr dilution.
+  facts.facts["dei"] = {
+    EntityCommonStockSharesOutstanding: { units: { shares: [
+      { end: iso(760), val: 1000, filed: iso(755) },
+      { end: iso(30), val: 1100, filed: iso(25) },
+    ] } },
+  };
+  const t = computeTrajectory(facts);
+  assert.ok(t.quarters.length >= 4 && t.quarters.length <= 8);
+  const last = t.quarters[t.quarters.length - 1];
+  assert.equal(last.revenue, 290);
+  assert.ok(Math.abs(last.margin - 10) < 0.01, `margin ${last.margin}`);
+  assert.ok(Math.abs(last.revYoY - 16) < 0.01, `revYoY ${last.revYoY} (290 vs 250)`);
+  assert.ok(t.dilution.annualPct > 4 && t.dilution.annualPct < 6, `dilution ${t.dilution.annualPct}`);
 });
 
 test("mergeMetrics fills gaps from EDGAR, confirms agreement, flags conflicts", () => {
