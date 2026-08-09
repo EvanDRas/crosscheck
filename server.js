@@ -16,6 +16,7 @@ import { getQuoteCached } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGrade, hasTiingoKey } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
+import { marketNews } from "./lib/news.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
@@ -200,6 +201,51 @@ app.get("/api/compare", async (req, res) => {
     if (err instanceof FinnhubError) return res.status(err.status === 429 ? 429 : 502).json({ error: err.message });
     console.error("compare failed:", err);
     res.status(500).json({ error: "Could not build the peer comparison." });
+  }
+});
+
+// Landing-page market overview: index levels, a clickable mega-cap board,
+// and market headlines. One shared cache serves every visitor for 2 minutes,
+// so the front page costs ~11 API calls per interval — not per page load.
+// Keyless: quotes are unavailable, headlines still flow (RSS needs no key).
+const INDICES = [
+  ["SPY", "S&P 500"],
+  ["QQQ", "Nasdaq 100"],
+  ["DIA", "Dow"],
+  ["IWM", "Russell 2000"],
+];
+const BOARD = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA"];
+let marketCache = null;
+app.get("/api/market", async (_req, res) => {
+  try {
+    if (marketCache && Date.now() - marketCache.at < 120_000) return res.json(marketCache.payload);
+    const apiKey = process.env.FINNHUB_API_KEY;
+    const quoteRow = async ([symbol, label]) => {
+      try {
+        const q = await getQuoteCached(symbol, apiKey);
+        if (!q?.c) return null;
+        return { symbol, label: label ?? symbol, price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
+      } catch {
+        return null;
+      }
+    };
+    const [indices, board, news] = await Promise.all([
+      apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
+      apiKey ? Promise.all(BOARD.map((s) => quoteRow([s, s]))) : [],
+      marketNews(apiKey).catch(() => []),
+    ]);
+    const payload = {
+      asOf: new Date().toISOString(),
+      hasKey: Boolean(apiKey),
+      indices: indices.filter(Boolean),
+      board: board.filter(Boolean),
+      news,
+    };
+    marketCache = { at: Date.now(), payload };
+    res.json(payload);
+  } catch (err) {
+    console.error("market failed:", err);
+    res.status(500).json({ error: "Could not load the market overview." });
   }
 });
 

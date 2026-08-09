@@ -1366,7 +1366,83 @@ $("brandLink").addEventListener("click", (e) => {
   el.intro.hidden = false;
   el.input.value = "";
   el.input.focus();
+  loadMarket();
 });
+
+// ---------- market overview (the landing page) ----------
+
+const chgCls = (v) => (isNum(v) ? (v > 0 ? "pos" : v < 0 ? "neg" : "") : "");
+// Prices always get two decimals — "354.3" reads like a typo on a terminal.
+const fmtPrice = (v) =>
+  isNum(v) ? v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null;
+
+function renderMarket(m) {
+  const strip = $("marketStrip");
+  if (m.indices?.length) {
+    strip.innerHTML = m.indices.map((i) => `
+      <div class="mkt-tile">
+        <div class="mkt-label">${esc(i.label)} · ${esc(i.symbol)}</div>
+        <div class="mkt-price">${esc(fmtPrice(i.price) ?? "—")}</div>
+        <div class="mkt-chg ${chgCls(i.changePercent)}">${esc(isNum(i.change) && isNum(i.changePercent) ? `${i.change > 0 ? "+" : ""}${fmtPrice(i.change)} (${fmtPct(i.changePercent, true)})` : "—")}</div>
+      </div>`).join("");
+    strip.hidden = false;
+  } else strip.hidden = true;
+
+  const board = $("marketBoard");
+  if (m.board?.length) {
+    board.innerHTML = `
+      <h2>The big board</h2>
+      <p class="sub">Mega-caps right now — click any row for the full crosscheck.</p>
+      <table class="mkt-table">
+        ${m.board.map((r) => `
+          <tr class="mkt-row" data-t="${esc(r.symbol)}">
+            <td class="mkt-sym">${esc(r.symbol)}</td>
+            <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
+            <td class="num ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</td>
+          </tr>`).join("")}
+      </table>`;
+    board.hidden = false;
+  } else board.hidden = true;
+
+  const newsEl = $("marketNews");
+  if (m.news?.length) {
+    newsEl.innerHTML = `
+      <h2>Market news</h2>
+      <p class="sub">Merged from Google News${m.hasKey ? " and Finnhub" : ""} — deduplicated, newest first.</p>
+      <ul class="news-list">
+        ${m.news.map((n) => `
+          <li class="news-item">
+            <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
+            <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}</div>
+          </li>`).join("")}
+      </ul>`;
+    newsEl.hidden = false;
+  } else newsEl.hidden = true;
+}
+
+async function loadMarket() {
+  try {
+    const res = await fetch("/api/market");
+    if (!res.ok) return;
+    renderMarket(await res.json());
+  } catch {
+    /* landing page just stays minimal — the search bar still works */
+  }
+}
+
+$("marketBoard").addEventListener("click", (e) => {
+  const t = e.target.closest?.(".mkt-row")?.dataset?.t;
+  if (t) {
+    el.dateInput.value = "";
+    go(t);
+  }
+});
+
+// Keep the landing data fresh while it's on screen. The server caches the
+// payload for 2 minutes, so this polling costs nothing extra upstream.
+setInterval(() => {
+  if (!el.intro.hidden) loadMarket();
+}, 120_000);
 
 window.addEventListener("hashchange", () => {
   const t = location.hash.slice(1);
@@ -1422,6 +1498,9 @@ $("setupSaveBtn").addEventListener("click", async () => {
 
 checkSetup();
 
-// Deep link: /#AAPL analyzes on load.
+// Deep link: /#AAPL analyzes on load; otherwise land on the market overview.
 if (location.hash.length > 1) analyze(location.hash.slice(1));
-else el.input.focus();
+else {
+  el.input.focus();
+  loadMarket();
+}

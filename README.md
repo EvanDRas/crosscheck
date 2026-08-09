@@ -45,6 +45,11 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   Momentum 10 / Analyst 15), weights renormalize over whatever data exists, and
   the UI shows every sub-score. Fewer than two scorable categories → an honest
   "NOT ENOUGH DATA" instead of a fake verdict.
+- **Market overview homepage**: the landing page opens on live index levels
+  (S&P 500, Nasdaq 100, Dow, Russell 2000 via ETF proxies), a clickable
+  mega-cap board, and aggregated market headlines — one shared server cache
+  serves every visitor for 2 minutes, so the front page costs ~11 API calls
+  per interval total. Keyless, the headlines still flow (RSS needs no key).
 - **Live prices, not delayed:** the quote refreshes on every request even when
   the heavy payload is served from cache (1 API call instead of ~7), and while
   a result is on screen the price block streams real-time trades from
