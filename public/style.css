@@ -95,6 +95,54 @@ a:hover { text-decoration: underline; }
   flex: 1;
   min-width: 220px;
   max-width: 420px;
+  position: relative;
+}
+
+/* Search typeahead — anchored under the ticker input. */
+.typeahead {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 280px;
+  max-width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 3px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 40;
+  overflow: hidden;
+}
+.typeahead button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-2);
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.typeahead button:first-child { border-top: none; }
+.typeahead button b {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 52px;
+}
+.typeahead button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+.typeahead button:hover, .typeahead button.active {
+  background: rgba(79, 134, 198, 0.12);
+  color: var(--ink);
 }
 #tickerInput {
   flex: 1;
@@ -259,7 +307,66 @@ a:hover { text-decoration: underline; }
 .mkt-sym { font-weight: 600; letter-spacing: 0.4px; }
 .mkt-row:hover .mkt-sym { color: var(--accent); }
 
+/* Recently viewed — quiet one-liner under the intro chips. */
+.recent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.recent-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 2px;
+}
+.recent-row button {
+  background: none;
+  border: 1px solid var(--baseline);
+  border-radius: 3px;
+  color: var(--ink-2);
+  padding: 2px 9px;
+  font-size: 12px;
+  font-family: var(--mono);
+  cursor: pointer;
+}
+.recent-row button:hover { border-color: var(--accent); color: var(--ink); }
+.recent-row .recent-clear {
+  border: none;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 11px;
+}
+.recent-row .recent-clear:hover { color: var(--ink-2); }
+
 /* Verdict screen — the whole batch universe, scrollable, ranked by score. */
+.screen-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 2px 0 10px;
+}
+.screen-filters button {
+  background: none;
+  border: 1px solid var(--baseline);
+  border-radius: 3px;
+  color: var(--muted);
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: var(--mono);
+  cursor: pointer;
+}
+.screen-filters button:hover { border-color: var(--accent); color: var(--ink); }
+.screen-filters button.active {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: rgba(79, 134, 198, 0.1);
+}
+.screen-table th.sortable { cursor: pointer; user-select: none; }
+.screen-table th.sortable:hover { color: var(--ink-2); }
 .screen-scroll {
   max-height: 430px;
   overflow-y: auto;

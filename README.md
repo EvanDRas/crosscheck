@@ -56,6 +56,10 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   ledger (zero API calls). Click any row for the full analysis. Populates
   after the first `npm run batch`; every call shown is graded in public on
   the track record page.
+- **Fast to drive**: search-as-you-type company lookup ("coca cola" → KO)
+  with arrow-key navigation, a recently-viewed row on the homepage, sortable
+  and filterable verdict screen (Buys / Holds / Sells), "/" focuses search
+  from anywhere, and the browser back button returns to the market overview.
 - **Live prices, not delayed:** the quote refreshes on every request even when
   the heavy payload is served from cache (1 API call instead of ~7), and while
   a result is on screen the price block streams real-time trades from

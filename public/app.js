@@ -1136,6 +1136,7 @@ function render(d) {
   renderPeers(d);
   renderNews(d);
   startLive(d);
+  if (!d.demo && d.ticker) pushRecent(d.ticker);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -1352,21 +1353,32 @@ $("introChips").addEventListener("click", (e) => {
   }
 });
 
-$("brandLink").addEventListener("click", (e) => {
-  e.preventDefault();
+// One canonical way back to the landing view — used by the brand link and
+// by the browser back button (hash cleared). Bumping viewSeq and aborting
+// the in-flight request means a half-finished analysis can't render over it.
+function showHome() {
+  viewSeq++;
+  inFlight?.abort();
   stopLive();
-  history.replaceState(null, "", location.pathname);
   el.results.hidden = true;
   el.tmResults.hidden = true;
   el.dateInput.value = "";
   el.error.hidden = true;
+  el.suggest.hidden = true;
   el.demoNote.hidden = true;
   el.warnings.hidden = true;
   el.status.hidden = true;
+  el.btn.disabled = false;
   el.intro.hidden = false;
+  loadMarket();
+}
+
+$("brandLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  history.replaceState(null, "", location.pathname);
+  showHome();
   el.input.value = "";
   el.input.focus();
-  loadMarket();
 });
 
 // ---------- market overview (the landing page) ----------
@@ -1404,34 +1416,8 @@ function renderMarket(m) {
     board.hidden = false;
   } else board.hidden = true;
 
-  const scr = $("screenCard");
-  if (m.screen?.length) {
-    scr.innerHTML = `
-      <h2>Verdict screen</h2>
-      <p class="sub">The formula's latest pass over its fixed ${m.screen.length}-stock universe, ranked by
-        overall score (logged ${esc(m.screen[0].date)}). A mechanical screen — every one of these calls is
-        graded in public on the <a href="/ledger.html">track record</a>, and the formula's backtests are on the
-        <a href="/evidence.html">evidence page</a>. Not advice. Click a row for the full picture.</p>
-      <div class="screen-scroll">
-        <table class="mkt-table screen-table">
-          <thead>
-            <tr><th>#</th><th>Ticker</th><th class="num">Score</th><th>Verdict</th><th class="opt">Near-term</th><th class="opt">Long-term</th></tr>
-          </thead>
-          <tbody>
-            ${m.screen.map((r, i) => `
-              <tr class="mkt-row" data-t="${esc(r.ticker)}">
-                <td class="rank">${i + 1}</td>
-                <td class="mkt-sym">${esc(r.ticker)}</td>
-                <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
-                <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
-                <td class="opt">${r.nt ? `<span class="pill-sm ${verdictClass(r.nt)}">${esc(r.nt)}</span>` : "—"}</td>
-                <td class="opt">${r.lt ? `<span class="pill-sm ${verdictClass(r.lt)}">${esc(r.lt)}</span>` : "—"}</td>
-              </tr>`).join("")}
-          </tbody>
-        </table>
-      </div>`;
-    scr.hidden = false;
-  } else scr.hidden = true;
+  screenData = m.screen ?? [];
+  renderScreen();
 
   const newsEl = $("marketNews");
   if (m.news?.length) {
@@ -1452,7 +1438,76 @@ function renderMarket(m) {
   } else newsEl.hidden = true;
 }
 
+// Verdict screen state: the payload survives refreshes; sort and filter are
+// view state that must survive the 2-minute re-poll without snapping back.
+let screenData = [];
+let screenSort = { key: "score", dir: -1 };
+let screenFilter = "ALL";
+const SCREEN_GROUPS = { BUY: ["STRONG BUY", "BUY"], HOLD: ["HOLD"], SELL: ["SELL", "STRONG SELL"] };
+const SCREEN_LABELS = { ALL: "All", BUY: "Buys", HOLD: "Holds", SELL: "Sells" };
+
+function renderScreen() {
+  const scr = $("screenCard");
+  if (!screenData.length) {
+    scr.hidden = true;
+    return;
+  }
+  const counts = { ALL: screenData.length };
+  for (const [g, vs] of Object.entries(SCREEN_GROUPS)) counts[g] = screenData.filter((r) => vs.includes(r.verdict)).length;
+  const rows = (screenFilter === "ALL" ? [...screenData] : screenData.filter((r) => SCREEN_GROUPS[screenFilter].includes(r.verdict)))
+    .sort((a, b) => (screenSort.key === "ticker"
+      ? screenSort.dir * a.ticker.localeCompare(b.ticker)
+      : screenSort.dir * ((a.score ?? 0) - (b.score ?? 0))));
+  const arrow = (k) => (screenSort.key === k ? (screenSort.dir === -1 ? " ↓" : " ↑") : "");
+  scr.innerHTML = `
+    <h2>Verdict screen</h2>
+    <p class="sub">The formula's latest pass over its fixed ${screenData.length}-stock universe
+      (logged ${esc(screenData[0].date)}). A mechanical screen — every one of these calls is
+      graded in public on the <a href="/ledger.html">track record</a>, and the formula's backtests are on the
+      <a href="/evidence.html">evidence page</a>. Not advice. Click a row for the full picture.</p>
+    <div class="screen-filters">
+      ${["ALL", "BUY", "HOLD", "SELL"].map((g) =>
+        `<button type="button" data-f="${g}" class="${screenFilter === g ? "active" : ""}">${SCREEN_LABELS[g]} · ${counts[g]}</button>`).join("")}
+    </div>
+    <div class="screen-scroll">
+      <table class="mkt-table screen-table">
+        <thead>
+          <tr><th>#</th><th class="sortable" data-sort="ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score">Score${arrow("score")}</th><th>Verdict</th><th class="opt">Near-term</th><th class="opt">Long-term</th></tr>
+        </thead>
+        <tbody>
+          ${rows.map((r, i) => `
+            <tr class="mkt-row" data-t="${esc(r.ticker)}">
+              <td class="rank">${i + 1}</td>
+              <td class="mkt-sym">${esc(r.ticker)}</td>
+              <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
+              <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
+              <td class="opt">${r.nt ? `<span class="pill-sm ${verdictClass(r.nt)}">${esc(r.nt)}</span>` : "—"}</td>
+              <td class="opt">${r.lt ? `<span class="pill-sm ${verdictClass(r.lt)}">${esc(r.lt)}</span>` : "—"}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  scr.hidden = false;
+}
+
+// Filter chips and sortable headers live inside the same card as the rows;
+// they have no data-t / .mkt-row, so the row-click delegation ignores them.
+$("screenCard").addEventListener("click", (e) => {
+  const f = e.target.closest?.("[data-f]")?.dataset?.f;
+  if (f) {
+    screenFilter = f;
+    renderScreen();
+    return;
+  }
+  const s = e.target.closest?.("th[data-sort]")?.dataset?.sort;
+  if (s) {
+    screenSort = { key: s, dir: screenSort.key === s ? -screenSort.dir : (s === "score" ? -1 : 1) };
+    renderScreen();
+  }
+});
+
 async function loadMarket() {
+  renderRecent();
   try {
     const res = await fetch("/api/market");
     if (!res.ok) return;
@@ -1481,7 +1536,131 @@ setInterval(() => {
 window.addEventListener("hashchange", () => {
   const t = location.hash.slice(1);
   if (t) analyze(t);
+  else showHome(); // browser back from #TICKER lands on the market overview
 });
+
+// ---------- recently viewed ----------
+
+const RECENT_KEY = "cc_recent";
+
+function readRecent() {
+  try {
+    const a = JSON.parse(localStorage.getItem(RECENT_KEY));
+    return Array.isArray(a) ? a.filter((t) => typeof t === "string").slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+
+function pushRecent(t) {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify([t, ...readRecent().filter((x) => x !== t)].slice(0, 8)));
+  } catch {
+    /* storage blocked (private mode) — recents just don't persist */
+  }
+}
+
+function renderRecent() {
+  const row = $("recentRow");
+  const a = readRecent();
+  if (!a.length) {
+    row.hidden = true;
+    return;
+  }
+  row.innerHTML = `<span class="recent-label">Recent</span>`
+    + a.map((t) => `<button type="button" data-t="${esc(t)}">${esc(t)}</button>`).join("")
+    + `<button type="button" class="recent-clear" data-clear="1">clear</button>`;
+  row.hidden = false;
+}
+
+$("recentRow").addEventListener("click", (e) => {
+  if (e.target?.dataset?.clear) {
+    try { localStorage.removeItem(RECENT_KEY); } catch { /* already gone */ }
+    renderRecent();
+    return;
+  }
+  const t = e.target?.dataset?.t;
+  if (t) go(t);
+});
+
+// ---------- search typeahead ----------
+
+// Company-name-to-ticker as you type: debounced against /api/search (which
+// has its own 1-hour server cache), best-effort, keyboard-first. Keyless
+// installs skip it — search needs a Finnhub key.
+const ta = $("typeahead");
+let taSeq = 0;
+let taTimer = null;
+let taItems = [];
+let taActive = -1;
+
+function taClose() {
+  ta.hidden = true;
+  taItems = [];
+  taActive = -1;
+}
+
+function taRender() {
+  ta.innerHTML = taItems.map((r, i) =>
+    `<button type="button" data-i="${i}" class="${i === taActive ? "active" : ""}"><b>${esc(r.symbol)}</b><span>${esc(r.name)}</span></button>`).join("");
+  ta.hidden = !taItems.length;
+}
+
+el.input.addEventListener("input", () => {
+  const q = el.input.value.trim();
+  clearTimeout(taTimer);
+  if (!hasKey || q.length < 2) {
+    taClose();
+    return;
+  }
+  taTimer = setTimeout(async () => {
+    const seq = ++taSeq;
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const { results } = await res.json();
+      if (seq !== taSeq || document.activeElement !== el.input) return;
+      taItems = (results ?? []).slice(0, 6);
+      taActive = -1;
+      taRender();
+    } catch {
+      /* typeahead is best-effort — plain submit still works */
+    }
+  }, 250);
+});
+
+el.input.addEventListener("keydown", (e) => {
+  if (ta.hidden) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const d = e.key === "ArrowDown" ? 1 : -1;
+    taActive = (taActive + d + taItems.length) % taItems.length;
+    taRender();
+  } else if (e.key === "Enter") {
+    if (taActive >= 0) {
+      e.preventDefault();
+      const t = taItems[taActive].symbol;
+      taClose();
+      go(t);
+    } else {
+      taClose(); // fall through to the normal form submit
+    }
+  } else if (e.key === "Escape") {
+    taClose();
+  }
+});
+
+// mousedown (not click) so the pick lands before the input's blur closes us.
+ta.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  const b = e.target.closest("button");
+  if (!b) return;
+  const t = taItems[Number(b.dataset.i)]?.symbol;
+  taClose();
+  if (t) go(t);
+});
+
+el.input.addEventListener("blur", () => setTimeout(taClose, 120));
+el.form.addEventListener("submit", taClose);
 
 // ---------- first-run setup ----------
 
