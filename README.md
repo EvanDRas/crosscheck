@@ -50,6 +50,12 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   mega-cap board, and aggregated market headlines — one shared server cache
   serves every visitor for 2 minutes, so the front page costs ~11 API calls
   per interval total. Keyless, the headlines still flow (RSS needs no key).
+- **Verdict screen**: a browsable, scrollable ranking of the entire fixed
+  50-stock batch universe by the formula's latest logged score — overall,
+  near-term, and long-term verdicts per row, served straight from the local
+  ledger (zero API calls). Click any row for the full analysis. Populates
+  after the first `npm run batch`; every call shown is graded in public on
+  the track record page.
 - **Live prices, not delayed:** the quote refreshes on every request even when
   the heavy payload is served from cache (1 API call instead of ~7), and while
   a result is on screen the price block streams real-time trades from

@@ -1404,6 +1404,35 @@ function renderMarket(m) {
     board.hidden = false;
   } else board.hidden = true;
 
+  const scr = $("screenCard");
+  if (m.screen?.length) {
+    scr.innerHTML = `
+      <h2>Verdict screen</h2>
+      <p class="sub">The formula's latest pass over its fixed ${m.screen.length}-stock universe, ranked by
+        overall score (logged ${esc(m.screen[0].date)}). A mechanical screen — every one of these calls is
+        graded in public on the <a href="/ledger.html">track record</a>, and the formula's backtests are on the
+        <a href="/evidence.html">evidence page</a>. Not advice. Click a row for the full picture.</p>
+      <div class="screen-scroll">
+        <table class="mkt-table screen-table">
+          <thead>
+            <tr><th>#</th><th>Ticker</th><th class="num">Score</th><th>Verdict</th><th class="opt">Near-term</th><th class="opt">Long-term</th></tr>
+          </thead>
+          <tbody>
+            ${m.screen.map((r, i) => `
+              <tr class="mkt-row" data-t="${esc(r.ticker)}">
+                <td class="rank">${i + 1}</td>
+                <td class="mkt-sym">${esc(r.ticker)}</td>
+                <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
+                <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
+                <td class="opt">${r.nt ? `<span class="pill-sm ${verdictClass(r.nt)}">${esc(r.nt)}</span>` : "—"}</td>
+                <td class="opt">${r.lt ? `<span class="pill-sm ${verdictClass(r.lt)}">${esc(r.lt)}</span>` : "—"}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    scr.hidden = false;
+  } else scr.hidden = true;
+
   const newsEl = $("marketNews");
   if (m.news?.length) {
     newsEl.innerHTML = `
@@ -1433,13 +1462,15 @@ async function loadMarket() {
   }
 }
 
-$("marketBoard").addEventListener("click", (e) => {
-  const t = e.target.closest?.(".mkt-row")?.dataset?.t;
-  if (t) {
-    el.dateInput.value = "";
-    go(t);
-  }
-});
+for (const id of ["marketBoard", "screenCard"]) {
+  $(id).addEventListener("click", (e) => {
+    const t = e.target.closest?.(".mkt-row")?.dataset?.t;
+    if (t) {
+      el.dateInput.value = "";
+      go(t);
+    }
+  });
+}
 
 // Keep the landing data fresh while it's on screen. The server caches the
 // payload for 2 minutes, so this polling costs nothing extra upstream.

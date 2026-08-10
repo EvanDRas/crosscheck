@@ -215,6 +215,35 @@ const INDICES = [
   ["IWM", "Russell 2000"],
 ];
 const BOARD = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA"];
+
+// Browsable verdict screen: the daily batch already logs the whole fixed
+// 50-stock universe, so the landing page can rank it from disk — zero API
+// calls. Current-formula (v2) entries only; the newest entry per ticker wins.
+function buildScreen() {
+  try {
+    const uni = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
+    const universe = new Set(uni.tickers ?? []);
+    const latest = new Map();
+    for (const e of readLedger()) {
+      if (universe.has(e.ticker) && e.formulaVersion === SCORING_VERSION) latest.set(e.ticker, e);
+    }
+    return [...latest.values()]
+      .filter((e) => Number.isFinite(e.score))
+      .sort((a, b) => b.score - a.score)
+      .map((e) => ({
+        ticker: e.ticker,
+        score: e.score,
+        verdict: e.verdict,
+        confidence: e.confidence ?? null,
+        nt: e.ntVerdict ?? null,
+        lt: e.ltVerdict ?? null,
+        date: e.date,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 let marketCache = null;
 app.get("/api/market", async (_req, res) => {
   try {
@@ -240,6 +269,7 @@ app.get("/api/market", async (_req, res) => {
       indices: indices.filter(Boolean),
       board: board.filter(Boolean),
       news,
+      screen: buildScreen(),
     };
     marketCache = { at: Date.now(), payload };
     res.json(payload);

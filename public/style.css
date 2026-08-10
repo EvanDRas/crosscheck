@@ -259,6 +259,37 @@ a:hover { text-decoration: underline; }
 .mkt-sym { font-weight: 600; letter-spacing: 0.4px; }
 .mkt-row:hover .mkt-sym { color: var(--accent); }
 
+/* Verdict screen — the whole batch universe, scrollable, ranked by score. */
+.screen-scroll {
+  max-height: 430px;
+  overflow-y: auto;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.screen-table th {
+  position: sticky;
+  top: 0;
+  background: var(--page);
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--baseline);
+}
+.screen-table th.num { text-align: right; }
+.screen-table .rank {
+  color: var(--muted);
+  font-size: 11px;
+  width: 26px;
+}
+.screen-table .pill-sm { white-space: nowrap; }
+@media (max-width: 720px) {
+  .screen-table .opt { display: none; }
+}
+
 /* Small press-style thumbnails — muted so photos don't shout over the data. */
 .news-item.has-thumb { display: flex; gap: 12px; align-items: flex-start; }
 .news-item.has-thumb .news-body { min-width: 0; }
