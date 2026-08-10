@@ -307,6 +307,34 @@ a:hover { text-decoration: underline; }
 .mkt-sym { font-weight: 600; letter-spacing: 0.4px; }
 .mkt-row:hover .mkt-sym { color: var(--accent); }
 
+/* Today's movers — two ranked mini-tables inside one card. */
+.movers-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 32px;
+}
+@media (max-width: 720px) {
+  .movers-cols { grid-template-columns: 1fr; gap: 14px 0; }
+}
+.movers-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+/* Record strip — the forward test's own numbers on the homepage. */
+.record-strip { margin-top: 4px; grid-template-columns: repeat(6, auto); justify-content: start; }
+.record-strip .mkt-tile { padding-right: 24px; }
+.record-val { font-size: 17px; }
+.record-val.pos { color: var(--good); }
+@media (max-width: 860px) {
+  .record-strip { grid-template-columns: repeat(2, 1fr); }
+  .record-strip .mkt-tile { border-left: none; padding-left: 0; }
+}
+
 /* Recently viewed — quiet one-liner under the intro chips. */
 .recent-row {
   display: flex;

@@ -1506,18 +1506,127 @@ $("screenCard").addEventListener("click", (e) => {
   }
 });
 
-async function loadMarket() {
-  renderRecent();
-  try {
-    const res = await fetch("/api/market");
-    if (!res.ok) return;
-    renderMarket(await res.json());
-  } catch {
-    /* landing page just stays minimal — the search bar still works */
+function renderMovers(m) {
+  const card = $("moversCard");
+  const rows = (m.rows ?? []).filter((r) => isNum(r.changePercent));
+  if (rows.length < 10) {
+    card.hidden = true;
+    return;
   }
+  const sorted = [...rows].sort((a, b) => b.changePercent - a.changePercent);
+  const cols = [
+    ["Gainers", sorted.slice(0, 5)],
+    ["Losers", sorted.slice(-5).reverse()],
+  ];
+  card.innerHTML = `
+    <h2>Today's movers</h2>
+    <p class="sub">Biggest moves across the 50-stock universe right now. Click through for the whole story.</p>
+    <div class="movers-cols">
+      ${cols.map(([label, list]) => `
+        <div>
+          <div class="movers-label">${label}</div>
+          <table class="mkt-table">
+            ${list.map((r) => `
+              <tr class="mkt-row" data-t="${esc(r.ticker)}">
+                <td class="mkt-sym">${esc(r.ticker)}</td>
+                <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
+                <td class="num ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</td>
+              </tr>`).join("")}
+          </table>
+        </div>`).join("")}
+    </div>`;
+  card.hidden = false;
 }
 
-for (const id of ["marketBoard", "screenCard"]) {
+function renderRecord(s) {
+  const card = $("recordCard");
+  if (!s || s.empty || !s.calls) {
+    card.hidden = true;
+    return;
+  }
+  const exc = (v) => (isNum(v) ? `${v > 0 ? "+" : ""}${fmtNum(v, 1)}% vs SPY` : "—");
+  // Small-sample guards: a hit rate off one aged call is noise dressed up
+  // as a number — hold the tiles back until enough calls have aged.
+  const tiles = [
+    ["Calls logged", String(s.calls), ""],
+    ["Days running", String(s.days), ""],
+    ["Graded so far", String(s.graded), ""],
+    ["Beat the S&P", isNum(s.beatPct) && s.graded >= 10 ? `${fmtNum(s.beatPct, 0)}%` : "too early", isNum(s.beatPct) && s.graded >= 10 && s.beatPct >= 50 ? "pos" : ""],
+    s.best && s.graded >= 5 ? ["Best aged call", `${esc(s.best.ticker)} ${exc(s.best.excessPct)}`, s.best.excessPct > 0 ? "pos" : ""] : null,
+    s.worst && s.graded >= 5 ? ["Worst aged call", `${esc(s.worst.ticker)} ${exc(s.worst.excessPct)}`, ""] : null,
+  ].filter(Boolean);
+  card.innerHTML = `
+    <h2>The forward test, live</h2>
+    <p class="sub">Every verdict the formula logs is frozen and graded against the S&P in public —
+      wins and losses alike. The full graded ledger is on the <a href="/ledger.html">track record</a> page.</p>
+    <div class="mkt-strip record-strip">
+      ${tiles.map(([label, val, cls]) => `
+        <div class="mkt-tile">
+          <div class="mkt-label">${label}</div>
+          <div class="mkt-price record-val ${cls}">${val}</div>
+        </div>`).join("")}
+    </div>`;
+  card.hidden = false;
+}
+
+// Curated past dates worth exploring — each one runs the point-in-time
+// engine: only that day's filings and prices, graded against everything
+// since. Needs a Tiingo key, so the row hides without one.
+const MOMENTS = [
+  ["NVDA", "2023-01-03", "NVDA on the eve of the AI boom"],
+  ["META", "2022-11-04", "Meta at the 2022 bottom"],
+  ["TSLA", "2020-01-02", "Tesla before the 2020 run"],
+  ["AMD", "2016-01-04", "AMD left for dead"],
+  ["GME", "2021-01-04", "GameStop, the month of the squeeze"],
+  ["BA", "2019-03-01", "Boeing days before the second MAX crash"],
+];
+
+function renderMoments() {
+  const card = $("momentsCard");
+  if (!hasTiingo) {
+    card.hidden = true;
+    return;
+  }
+  card.innerHTML = `
+    <h2>Time machine moments</h2>
+    <p class="sub">What would the formula have said — knowing only what was filed and priced by that day?
+      Each call is graded against everything since. No hindsight, no excuses.</p>
+    <div class="intro-chips">
+      ${MOMENTS.map(([t, d, label]) =>
+        `<button type="button" class="tm-chip" data-t="${esc(t)}" data-d="${esc(d)}">${esc(label)}</button>`).join("")}
+    </div>`;
+  card.hidden = false;
+}
+
+$("momentsCard").addEventListener("click", (e) => {
+  const t = e.target?.dataset?.t;
+  const d = e.target?.dataset?.d;
+  if (t && d) {
+    el.input.value = t;
+    el.dateInput.value = d;
+    timeMachine(t, d);
+  }
+});
+
+async function loadMarket() {
+  renderRecent();
+  renderMoments();
+  const grab = async (url, render) => {
+    try {
+      const res = await fetch(url);
+      if (res.ok) render(await res.json());
+    } catch {
+      /* each landing block is independent garnish — the search bar always works */
+    }
+  };
+  await Promise.allSettled([
+    grab("/api/market", renderMarket),
+    grab("/api/movers", renderMovers),
+    grab("/api/homestats", renderRecord),
+  ]);
+}
+
+for (const id of ["marketBoard", "screenCard", "moversCard"]) {
   $(id).addEventListener("click", (e) => {
     const t = e.target.closest?.(".mkt-row")?.dataset?.t;
     if (t) {
@@ -1665,13 +1774,16 @@ el.form.addEventListener("submit", taClose);
 // ---------- first-run setup ----------
 
 let hasKey = true; // optimistic until /api/health says otherwise
+let hasTiingo = false; // pessimistic — gates the time-machine moments row
 
 async function checkSetup() {
   try {
     const res = await fetch("/api/health");
     const h = await res.json();
     hasKey = Boolean(h.hasKey);
+    hasTiingo = Boolean(h.hasTiingo);
     el.setup.hidden = hasKey;
+    renderMoments(); // flags arrived after the first landing render
   } catch {
     /* server unreachable — the analyze path will surface it */
   }

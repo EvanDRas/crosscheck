@@ -46,10 +46,14 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   the UI shows every sub-score. Fewer than two scorable categories → an honest
   "NOT ENOUGH DATA" instead of a fake verdict.
 - **Market overview homepage**: the landing page opens on live index levels
-  (S&P 500, Nasdaq 100, Dow, Russell 2000 via ETF proxies), a clickable
-  mega-cap board, and aggregated market headlines — one shared server cache
-  serves every visitor for 2 minutes, so the front page costs ~11 API calls
-  per interval total. Keyless, the headlines still flow (RSS needs no key).
+  (S&P 500, Nasdaq 100, Dow, Russell 2000 via ETF proxies), today's biggest
+  gainers and losers across the batch universe, a clickable mega-cap board,
+  aggregated market headlines, the forward test's own live record tiles
+  (calls logged, hit rate once enough calls age — losses included), and a
+  row of curated Time Machine moments to explore. Everything is served from
+  shared server caches, so the front page stays inside free-tier limits no
+  matter how many people load it. Keyless, the headlines still flow (RSS
+  needs no key).
 - **Verdict screen**: a browsable, scrollable ranking of the entire fixed
   50-stock batch universe by the formula's latest logged score — overall,
   near-term, and long-term verdicts per row, served straight from the local

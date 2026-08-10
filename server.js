@@ -14,7 +14,7 @@ import { readPicks, logPick, PICK_DIRECTIONS } from "./lib/picks.js";
 import { updateSnapshot } from "./lib/snapshots.js";
 import { getQuoteCached } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
-import { tiingoGrade, hasTiingoKey } from "./lib/tiingo.js";
+import { tiingoGradeMany, hasTiingoKey } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
 import { marketNews } from "./lib/news.js";
 
@@ -279,6 +279,75 @@ app.get("/api/market", async (_req, res) => {
   }
 });
 
+// Today's movers across the whole batch universe. Quotes go through the
+// shared 2-minute cache and are fetched in chunks to stay inside Finnhub's
+// per-second burst limit; the payload is cached so visitors don't re-trigger
+// 50 lookups. Best-effort garnish — never an error page.
+let moversCache = null;
+app.get("/api/movers", async (_req, res) => {
+  try {
+    if (moversCache && Date.now() - moversCache.at < 150_000) return res.json(moversCache.payload);
+    const apiKey = process.env.FINNHUB_API_KEY;
+    if (!apiKey) return res.json({ rows: [] });
+    const uni = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
+    const tickers = uni.tickers ?? [];
+    const rows = [];
+    for (let i = 0; i < tickers.length; i += 20) {
+      const chunk = await Promise.all(tickers.slice(i, i + 20).map(async (t) => {
+        try {
+          const q = await getQuoteCached(t, apiKey);
+          return q?.c && Number.isFinite(q.dp) ? { ticker: t, price: q.c, changePercent: q.dp } : null;
+        } catch {
+          return null;
+        }
+      }));
+      rows.push(...chunk);
+      if (i + 20 < tickers.length) await new Promise((r) => setTimeout(r, 250));
+    }
+    const payload = { rows: rows.filter(Boolean), asOf: new Date().toISOString() };
+    moversCache = { at: Date.now(), payload };
+    res.json(payload);
+  } catch (err) {
+    console.error("movers failed:", err);
+    res.json({ rows: [] });
+  }
+});
+
+// Homepage record tiles: the forward test's own numbers, from the same
+// grading the ledger page uses. Cached 10 minutes — grading is mostly local
+// (the price panel), with Tiingo only filling gaps through its own cache.
+let homeStatsCache = null;
+app.get("/api/homestats", async (_req, res) => {
+  try {
+    if (homeStatsCache && Date.now() - homeStatsCache.at < homeStatsCache.ttl) return res.json(homeStatsCache.payload);
+    const entries = readLedger();
+    if (!entries.length) return res.json({ empty: true });
+    const { rows, warnings } = await gradeEntries(entries);
+    // A capped or partly-failed grading pass is a cold-start artifact —
+    // keep it only briefly so the tiles self-heal on the next visit.
+    const partial = warnings.some((w) => /Graded \d+ of|grading failed/.test(w));
+    const era = rows.filter((r) => (r.formulaVersion ?? "v1") === SCORING_VERSION);
+    const graded = era.filter((r) => r.excess != null && r.ageDays > 0 && r.basis !== "raw");
+    const beat = graded.filter((r) => r.excess > 0).length;
+    const best = graded.length ? graded.reduce((a, b) => (b.excess > a.excess ? b : a)) : null;
+    const worst = graded.length ? graded.reduce((a, b) => (b.excess < a.excess ? b : a)) : null;
+    const payload = {
+      calls: entries.length,
+      days: new Set(entries.map((e) => e.date)).size,
+      graded: graded.length,
+      beatPct: graded.length ? (100 * beat) / graded.length : null,
+      best: best ? { ticker: best.ticker, excessPct: 100 * best.excess } : null,
+      worst: worst ? { ticker: worst.ticker, excessPct: 100 * worst.excess } : null,
+      asOf: new Date().toISOString(),
+    };
+    homeStatsCache = { at: Date.now(), ttl: partial ? 60_000 : 600_000, payload };
+    res.json(payload);
+  } catch (err) {
+    console.error("homestats failed:", err);
+    res.json({ empty: true });
+  }
+});
+
 // The Time Machine: what the formula would have said on a past date, using
 // only information filed and priced by that day, graded against everything
 // since. The feature that makes the honesty claim interactive.
@@ -441,16 +510,31 @@ async function gradeEntries(entries) {
 
   const tGrades = {};
   if (hasTiingoKey()) {
-    const missingPairs = [...new Set(
-      entries.filter((e) => !grades[`${e.ticker}|${e.date}`]).map((e) => `${e.ticker}|${e.date}`)
-    )].slice(-25);
-    const settled = await Promise.allSettled(missingPairs.map((k) => tiingoGrade(...k.split("|"))));
+    // Group missing (ticker, date) pairs by ticker: one series fetch grades
+    // every date for that ticker at once. Newest tickers first, so a capped
+    // load still grades what the top of the ledger shows; series are cached
+    // for an hour, so consecutive loads finish whatever was left out.
+    const byTicker = new Map();
+    for (const e of [...entries].reverse()) {
+      if (grades[`${e.ticker}|${e.date}`]) continue;
+      if (!byTicker.has(e.ticker)) byTicker.set(e.ticker, new Set());
+      byTicker.get(e.ticker).add(e.date);
+    }
+    const MAX_TICKERS = 30;
+    const capped = [...byTicker.entries()].slice(0, MAX_TICKERS);
+    const settled = await Promise.allSettled(capped.map(([t, dates]) => tiingoGradeMany(t, [...dates])));
     let tiingoFailed = 0;
-    missingPairs.forEach((k, i) => {
-      if (settled[i].status === "fulfilled" && settled[i].value) tGrades[k] = settled[i].value;
-      else if (settled[i].status === "rejected") tiingoFailed++;
+    capped.forEach(([t], i) => {
+      if (settled[i].status === "fulfilled") {
+        for (const [date, g] of Object.entries(settled[i].value)) tGrades[`${t}|${date}`] = g;
+      } else {
+        tiingoFailed++;
+      }
     });
     if (tiingoFailed) warnings.push(`Tiingo grading failed for ${tiingoFailed} ticker(s) this load.`);
+    if (byTicker.size > MAX_TICKERS) {
+      warnings.push(`Graded ${MAX_TICKERS} of ${byTicker.size} tickers this load (free-tier protection) — reload in a few minutes for the rest.`);
+    }
   }
 
   const MAX_QUOTES = 50;
