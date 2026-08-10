@@ -259,6 +259,20 @@ a:hover { text-decoration: underline; }
 .mkt-sym { font-weight: 600; letter-spacing: 0.4px; }
 .mkt-row:hover .mkt-sym { color: var(--accent); }
 
+/* Small press-style thumbnails — muted so photos don't shout over the data. */
+.news-item.has-thumb { display: flex; gap: 12px; align-items: flex-start; }
+.news-item.has-thumb .news-body { min-width: 0; }
+.news-thumb {
+  width: 86px;
+  height: 58px;
+  flex: none;
+  object-fit: cover;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: var(--surface);
+  filter: saturate(0.75) contrast(0.95);
+}
+
 /* ---------- status / banners ---------- */
 
 .status {

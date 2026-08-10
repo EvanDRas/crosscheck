@@ -1411,9 +1411,12 @@ function renderMarket(m) {
       <p class="sub">Merged from Google News${m.hasKey ? " and Finnhub" : ""} — deduplicated, newest first.</p>
       <ul class="news-list">
         ${m.news.map((n) => `
-          <li class="news-item">
-            <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
-            <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}</div>
+          <li class="news-item${/^https:\/\//i.test(n.image ?? "") ? " has-thumb" : ""}">
+            ${/^https:\/\//i.test(n.image ?? "") ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('li').classList.remove('has-thumb'); this.remove()">` : ""}
+            <div class="news-body">
+              <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
+              <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}</div>
+            </div>
           </li>`).join("")}
       </ul>`;
     newsEl.hidden = false;
