@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Learn — Crosscheck</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2214%22 fill=%22%230c0d0f%22/><rect x=%223%22 y=%223%22 width=%2294%22 height=%2294%22 rx=%2212%22 fill=%22none%22 stroke=%22%234f86c6%22 stroke-width=%226%22/><text x=%2250%22 y=%2274%22 font-family=%22Georgia,serif%22 font-size=%2266%22 font-weight=%22bold%22 fill=%22%23e9eaec%22 text-anchor=%22middle%22>C</text></svg>" />
-  <link rel="stylesheet" href="style.css?v=17" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
   <header class="topbar">
@@ -28,6 +28,13 @@
          And because this site tested its own formula and published the null result, you also get the
          lesson most sites skip: how to tell when a number is telling you nothing.</p>
       <nav class="learn-toc" id="learnToc"></nav>
+    </section>
+
+    <section class="card" id="l-callit">
+      <h2>Interactive · Call it</h2>
+      <p class="sub">The fastest way to learn what numbers can and can't tell you: make a call on real data,
+        then find out. Your score versus the formula's accumulates in this browser.</p>
+      <div id="callitMount" class="callit"></div>
     </section>
 
     <section class="card" id="l-verdict">
@@ -52,6 +59,15 @@
          business shrank; Nvidia has looked expensive for a decade while compounding. The formula uses all three
          ratios together, but the honest answer is that valuation alone has never been enough to predict returns.</p>
       <p class="learn-live"><a href="/#INTC">Cheap-looking: INTC →</a> <a href="/#NVDA">Expensive-looking: NVDA →</a></p>
+      <div class="calc" id="peCalc">
+        <div class="mkt-label">Try it · what are you actually paying?</div>
+        <div class="calc-row">
+          <label>Share price <input type="number" id="calcPrice" value="500" min="1" step="1"></label>
+          <label>Earnings per share (yearly) <input type="number" id="calcEps" value="13" min="0.01" step="0.1"></label>
+          <label>Expected growth <span id="calcGrowthOut">15%</span> <input type="range" id="calcGrowth" min="0" max="60" value="15"></label>
+        </div>
+        <div class="calc-out" id="calcOut"></div>
+      </div>
     </section>
 
     <section class="card" id="l-quality">
@@ -170,8 +186,35 @@
     how to read public data; they are not recommendations. Always do your own research.
   </footer>
 
-  <script src="glossary.js?v=17"></script>
+  <script src="glossary.js?v=19"></script>
+  <script src="callit.js?v=19"></script>
   <script>
+    // The game: universe list from /api/movers (keyless installs still get
+    // the list; the Time Machine itself needs a Tiingo key and says so).
+    fetch("/api/movers").then((r) => r.json()).then((m) => {
+      window.mountCallIt(document.getElementById("callitMount"), { tickers: m.universe ?? [] });
+    }).catch(() => {
+      document.getElementById("callitMount").innerHTML = "<p class=\"callit-msg\">Start the app to play — the game needs the local server.</p>";
+    });
+
+    // P/E calculator: turns the ratio into years and a PEG.
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const run = () => {
+        const p = Number($("calcPrice").value);
+        const e = Number($("calcEps").value);
+        const g = Number($("calcGrowth").value);
+        $("calcGrowthOut").textContent = `${g}%`;
+        if (!(p > 0) || !(e > 0)) { $("calcOut").textContent = "Enter a positive price and EPS."; return; }
+        const pe = p / e;
+        const peg = g > 0 ? pe / g : null;
+        $("calcOut").innerHTML = `P/E <b>${pe.toFixed(1)}×</b> — at today's profit it takes <b>${pe.toFixed(0)} years</b> of earnings to pay back the price.
+          ${peg != null ? `With ${g}% growth the PEG is <b>${peg.toFixed(2)}</b> — ${peg < 1 ? "growth more than covers the price." : peg < 2 ? "a fair price for the growth, if it happens." : "you are paying a lot for growth that has to show up."}` : "With no growth, the P/E is the whole story."}`;
+      };
+      ["calcPrice", "calcEps", "calcGrowth"].forEach((id) => $(id).addEventListener("input", run));
+      run();
+    })();
+
     (() => {
       const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       // Table of contents from the lesson headings.

@@ -1043,3 +1043,151 @@ a:hover { text-decoration: underline; }
 .gl-term { border-top: 1px solid var(--hairline); padding: 12px 0 6px; }
 .gl-name { font-weight: 650; margin-bottom: 4px; }
 .gl-use, .gl-caveat { color: var(--muted); }
+
+/* ---------- change badges + refresh flash ---------- */
+
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.badge.pos { background: rgba(61, 156, 107, 0.18); color: var(--good); }
+.badge.neg { background: rgba(191, 77, 77, 0.18); color: var(--critical); }
+@keyframes flashUp { from { background: rgba(61, 156, 107, 0.22); } to { background: transparent; } }
+@keyframes flashDown { from { background: rgba(191, 77, 77, 0.22); } to { background: transparent; } }
+.mkt-tile.flash-up { animation: flashUp 1.4s ease-out; }
+.mkt-tile.flash-down { animation: flashDown 1.4s ease-out; }
+
+/* ---------- news that pops ---------- */
+
+.news-trending {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.news-trending .mkt-label { margin-right: 4px; }
+.news-tag {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 3px;
+  color: var(--ink);
+  padding: 1px 7px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.news-tag:hover { border-color: var(--accent); }
+.news-tag .pos { color: var(--good); font-weight: 500; }
+.news-tag .neg { color: var(--critical); font-weight: 500; }
+.news-tags { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.news-lead { display: block; margin-bottom: 10px; color: inherit; }
+.news-lead:hover { text-decoration: none; }
+.news-lead:hover .news-lead-title { color: var(--accent); }
+.news-lead-img {
+  width: 100%;
+  max-height: 210px;
+  object-fit: cover;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  filter: saturate(0.85);
+  display: block;
+  margin-bottom: 8px;
+}
+.news-lead-title { font-size: 16px; font-weight: 650; line-height: 1.3; color: var(--ink); }
+.news-lead-tags { display: flex; gap: 4px; flex-wrap: wrap; margin: -4px 0 14px; }
+
+/* ---------- heat tile verdict dot ---------- */
+
+.heat-tile { position: relative; }
+.heat-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--baseline);
+}
+.heat-dot.v-strongbuy, .heat-dot.v-buy { background: var(--good); }
+.heat-dot.v-hold { background: var(--warning); }
+.heat-dot.v-sell, .heat-dot.v-strongsell { background: var(--critical); }
+
+/* ---------- Call it (the game) ---------- */
+
+.callit { max-width: 760px; }
+.callit-lead, .callit-q, .callit-note { font-size: 13px; color: var(--ink-2); margin: 0 0 10px; line-height: 1.5; }
+.callit-msg { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.callit-head { font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+.callit-head b { color: var(--ink); font-family: var(--mono); }
+.callit-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px 18px;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  padding: 10px 0;
+  margin-bottom: 10px;
+}
+.callit-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; margin-top: 2px; }
+.callit-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.callit-btn {
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.callit-btn:hover { border-color: var(--accent); }
+.callit-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.callit-score {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.callit-score b { color: var(--ink-2); font-weight: 600; margin-right: 4px; }
+.callit-reset { background: none; border: none; color: var(--muted); font-size: 11px; cursor: pointer; }
+.callit-reset:hover { color: var(--ink-2); }
+.callit-outcome { font-size: 14px; margin-bottom: 8px; }
+.callit-outcome.pos b { color: var(--good); }
+.callit-outcome.neg b { color: var(--critical); }
+.callit-verdicts { font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; margin-bottom: 8px; }
+.callit-verdicts .pos { color: var(--good); }
+.callit-verdicts .neg { color: var(--critical); }
+
+/* ---------- Learn page calculator ---------- */
+
+.calc { border-top: 1px solid var(--hairline); padding-top: 10px; margin-top: 6px; }
+.calc-row { display: flex; gap: 18px; flex-wrap: wrap; margin: 8px 0; }
+.calc-row label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.calc-row input[type="number"] {
+  width: 110px;
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 3px;
+  color: var(--ink);
+  padding: 5px 8px;
+  font-family: var(--mono);
+}
+.calc-row input[type="range"] { width: 160px; accent-color: var(--accent); }
+.calc-out { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.calc-out b { color: var(--ink); font-family: var(--mono); }

@@ -69,9 +69,26 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
 - **Learn as you look** (`/learn.html`): eleven short lessons built on live
   data — reading a verdict, valuation vs quality vs health, look-ahead bias,
   total return, and what this site found when it tested itself — plus a
-  24-term plain-English glossary. Every key number on a result page has a
-  `?` that opens its definition in place: what it is, and what it can't
-  tell you. The homepage rotates one concept a day with a live example.
+  24-term plain-English glossary and an interactive P/E → years → PEG
+  calculator. Every key number on a result page has a `?` that opens its
+  definition in place: what it is, and what it can't tell you. The homepage
+  rotates one concept a day with a live example.
+- **Call it — the game**: a real company's real numbers on a random past
+  date, ticker hidden. You call whether it beat the S&P from that day to
+  now; the truth is revealed alongside what the formula would have said with
+  the same information. Scores accumulate locally, you versus the formula.
+  Every round is a point-in-time reconstruction (no hindsight on either
+  side) — the most honest demonstration on the site of how hard prediction
+  is. On the homepage and the Learn page; needs a Tiingo key.
+- **News that pops**: a lead story with photo, every headline tagged with
+  the universe tickers it mentions (with today's move, clickable), and a
+  "trending in the news" row derived from those mentions. Change badges and
+  refresh-flash on the index strip; verdict dots on every heat-map tile.
+- **Cold-start friendly**: the 50-quote movers sweep runs in the background
+  and the endpoint answers progressively (partial payloads, the page
+  re-polls every 4s), concurrent loads share one computation, and refreshes
+  are stale-while-revalidate — so the first screen is never blank and a
+  fresh launch never rate-limits your first analysis.
 - **Fast to drive**: search-as-you-type company lookup ("coca cola" → KO)
   with arrow-key navigation, a recently-viewed row on the homepage, sortable
   and filterable verdict screen (Buys / Holds / Sells), "/" focuses search

@@ -1424,15 +1424,22 @@ function sparkSvg(vals, w = 84, h = 24) {
   return `<svg class="spark ${up ? "pos" : "neg"}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
+// Last rendered strip prices: a tile flashes green/red when its price moves
+// between refreshes, so a live page visibly breathes.
+let lastStripPrices = {};
+
 function renderMarket(m) {
   const sparks = m.sparks ?? {};
   const strip = $("marketStrip");
   if (m.indices?.length) {
+    const prev = lastStripPrices;
+    lastStripPrices = Object.fromEntries(m.indices.map((i) => [i.symbol, i.price]));
+    const flash = (i) => (isNum(prev[i.symbol]) && prev[i.symbol] !== i.price ? (i.price > prev[i.symbol] ? " flash-up" : " flash-down") : "");
     strip.innerHTML = m.indices.map((i) => `
-      <div class="mkt-tile">
+      <div class="mkt-tile${flash(i)}">
         <div class="mkt-label">${esc(i.label)} · ${esc(i.symbol)}</div>
         <div class="mkt-price">${esc(fmtPrice(i.price) ?? "—")}</div>
-        <div class="mkt-chg ${chgCls(i.changePercent)}">${esc(isNum(i.change) && isNum(i.changePercent) ? `${i.change > 0 ? "+" : ""}${fmtPrice(i.change)} (${fmtPct(i.changePercent, true)})` : "—")}</div>
+        <div class="mkt-chg">${isNum(i.change) && isNum(i.changePercent) ? `<span class="badge ${chgCls(i.changePercent)}">${esc(`${i.change > 0 ? "+" : ""}${fmtPrice(i.change)} (${fmtPct(i.changePercent, true)})`)}</span>` : "—"}</div>
         ${sparks[i.symbol] ? `<div class="mkt-spark" title="Last 30 sessions">${sparkSvg(sparks[i.symbol], 120, 26)}</div>` : ""}
       </div>`).join("");
     strip.hidden = false;
@@ -1449,7 +1456,7 @@ function renderMarket(m) {
             <td class="mkt-sym">${esc(r.symbol)}</td>
             <td class="spark-cell">${sparkSvg(sparks[r.symbol])}</td>
             <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
-            <td class="num ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</td>
+            <td class="num"><span class="badge ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</span></td>
           </tr>`).join("")}
       </table>`;
     board.hidden = false;
@@ -1458,23 +1465,72 @@ function renderMarket(m) {
   screenData = m.screen ?? [];
   renderScreen();
 
+  newsData = { items: m.news ?? [], hasKey: Boolean(m.hasKey) };
+  renderNewsCard();
+  if (moversData) renderHeat(); // verdict dots need screenData, which just arrived
+}
+
+// ---------- news card: lead story, ticker tags, trending ----------
+
+let newsData = null;
+let moversData = null;
+
+// Which universe names does a headline mention? Aliases come from
+// data/universe.json; bare tickers count only at 4+ letters (T, V, MA, GE…
+// are ordinary words).
+function tickersIn(text) {
+  const names = moversData?.names ?? {};
+  const out = [];
+  for (const [t, aliases] of Object.entries(names)) {
+    const pats = [...aliases, ...(t.length >= 4 ? [t] : [])];
+    if (pats.some((a) => new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text))) out.push(t);
+  }
+  return out;
+}
+
+function tagChip(t) {
+  const q = moversData?.rows?.find((r) => r.ticker === t);
+  const dp = q?.changePercent;
+  return `<button type="button" class="news-tag mkt-row" data-t="${esc(t)}">${esc(t)}${isNum(dp) ? ` <span class="${chgCls(dp)}">${esc(fmtPct(dp, true))}</span>` : ""}</button>`;
+}
+
+function renderNewsCard() {
   const newsEl = $("marketNews");
-  if (m.news?.length) {
-    newsEl.innerHTML = `
-      <h2>Market news</h2>
-      <p class="sub">Merged from Google News${m.hasKey ? " and Finnhub" : ""} — deduplicated, newest first.</p>
-      <ul class="news-list">
-        ${m.news.map((n) => `
-          <li class="news-item${/^https:\/\//i.test(n.image ?? "") ? " has-thumb" : ""}">
-            ${/^https:\/\//i.test(n.image ?? "") ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('li').classList.remove('has-thumb'); this.remove()">` : ""}
-            <div class="news-body">
-              <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
-              <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}</div>
-            </div>
-          </li>`).join("")}
-      </ul>`;
-    newsEl.hidden = false;
-  } else newsEl.hidden = true;
+  const items = newsData?.items ?? [];
+  if (!items.length) {
+    newsEl.hidden = true;
+    return;
+  }
+  const hasImg = (n) => /^https:\/\//i.test(n.image ?? "");
+  const leadIdx = items.findIndex(hasImg);
+  const lead = leadIdx >= 0 ? items[leadIdx] : null;
+  const rest = items.filter((_, i) => i !== leadIdx);
+  const tagged = items.map((n) => ({ n, tags: tickersIn(n.headline) }));
+  const counts = new Map();
+  for (const { tags } of tagged) for (const t of tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+  const trending = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t);
+  const tagsFor = (n) => tagged.find((x) => x.n === n)?.tags ?? [];
+  const item = (n) => `
+    <li class="news-item${hasImg(n) ? " has-thumb" : ""}">
+      ${hasImg(n) ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('li').classList.remove('has-thumb'); this.remove()">` : ""}
+      <div class="news-body">
+        <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
+        <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}${tagsFor(n).length ? ` <span class="news-tags">${tagsFor(n).map(tagChip).join("")}</span>` : ""}</div>
+      </div>
+    </li>`;
+  newsEl.innerHTML = `
+    <h2>Market news</h2>
+    <p class="sub">Merged from Google News${newsData.hasKey ? " and Finnhub" : ""} — deduplicated, newest first. Tickers mentioned are tagged with today's move.</p>
+    ${trending.length ? `<div class="news-trending"><span class="mkt-label">Trending in the news</span>${trending.map(tagChip).join("")}</div>` : ""}
+    ${lead ? `
+      <a class="news-lead" href="${esc(safeHref(lead.link))}" target="_blank" rel="noopener noreferrer">
+        <img class="news-lead-img" src="${esc(lead.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">
+        <div class="news-lead-title">${esc(lead.headline)}</div>
+        <div class="news-meta">${esc(lead.source)}${lead.date ? ` · ${esc(relTime(lead.date))}` : ""}</div>
+      </a>
+      ${tagsFor(lead).length ? `<div class="news-lead-tags">${tagsFor(lead).map(tagChip).join("")}</div>` : ""}` : ""}
+    <ul class="news-list">${rest.map(item).join("")}</ul>`;
+  newsEl.hidden = false;
 }
 
 // Verdict screen state: the payload survives refreshes; sort and filter are
@@ -1553,12 +1609,17 @@ function heatStyle(dp) {
   return dp > 0 ? `background: rgba(61, 156, 107, ${a.toFixed(2)})` : `background: rgba(191, 77, 77, ${a.toFixed(2)})`;
 }
 
-function renderHeat(rows, sectors) {
+function renderHeat() {
   const card = $("heatCard");
+  const rows = (moversData?.rows ?? []).filter((r) => isNum(r.changePercent));
+  const sectors = moversData?.sectors;
   if (rows.length < 10 || !sectors || !Object.keys(sectors).length) {
     card.hidden = true;
     return;
   }
+  // Cross-link: the formula's latest verdict as a dot on each tile, so the
+  // map shows both what moved today and what the numbers say.
+  const verdictOf = (t) => screenData.find((r) => r.ticker === t);
   const groups = new Map();
   for (const r of rows) {
     const s = sectors[r.ticker] ?? "Other";
@@ -1588,7 +1649,8 @@ function renderHeat(rows, sectors) {
           <div class="heat-sector-label">${esc(sec)} <span class="${chgCls(avg(list))}">${esc(fmtPct(avg(list), true))}</span></div>
           <div class="heat-tiles">
             ${[...list].sort((a, b) => b.changePercent - a.changePercent).map((r) => `
-              <button type="button" class="heat-tile mkt-row" data-t="${esc(r.ticker)}" style="${heatStyle(r.changePercent)}">
+              <button type="button" class="heat-tile mkt-row" data-t="${esc(r.ticker)}" style="${heatStyle(r.changePercent)}" title="${esc(r.ticker)}${verdictOf(r.ticker) ? ` · formula: ${verdictOf(r.ticker).verdict} ${verdictOf(r.ticker).score}/100` : ""}">
+                ${verdictOf(r.ticker) ? `<span class="heat-dot ${verdictClass(verdictOf(r.ticker).verdict)}"></span>` : ""}
                 <span class="heat-sym">${esc(r.ticker)}</span>
                 <span class="heat-chg">${esc(fmtPct(r.changePercent, true))}</span>
               </button>`).join("")}
@@ -1598,10 +1660,37 @@ function renderHeat(rows, sectors) {
   card.hidden = false;
 }
 
+let callitMounted = false;
+let moversPoll = null;
+
+// A cold server answers /api/movers progressively (partial: true while its
+// budget-gated sweep runs) — keep re-polling until the map is complete.
+async function loadMovers() {
+  try {
+    const res = await fetch("/api/movers");
+    if (res.ok) renderMovers(await res.json());
+  } catch {
+    /* best-effort */
+  }
+}
+
 function renderMovers(m) {
+  moversData = m;
+  clearTimeout(moversPoll);
+  if (m.partial && !el.intro.hidden) moversPoll = setTimeout(loadMovers, 4000);
   const card = $("moversCard");
   const rows = (m.rows ?? []).filter((r) => isNum(r.changePercent));
-  renderHeat(rows, m.sectors);
+  renderHeat();
+  if (newsData) renderNewsCard(); // ticker tags need the quotes that just arrived
+  // The game needs the universe list (for random picks) and a Tiingo key.
+  const gameCard = $("callitCard");
+  if (m.universe?.length && hasTiingo && window.mountCallIt) {
+    if (!callitMounted) {
+      window.mountCallIt($("callitMount"), { tickers: m.universe, compact: true });
+      callitMounted = true;
+    }
+    gameCard.hidden = false;
+  } else gameCard.hidden = true;
   if (rows.length < 10) {
     card.hidden = true;
     return;
@@ -1623,7 +1712,7 @@ function renderMovers(m) {
               <tr class="mkt-row" data-t="${esc(r.ticker)}">
                 <td class="mkt-sym">${esc(r.ticker)}</td>
                 <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
-                <td class="num ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</td>
+                <td class="num"><span class="badge ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</span></td>
               </tr>`).join("")}
           </table>
         </div>`).join("")}
@@ -1765,12 +1854,12 @@ async function loadMarket() {
   };
   await Promise.allSettled([
     grab("/api/market", renderMarket),
-    grab("/api/movers", renderMovers),
+    loadMovers(),
     grab("/api/homestats", renderRecord),
   ]);
 }
 
-for (const id of ["marketBoard", "screenCard", "moversCard", "heatCard"]) {
+for (const id of ["marketBoard", "screenCard", "moversCard", "heatCard", "marketNews"]) {
   $(id).addEventListener("click", (e) => {
     const t = e.target.closest?.(".mkt-row")?.dataset?.t;
     if (t) {

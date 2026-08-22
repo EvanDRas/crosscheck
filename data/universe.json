@@ -107,5 +107,172 @@
     "LIN": "Materials",
     "PLD": "Real Estate",
     "AMT": "Real Estate"
+  },
+  "_names_note": "Headline-matching aliases for the news feed's ticker tags. Metadata only.",
+  "names": {
+    "AAPL": [
+      "Apple",
+      "iPhone"
+    ],
+    "MSFT": [
+      "Microsoft"
+    ],
+    "NVDA": [
+      "Nvidia"
+    ],
+    "AVGO": [
+      "Broadcom"
+    ],
+    "ORCL": [
+      "Oracle"
+    ],
+    "CRM": [
+      "Salesforce"
+    ],
+    "AMD": [
+      "Advanced Micro Devices"
+    ],
+    "INTC": [
+      "Intel"
+    ],
+    "GOOGL": [
+      "Google",
+      "Alphabet"
+    ],
+    "META": [
+      "Meta Platforms",
+      "Facebook",
+      "Instagram",
+      "Zuckerberg"
+    ],
+    "NFLX": [
+      "Netflix"
+    ],
+    "DIS": [
+      "Disney"
+    ],
+    "T": [
+      "AT&T"
+    ],
+    "AMZN": [
+      "Amazon"
+    ],
+    "TSLA": [
+      "Tesla",
+      "Elon Musk"
+    ],
+    "HD": [
+      "Home Depot"
+    ],
+    "MCD": [
+      "McDonald's",
+      "McDonalds"
+    ],
+    "NKE": [
+      "Nike"
+    ],
+    "BRK.B": [
+      "Berkshire",
+      "Buffett"
+    ],
+    "JPM": [
+      "JPMorgan",
+      "JP Morgan",
+      "Jamie Dimon"
+    ],
+    "BAC": [
+      "Bank of America"
+    ],
+    "WFC": [
+      "Wells Fargo"
+    ],
+    "GS": [
+      "Goldman"
+    ],
+    "V": [
+      "Visa"
+    ],
+    "MA": [
+      "Mastercard"
+    ],
+    "LLY": [
+      "Eli Lilly",
+      "Lilly"
+    ],
+    "UNH": [
+      "UnitedHealth"
+    ],
+    "JNJ": [
+      "Johnson & Johnson"
+    ],
+    "ABBV": [
+      "AbbVie"
+    ],
+    "MRK": [
+      "Merck"
+    ],
+    "PFE": [
+      "Pfizer"
+    ],
+    "TMO": [
+      "Thermo Fisher"
+    ],
+    "CAT": [
+      "Caterpillar"
+    ],
+    "BA": [
+      "Boeing"
+    ],
+    "HON": [
+      "Honeywell"
+    ],
+    "UPS": [
+      "United Parcel"
+    ],
+    "GE": [
+      "GE Aerospace",
+      "General Electric"
+    ],
+    "WMT": [
+      "Walmart"
+    ],
+    "COST": [
+      "Costco"
+    ],
+    "PG": [
+      "Procter"
+    ],
+    "KO": [
+      "Coca-Cola",
+      "Coca Cola"
+    ],
+    "PEP": [
+      "PepsiCo",
+      "Pepsi"
+    ],
+    "XOM": [
+      "Exxon"
+    ],
+    "CVX": [
+      "Chevron"
+    ],
+    "COP": [
+      "ConocoPhillips"
+    ],
+    "NEE": [
+      "NextEra"
+    ],
+    "DUK": [
+      "Duke Energy"
+    ],
+    "LIN": [
+      "Linde"
+    ],
+    "PLD": [
+      "Prologis"
+    ],
+    "AMT": [
+      "American Tower"
+    ]
   }
 }

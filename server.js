@@ -244,10 +244,30 @@ function buildScreen() {
   }
 }
 
+// Single-flight: when several tabs (or several friends on one box) load the
+// landing page at once, the expensive sweeps must run once and be shared —
+// otherwise N concurrent cold loads mean N×50 quote calls before any cache
+// exists, and the budget gate stalls all of them.
+const inflight = new Map();
+function singleFlight(key, fn) {
+  if (inflight.has(key)) return inflight.get(key);
+  const p = fn().finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}
+
 let marketCache = null;
 app.get("/api/market", async (_req, res) => {
   try {
     if (marketCache && Date.now() - marketCache.at < 120_000) return res.json(marketCache.payload);
+    res.json(await singleFlight("market", buildMarket));
+  } catch (err) {
+    console.error("market failed:", err);
+    res.status(500).json({ error: "Could not load the market overview." });
+  }
+});
+async function buildMarket() {
+  {
     const apiKey = process.env.FINNHUB_API_KEY;
     const quoteRow = async ([symbol, label]) => {
       try {
@@ -288,38 +308,46 @@ app.get("/api/market", async (_req, res) => {
       sparks,
     };
     marketCache = { at: Date.now(), payload };
-    res.json(payload);
-  } catch (err) {
-    console.error("market failed:", err);
-    res.status(500).json({ error: "Could not load the market overview." });
+    return payload;
   }
-});
+}
 
 // Today's movers across the whole batch universe. Quotes go through the
 // shared 2-minute cache and are fetched in chunks to stay inside Finnhub's
 // per-second burst limit; the payload is cached so visitors don't re-trigger
 // 50 lookups. Best-effort garnish — never an error page.
-let moversCache = null;
-app.get("/api/movers", async (_req, res) => {
-  try {
-    if (moversCache && Date.now() - moversCache.at < 150_000) return res.json(moversCache.payload);
-    const apiKey = process.env.FINNHUB_API_KEY;
-    if (!apiKey) return res.json({ rows: [] });
-    const uni = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
-    const tickers = uni.tickers ?? [];
-    const rows = [];
-    // Budget-aware sweep: this is background garnish, so it yields whenever
-    // the rolling minute is getting full — an interactive analysis (~10
-    // calls) must never 429 because the heat map was refreshing.
+// The sweep is budget-aware (it yields whenever the rolling minute gets
+// full, so an interactive analysis never 429s because the heat map was
+// refreshing) — which means a cold sweep can take most of a minute. So it
+// runs fire-and-forget and the endpoint answers instantly with whatever is
+// ready, flagged partial; the page re-polls and the map fills in live.
+// Refreshes are stale-while-revalidate: the last complete payload is served
+// while a new sweep runs.
+let moversCache = null; // last complete payload
+let moversSweep = null; // in-progress sweep { rows }
+function moversMeta() {
+  const uni = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
+  return { universe: uni.tickers ?? [], sectors: uni.sectors ?? {}, names: uni.names ?? {} };
+}
+function startMoversSweep(meta) {
+  const apiKey = process.env.FINNHUB_API_KEY;
+  if (!apiKey) {
+    moversCache = { at: Date.now(), payload: { rows: [], ...meta, asOf: new Date().toISOString() } };
+    return;
+  }
+  const sweep = { rows: [] };
+  moversSweep = sweep;
+  (async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const tickers = meta.universe;
     let complete = true;
     for (let i = 0; i < tickers.length; i += 10) {
       let waited = 0;
-      while (callsLastMinute() > 35 && waited < 45_000) {
+      while (callsLastMinute() > 42 && waited < 60_000) {
         await sleep(3000);
         waited += 3000;
       }
-      if (callsLastMinute() > 35) {
+      if (callsLastMinute() > 42) {
         complete = false;
         break;
       }
@@ -331,13 +359,25 @@ app.get("/api/movers", async (_req, res) => {
           return null;
         }
       }));
-      rows.push(...chunk);
+      sweep.rows.push(...chunk.filter(Boolean));
     }
-    const payload = { rows: rows.filter(Boolean), sectors: uni.sectors ?? {}, asOf: new Date().toISOString() };
-    // A partial sweep is served (the page degrades gracefully) but expires
-    // fast so the next visit completes it once the budget has recovered.
+    const payload = { rows: sweep.rows, ...meta, asOf: new Date().toISOString() };
+    // A partial sweep still becomes the served payload, but stays flagged
+    // (so the page keeps polling) and expires fast so the next refresh
+    // completes it once the budget has recovered.
+    if (!complete) payload.partial = true;
     moversCache = { at: Date.now() - (complete ? 0 : 100_000), payload };
-    res.json(payload);
+  })().catch((err) => console.error("movers sweep failed:", err)).finally(() => {
+    moversSweep = null;
+  });
+}
+app.get("/api/movers", (_req, res) => {
+  try {
+    const meta = moversMeta();
+    const fresh = moversCache && Date.now() - moversCache.at < 150_000;
+    if (!fresh && !moversSweep) startMoversSweep(meta);
+    if (moversCache) return res.json(moversCache.payload);
+    res.json({ rows: [...(moversSweep?.rows ?? [])], ...meta, partial: true, asOf: new Date().toISOString() });
   } catch (err) {
     console.error("movers failed:", err);
     res.json({ rows: [] });
@@ -351,8 +391,16 @@ let homeStatsCache = null;
 app.get("/api/homestats", async (_req, res) => {
   try {
     if (homeStatsCache && Date.now() - homeStatsCache.at < homeStatsCache.ttl) return res.json(homeStatsCache.payload);
+    res.json(await singleFlight("homestats", buildHomeStats));
+  } catch (err) {
+    console.error("homestats failed:", err);
+    res.json({ empty: true });
+  }
+});
+async function buildHomeStats() {
+  {
     const entries = readLedger();
-    if (!entries.length) return res.json({ empty: true });
+    if (!entries.length) return { empty: true };
     const { rows, warnings } = await gradeEntries(entries, { rawQuotes: false });
     // A capped or partly-failed grading pass is a cold-start artifact —
     // keep it only briefly so the tiles self-heal on the next visit.
@@ -372,12 +420,9 @@ app.get("/api/homestats", async (_req, res) => {
       asOf: new Date().toISOString(),
     };
     homeStatsCache = { at: Date.now(), ttl: partial ? 60_000 : 600_000, payload };
-    res.json(payload);
-  } catch (err) {
-    console.error("homestats failed:", err);
-    res.json({ empty: true });
+    return payload;
   }
-});
+}
 
 // The Time Machine: what the formula would have said on a past date, using
 // only information filed and priced by that day, graded against everything
