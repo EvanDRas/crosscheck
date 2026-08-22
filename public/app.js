@@ -447,23 +447,36 @@ window.addEventListener("resize", () => {
 
 function renderKeyNumbers(d) {
   const m = d.metrics ?? {};
+  // [label, value, provenance key, glossary term]
   const tiles = [
-    ["P/E (TTM)", fmtX(m.pe), "pe"],
-    ["P/S", fmtX(m.ps), "ps"],
-    ["P/B", fmtX(m.pb)],
-    ["PEG", fmtX(m.peg)],
-    ["Net margin", fmtPct(m.netMargin), "netMargin"],
-    ["ROE", fmtPct(m.roe), "roe"],
-    ["ROA", fmtPct(m.roa)],
-    ["Revenue growth YoY", fmtPct(m.revenueGrowth, true), "revenueGrowth"],
-    ["EPS growth YoY", fmtPct(m.epsGrowth, true), "epsGrowth"],
-    ["Current ratio", fmtNum(m.currentRatio), "currentRatio"],
-    ["Debt / equity", fmtNum(m.debtEquity), "debtEquity"],
-    ["Dividend yield", fmtPct(m.dividendYield)],
-    ["Beta", fmtNum(m.beta)],
-    ["52-week high", fmtMoney(m.high52)],
-    ["52-week low", fmtMoney(m.low52)],
+    ["P/E (TTM)", fmtX(m.pe), "pe", "pe"],
+    ["P/S", fmtX(m.ps), "ps", "ps"],
+    ["P/B", fmtX(m.pb), null, "pb"],
+    ["PEG", fmtX(m.peg), null, "peg"],
+    ["Net margin", fmtPct(m.netMargin), "netMargin", "netMargin"],
+    ["ROE", fmtPct(m.roe), "roe", "roe"],
+    ["ROA", fmtPct(m.roa), null, "roa"],
+    ["Revenue growth YoY", fmtPct(m.revenueGrowth, true), "revenueGrowth", "revenueGrowth"],
+    ["EPS growth YoY", fmtPct(m.epsGrowth, true), "epsGrowth", "epsGrowth"],
+    ["Current ratio", fmtNum(m.currentRatio), "currentRatio", "currentRatio"],
+    ["Debt / equity", fmtNum(m.debtEquity), "debtEquity", "debtEquity"],
+    ["Dividend yield", fmtPct(m.dividendYield), null, "dividendYield"],
+    ["Beta", fmtNum(m.beta), null, "beta"],
+    ["52-week high", fmtMoney(m.high52), null, "range52"],
+    ["52-week low", fmtMoney(m.low52), null, "range52"],
   ];
+  // In-context learning: each tile carries its plain-English definition,
+  // revealed on click — what it is, and what it can't tell you.
+  const termPop = (term) => {
+    const t = window.TERMS?.[term];
+    if (!t) return "";
+    return `<div class="kn-pop">
+      <b>${esc(t.name)}</b>
+      <p>${esc(t.what)}</p>
+      <p class="learn-caveat">${esc(t.caveat)}</p>
+      <a href="/learn.html#term-${esc(term)}">Learn more →</a>
+    </div>`;
+  };
   // Provenance chips: SEC = value came from EDGAR filings (Finnhub had none),
   // ✓ = both sources agree, ⚠ = they disagree (hover for both values).
   const pn = (v) => (typeof v === "number" ? String(Math.round(v * 100) / 100) : String(v));
@@ -479,13 +492,24 @@ function renderKeyNumbers(d) {
     <h2>Key numbers</h2>
     <p class="sub">Fundamentals from Finnhub, cross-checked against SEC EDGAR filings${d.edgarThrough ? ` (filed data through ${esc(d.edgarThrough)})` : ""}. N/A = no source has a value.</p>
     <div class="kn-grid">
-      ${tiles.map(([label, val, key]) => `
-        <div class="kn-tile">
-          <div class="kn-label">${esc(label)}${provMark(key)}</div>
+      ${tiles.map(([label, val, key, term]) => `
+        <div class="kn-tile${term && window.TERMS?.[term] ? " has-term" : ""}" ${term ? `data-term="${esc(term)}"` : ""}>
+          <div class="kn-label">${esc(label)}${provMark(key)}${term && window.TERMS?.[term] ? ` <span class="term-q" title="What is this?">?</span>` : ""}</div>
           <div class="kn-value${val == null ? " na" : ""}">${val == null ? "N/A" : esc(val)}</div>
+          ${term ? termPop(term) : ""}
         </div>`).join("")}
     </div>`;
 }
+
+// One open definition at a time; clicking the same tile closes it.
+el.keyNumbers.addEventListener("click", (e) => {
+  if (e.target.closest("a")) return;
+  const tile = e.target.closest(".kn-tile.has-term");
+  if (!tile) return;
+  const wasOpen = tile.classList.contains("open");
+  el.keyNumbers.querySelectorAll(".kn-tile.open").forEach((t) => t.classList.remove("open"));
+  if (!wasOpen) tile.classList.add("open");
+});
 
 function fmtBillions(v) {
   if (!isNum(v)) return "—";
@@ -1388,7 +1412,20 @@ const chgCls = (v) => (isNum(v) ? (v > 0 ? "pos" : v < 0 ? "neg" : "") : "");
 const fmtPrice = (v) =>
   isNum(v) ? v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null;
 
+// Inline sparkline: 30 sessions, colored by the sign of the whole window.
+function sparkSvg(vals, w = 84, h = 24) {
+  if (!Array.isArray(vals) || vals.length < 2) return "";
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = max - min || 1;
+  const pts = vals.map((v, i) =>
+    `${((i / (vals.length - 1)) * w).toFixed(1)},${(h - 2 - ((v - min) / span) * (h - 4)).toFixed(1)}`).join(" ");
+  const up = vals[vals.length - 1] >= vals[0];
+  return `<svg class="spark ${up ? "pos" : "neg"}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
 function renderMarket(m) {
+  const sparks = m.sparks ?? {};
   const strip = $("marketStrip");
   if (m.indices?.length) {
     strip.innerHTML = m.indices.map((i) => `
@@ -1396,6 +1433,7 @@ function renderMarket(m) {
         <div class="mkt-label">${esc(i.label)} · ${esc(i.symbol)}</div>
         <div class="mkt-price">${esc(fmtPrice(i.price) ?? "—")}</div>
         <div class="mkt-chg ${chgCls(i.changePercent)}">${esc(isNum(i.change) && isNum(i.changePercent) ? `${i.change > 0 ? "+" : ""}${fmtPrice(i.change)} (${fmtPct(i.changePercent, true)})` : "—")}</div>
+        ${sparks[i.symbol] ? `<div class="mkt-spark" title="Last 30 sessions">${sparkSvg(sparks[i.symbol], 120, 26)}</div>` : ""}
       </div>`).join("");
     strip.hidden = false;
   } else strip.hidden = true;
@@ -1404,11 +1442,12 @@ function renderMarket(m) {
   if (m.board?.length) {
     board.innerHTML = `
       <h2>The big board</h2>
-      <p class="sub">Mega-caps right now — click any row for the full crosscheck.</p>
+      <p class="sub">Mega-caps right now, with the last 30 sessions — click any row for the full crosscheck.</p>
       <table class="mkt-table">
         ${m.board.map((r) => `
           <tr class="mkt-row" data-t="${esc(r.symbol)}">
             <td class="mkt-sym">${esc(r.symbol)}</td>
+            <td class="spark-cell">${sparkSvg(sparks[r.symbol])}</td>
             <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
             <td class="num ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</td>
           </tr>`).join("")}
@@ -1506,9 +1545,63 @@ $("screenCard").addEventListener("click", (e) => {
   }
 });
 
+// Heat map tile color: intensity scales with |change|, capped at 3%, in the
+// site's own desaturated green/red so it reads as data, not a carnival.
+function heatStyle(dp) {
+  if (!isNum(dp) || dp === 0) return "";
+  const a = (Math.min(Math.abs(dp), 3) / 3) * 0.6 + 0.08;
+  return dp > 0 ? `background: rgba(61, 156, 107, ${a.toFixed(2)})` : `background: rgba(191, 77, 77, ${a.toFixed(2)})`;
+}
+
+function renderHeat(rows, sectors) {
+  const card = $("heatCard");
+  if (rows.length < 10 || !sectors || !Object.keys(sectors).length) {
+    card.hidden = true;
+    return;
+  }
+  const groups = new Map();
+  for (const r of rows) {
+    const s = sectors[r.ticker] ?? "Other";
+    if (!groups.has(s)) groups.set(s, []);
+    groups.get(s).push(r);
+  }
+  const ordered = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  const adv = rows.filter((r) => r.changePercent > 0).length;
+  const dec = rows.filter((r) => r.changePercent < 0).length;
+  const flat = rows.length - adv - dec;
+  const avg = (list) => list.reduce((s, r) => s + r.changePercent, 0) / list.length;
+  card.innerHTML = `
+    <h2>Sector heat map</h2>
+    <p class="sub">The 50-stock universe by sector, colored by today's move — the shape of the day at a glance.
+      Click any tile for the full analysis.</p>
+    <div class="breadth" title="Advancing vs declining across the universe">
+      <div class="breadth-bar">
+        <span class="breadth-adv" style="width:${((adv / rows.length) * 100).toFixed(1)}%"></span>
+        <span class="breadth-flat" style="width:${((flat / rows.length) * 100).toFixed(1)}%"></span>
+        <span class="breadth-dec" style="width:${((dec / rows.length) * 100).toFixed(1)}%"></span>
+      </div>
+      <div class="breadth-label"><span class="pos">${adv} advancing</span> · <span class="neg">${dec} declining</span>${flat ? ` · ${flat} flat` : ""}</div>
+    </div>
+    <div class="heat-grid">
+      ${ordered.map(([sec, list]) => `
+        <div class="heat-sector">
+          <div class="heat-sector-label">${esc(sec)} <span class="${chgCls(avg(list))}">${esc(fmtPct(avg(list), true))}</span></div>
+          <div class="heat-tiles">
+            ${[...list].sort((a, b) => b.changePercent - a.changePercent).map((r) => `
+              <button type="button" class="heat-tile mkt-row" data-t="${esc(r.ticker)}" style="${heatStyle(r.changePercent)}">
+                <span class="heat-sym">${esc(r.ticker)}</span>
+                <span class="heat-chg">${esc(fmtPct(r.changePercent, true))}</span>
+              </button>`).join("")}
+          </div>
+        </div>`).join("")}
+    </div>`;
+  card.hidden = false;
+}
+
 function renderMovers(m) {
   const card = $("moversCard");
   const rows = (m.rows ?? []).filter((r) => isNum(r.changePercent));
+  renderHeat(rows, m.sectors);
   if (rows.length < 10) {
     card.hidden = true;
     return;
@@ -1608,9 +1701,60 @@ $("momentsCard").addEventListener("click", (e) => {
   }
 });
 
+// "Learn as you look": one concept a day (rotates deterministically by
+// date so everyone sees the same one), tied to a live example, plus the
+// lessons most worth reading first.
+function renderLearn() {
+  const card = $("learnCard");
+  const terms = window.TERMS ?? {};
+  const keys = Object.keys(terms);
+  if (!keys.length) {
+    card.hidden = true;
+    return;
+  }
+  const dayIndex = Math.floor(Date.now() / 86_400_000) % keys.length;
+  const key = keys[dayIndex];
+  const t = terms[key];
+  const featured = [
+    ["l-verdict", "How to read a verdict"],
+    ["l-pit", "Look-ahead bias: the mistake that makes fake edges"],
+    ["l-backtest", "What this site found when it tested itself"],
+    ["l-checklist", "How to use this site without fooling yourself"],
+  ];
+  card.innerHTML = `
+    <h2>Learn as you look</h2>
+    <p class="sub">Every number here has a plain-English explanation — click the <span class="term-q">?</span> beside
+      any key number on a result page, or read the <a href="/learn.html">lessons</a> built on live data.</p>
+    <div class="learn-cols">
+      <div class="learn-concept">
+        <div class="mkt-label">Today's concept</div>
+        <div class="learn-name">${esc(t.name)}</div>
+        <p>${esc(t.what)}</p>
+        <p class="learn-caveat"><b>What it can't tell you:</b> ${esc(t.caveat)}</p>
+        <p class="learn-live">${t.live ? `<a href="#" data-t="${esc(t.live)}">See it on ${esc(t.live)} →</a> ` : ""}<a href="/learn.html#term-${esc(key)}">Full definition →</a></p>
+      </div>
+      <div class="learn-featured">
+        <div class="mkt-label">Start here</div>
+        <ol class="learn-list">
+          ${featured.map(([id, title]) => `<li><a href="/learn.html#${id}">${esc(title)}</a></li>`).join("")}
+        </ol>
+      </div>
+    </div>`;
+  card.hidden = false;
+}
+
+$("learnCard").addEventListener("click", (e) => {
+  const t = e.target?.dataset?.t;
+  if (t) {
+    e.preventDefault();
+    go(t);
+  }
+});
+
 async function loadMarket() {
   renderRecent();
   renderMoments();
+  renderLearn();
   const grab = async (url, render) => {
     try {
       const res = await fetch(url);
@@ -1626,7 +1770,7 @@ async function loadMarket() {
   ]);
 }
 
-for (const id of ["marketBoard", "screenCard", "moversCard"]) {
+for (const id of ["marketBoard", "screenCard", "moversCard", "heatCard"]) {
   $(id).addEventListener("click", (e) => {
     const t = e.target.closest?.(".mkt-row")?.dataset?.t;
     if (t) {

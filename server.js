@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import dotenv from "dotenv";
-import { FinnhubError, getQuote, getMetrics, getPeers, searchSymbols } from "./lib/finnhub.js";
+import { FinnhubError, getQuote, getMetrics, getPeers, searchSymbols, callsLastMinute } from "./lib/finnhub.js";
 import { addViewer, viewerCount, streamingSupported } from "./lib/stream.js";
 import { analyzeTicker, NotFoundError, marketDate } from "./lib/analyze.js";
 import { demoPayload } from "./lib/demo.js";
@@ -14,7 +14,7 @@ import { readPicks, logPick, PICK_DIRECTIONS } from "./lib/picks.js";
 import { updateSnapshot } from "./lib/snapshots.js";
 import { getQuoteCached } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
-import { tiingoGradeMany, hasTiingoKey } from "./lib/tiingo.js";
+import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
 import { marketNews } from "./lib/news.js";
 
@@ -258,11 +258,26 @@ app.get("/api/market", async (_req, res) => {
         return null;
       }
     };
-    const [indices, board, news] = await Promise.all([
+    // 30-session sparklines for the strip and board. startDate is a calendar
+    // day, so the Tiingo series cache serves every refresh until tomorrow.
+    const sparkFor = async (sym) => {
+      try {
+        const from = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+        const rows = await getTiingoDaily(sym, from);
+        return rows ? rows.slice(-30).map((r) => r.adj) : null;
+      } catch {
+        return null;
+      }
+    };
+    const sparkSyms = [...INDICES.map(([s]) => s), ...BOARD];
+    const [indices, board, news, sparkPairs] = await Promise.all([
       apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
       apiKey ? Promise.all(BOARD.map((s) => quoteRow([s, s]))) : [],
       marketNews(apiKey).catch(() => []),
+      hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkFor(s)])) : [],
     ]);
+    const sparks = {};
+    for (const [s, v] of sparkPairs) if (v) sparks[s] = v;
     const payload = {
       asOf: new Date().toISOString(),
       hasKey: Boolean(apiKey),
@@ -270,6 +285,7 @@ app.get("/api/market", async (_req, res) => {
       board: board.filter(Boolean),
       news,
       screen: buildScreen(),
+      sparks,
     };
     marketCache = { at: Date.now(), payload };
     res.json(payload);
@@ -292,8 +308,22 @@ app.get("/api/movers", async (_req, res) => {
     const uni = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
     const tickers = uni.tickers ?? [];
     const rows = [];
-    for (let i = 0; i < tickers.length; i += 20) {
-      const chunk = await Promise.all(tickers.slice(i, i + 20).map(async (t) => {
+    // Budget-aware sweep: this is background garnish, so it yields whenever
+    // the rolling minute is getting full — an interactive analysis (~10
+    // calls) must never 429 because the heat map was refreshing.
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let complete = true;
+    for (let i = 0; i < tickers.length; i += 10) {
+      let waited = 0;
+      while (callsLastMinute() > 35 && waited < 45_000) {
+        await sleep(3000);
+        waited += 3000;
+      }
+      if (callsLastMinute() > 35) {
+        complete = false;
+        break;
+      }
+      const chunk = await Promise.all(tickers.slice(i, i + 10).map(async (t) => {
         try {
           const q = await getQuoteCached(t, apiKey);
           return q?.c && Number.isFinite(q.dp) ? { ticker: t, price: q.c, changePercent: q.dp } : null;
@@ -302,10 +332,11 @@ app.get("/api/movers", async (_req, res) => {
         }
       }));
       rows.push(...chunk);
-      if (i + 20 < tickers.length) await new Promise((r) => setTimeout(r, 250));
     }
-    const payload = { rows: rows.filter(Boolean), asOf: new Date().toISOString() };
-    moversCache = { at: Date.now(), payload };
+    const payload = { rows: rows.filter(Boolean), sectors: uni.sectors ?? {}, asOf: new Date().toISOString() };
+    // A partial sweep is served (the page degrades gracefully) but expires
+    // fast so the next visit completes it once the budget has recovered.
+    moversCache = { at: Date.now() - (complete ? 0 : 100_000), payload };
     res.json(payload);
   } catch (err) {
     console.error("movers failed:", err);
@@ -322,7 +353,7 @@ app.get("/api/homestats", async (_req, res) => {
     if (homeStatsCache && Date.now() - homeStatsCache.at < homeStatsCache.ttl) return res.json(homeStatsCache.payload);
     const entries = readLedger();
     if (!entries.length) return res.json({ empty: true });
-    const { rows, warnings } = await gradeEntries(entries);
+    const { rows, warnings } = await gradeEntries(entries, { rawQuotes: false });
     // A capped or partly-failed grading pass is a cold-start artifact —
     // keep it only briefly so the tiles self-heal on the next visit.
     const partial = warnings.some((w) => /Graded \d+ of|grading failed/.test(w));
@@ -493,7 +524,7 @@ app.get("/api/stream", (req, res) => {
 //  2. "tr" via Tiingo's adjusted closes for tickers the panel doesn't cover.
 //  3. "raw" — live quote vs the logged price/SPY level. Breaks across splits,
 //     excludes dividends — rows carry basis so the page can say which.
-async function gradeEntries(entries) {
+async function gradeEntries(entries, { rawQuotes = true } = {}) {
   const apiKey = process.env.FINNHUB_API_KEY;
   const warnings = [];
 
@@ -543,7 +574,9 @@ async function gradeEntries(entries) {
       .filter((e) => !grades[`${e.ticker}|${e.date}`] && !tGrades[`${e.ticker}|${e.date}`])
       .map((e) => e.ticker)
   )];
-  const toQuote = needsQuote.slice(0, MAX_QUOTES);
+  // Callers that only use total-return rows (homepage stats) skip the raw
+  // fallback entirely — those quotes would cost API budget and be ignored.
+  const toQuote = rawQuotes ? needsQuote.slice(0, MAX_QUOTES) : [];
   const quotes = {};
   let spyNow = null;
   if (apiKey && (toQuote.length || !spySeries)) {

@@ -60,6 +60,18 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   ledger (zero API calls). Click any row for the full analysis. Populates
   after the first `npm run batch`; every call shown is graded in public on
   the track record page.
+- **Visual, not just tabular**: a sector heat map of the whole batch
+  universe colored by today's move, an advancing/declining breadth bar, and
+  30-session sparklines on every index tile and big-board row. Background
+  sweeps are budget-aware — they yield whenever the rolling minute of
+  Finnhub calls gets full, so an interactive analysis never 429s because the
+  heat map was refreshing.
+- **Learn as you look** (`/learn.html`): eleven short lessons built on live
+  data — reading a verdict, valuation vs quality vs health, look-ahead bias,
+  total return, and what this site found when it tested itself — plus a
+  24-term plain-English glossary. Every key number on a result page has a
+  `?` that opens its definition in place: what it is, and what it can't
+  tell you. The homepage rotates one concept a day with a live example.
 - **Fast to drive**: search-as-you-type company lookup ("coca cola" → KO)
   with arrow-key navigation, a recently-viewed row on the homepage, sortable
   and filterable verdict screen (Buys / Holds / Sells), "/" focuses search

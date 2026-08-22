@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Learn — Crosscheck</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2214%22 fill=%22%230c0d0f%22/><rect x=%223%22 y=%223%22 width=%2294%22 height=%2294%22 rx=%2212%22 fill=%22none%22 stroke=%22%234f86c6%22 stroke-width=%226%22/><text x=%2250%22 y=%2274%22 font-family=%22Georgia,serif%22 font-size=%2266%22 font-weight=%22bold%22 fill=%22%23e9eaec%22 text-anchor=%22middle%22>C</text></svg>" />
+  <link rel="stylesheet" href="style.css?v=17" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">Crosscheck</a>
+      <nav class="topnav">
+        <a href="/">Analyzer</a>
+        <a href="/ledger.html">Track record</a>
+        <a href="/evidence.html">Evidence</a>
+        <a class="here" href="/learn.html">Learn</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="learn">
+    <section class="intro">
+      <h1>Learn to read a stock — on real numbers, with the mistakes left in.</h1>
+      <p>Every lesson below links to a live analysis so you can see the concept on a real company today.
+         And because this site tested its own formula and published the null result, you also get the
+         lesson most sites skip: how to tell when a number is telling you nothing.</p>
+      <nav class="learn-toc" id="learnToc"></nav>
+    </section>
+
+    <section class="card" id="l-verdict">
+      <h2>1 · How to read a verdict</h2>
+      <p>The 0–100 score is a weighted sum of six categories — Valuation 20, Profitability 20, Growth 20,
+         Financial health 15, Momentum 10, Analyst view 15. Each metric is mapped to 0–100 through a fixed curve
+         you can see on the result page itself (hover any bar). If a category has no data, its weight is
+         redistributed rather than scored as zero.</p>
+      <p>Verdict bands are calibrated so each label is a percentile of the universe: <b>STRONG BUY</b> is the top
+         tier of scores, <b>STRONG SELL</b> the bottom. A verdict is therefore a <em>ranking of the present</em>,
+         not a forecast — a STRONG BUY means the numbers look better than most companies' numbers today.</p>
+      <p class="learn-live"><a href="/#DEMO">See it live: the DEMO ticker →</a> <a href="/#AAPL">Apple's verdict →</a></p>
+    </section>
+
+    <section class="card" id="l-valuation">
+      <h2>2 · Price versus value: P/E, P/S, PEG</h2>
+      <p>A share price alone is meaningless — a $900 stock can be cheap and a $9 stock expensive. Valuation
+         ratios divide price by something the business produces. <b>P/E</b> divides by profit: at 30× you pay
+         $30 per $1 of annual earnings. <b>P/S</b> divides by revenue, useful when there is no profit yet.
+         <b>PEG</b> divides P/E by growth, asking whether a high price is earned by high growth.</p>
+      <p>The trap: cheap is often cheap for a reason. Intel has spent years looking inexpensive while its
+         business shrank; Nvidia has looked expensive for a decade while compounding. The formula uses all three
+         ratios together, but the honest answer is that valuation alone has never been enough to predict returns.</p>
+      <p class="learn-live"><a href="/#INTC">Cheap-looking: INTC →</a> <a href="/#NVDA">Expensive-looking: NVDA →</a></p>
+    </section>
+
+    <section class="card" id="l-quality">
+      <h2>3 · Is the business any good? Margins, ROE, growth</h2>
+      <p><b>Net margin</b> is the share of each sales dollar kept as profit. <b>Return on equity</b> is profit
+         earned on the owners' capital. <b>Revenue growth</b> is the hardest number to fake, because sales are
+         harder to massage than earnings. Together they describe a machine: how much it makes, how efficiently,
+         and whether it is getting bigger.</p>
+      <p>Compare within an industry or not at all. Visa runs net margins above 50%; Walmart runs near 2%; both
+         are superb businesses. The <b>Compare</b> button on every result page puts a company next to its
+         actual peers, which is the only comparison that means anything.</p>
+      <p class="learn-live"><a href="/#V">High-margin machine: V →</a> <a href="/#WMT">Thin-margin giant: WMT →</a></p>
+    </section>
+
+    <section class="card" id="l-health">
+      <h2>4 · Can it survive a bad year? Current ratio, debt</h2>
+      <p>The <b>current ratio</b> (short-term assets ÷ short-term liabilities) asks whether the company can pay
+         next year's bills from what it already holds. <b>Debt-to-equity</b> asks how much of the company is
+         funded by lenders rather than owners. Debt is cheap fuel in good times and a wrecking ball in bad ones.</p>
+      <p>Boeing is the textbook case: a great franchise whose balance sheet was hollowed out by buybacks and
+         then crushed by the 737 MAX grounding and the pandemic. Health metrics never predicted the crash —
+         but they showed there was no cushion when it came.</p>
+      <p class="learn-live"><a href="/#BA">Boeing today →</a> <a href="/#JNJ">A fortress balance sheet: JNJ →</a></p>
+    </section>
+
+    <section class="card" id="l-momentum">
+      <h2>5 · Momentum and the 52-week range — tested, found wanting</h2>
+      <p>Where a price sits in its one-year range is the formula's only momentum input. The folk wisdom says
+         winners keep winning. Crosscheck tested that claim on 274 months of S&amp;P data: the edge was
+         statistically zero (t = −0.24). That is why momentum carries only 10% of the score.</p>
+      <p>The lesson is bigger than momentum: every popular "signal" deserves this treatment. If a rule sounds
+         obvious and profitable, ask who tested it and whether they used only information available at the time.</p>
+      <p class="learn-live"><a href="/evidence.html">Read the momentum study →</a> <a href="/#NVDA">A stock near its high: NVDA →</a></p>
+    </section>
+
+    <section class="card" id="l-analysts">
+      <h2>6 · What an analyst "Buy" actually means</h2>
+      <p>Wall Street ratings skew optimistic by construction: Sells are rare because firms want access to
+         management and investment-banking business. A stock with 30 Buys and 2 Holds is normal, not
+         remarkable. What carries information is the <em>drift</em> — ratings moving toward Sell over months —
+         which the analyst card shows as a six-month trend.</p>
+      <p class="learn-live"><a href="/#INTC">Watch the drift: INTC →</a> <a href="/#TSLA">A divided street: TSLA →</a></p>
+    </section>
+
+    <section class="card" id="l-filings">
+      <h2>7 · Reading SEC filings: 10-K, 10-Q, 8-K, Form 4</h2>
+      <p>Public companies must tell the SEC the truth, in writing, on a schedule. The <b>10-K</b> is the
+         annual report (audited, comprehensive). The <b>10-Q</b> is the quarterly update. An <b>8-K</b> is a
+         "something happened" notice — acquisitions, CEO departures, restatements — filed within days. A
+         <b>Form 4</b> is an insider's own trade, filed within two business days.</p>
+      <p>Crosscheck pulls fundamentals directly from these filings and cross-checks them against the data
+         vendor. When the two disagree, the result page says so (the ⚠ marks). That disagreement is itself a
+         lesson: "official" numbers come in several versions.</p>
+      <p class="learn-live"><a href="/#AAPL">Apple's recent filings and insider trades →</a></p>
+    </section>
+
+    <section class="card" id="l-pit">
+      <h2>8 · Look-ahead bias: the mistake that makes fake edges</h2>
+      <p>A company's third-quarter results are not known on September 30. They are known when the 10-Q is
+         filed, often six weeks later. A backtest that uses September 30 data on September 30 is quietly using
+         the future — and will "discover" strategies that could never have been traded.</p>
+      <p>The <b>Time Machine</b> is built to make this concrete: pick any stock and any date since 2010, and it
+         reconstructs the verdict from filings <em>filed by that day</em> and prices through that close. Then it
+         shows what happened next. Try NVDA on 2023-01-03: the formula said SELL right before a 1,300% run.
+         That is not a bug in the demo — it is the point.</p>
+      <p class="learn-live"><a href="/">Open the Time Machine moments on the homepage →</a></p>
+    </section>
+
+    <section class="card" id="l-return">
+      <h2>9 · Total return and the only question that matters</h2>
+      <p>A stock that rises 5% while the index rises 8% <em>lost</em> — an index fund would have done better
+         with no effort. So the bar is never "did it go up" but "did it beat the alternative." And the
+         alternative's return includes dividends, which price charts ignore. That is <b>total return</b>, and
+         the difference between yours and the benchmark's is <b>excess return</b>.</p>
+      <p>Every call on the track record page is graded this way, split-adjusted, over the same window as the
+         S&amp;P. Losses are published next to wins. If you keep your own calls there too, time grades you the
+         same way.</p>
+      <p class="learn-live"><a href="/ledger.html">The track record →</a></p>
+    </section>
+
+    <section class="card" id="l-backtest">
+      <h2>10 · What this site found when it tested itself</h2>
+      <p>Crosscheck ran its own formula on 16,497 point-in-time calls from 2011 to 2024. STRONG BUY calls
+         returned −0.92% per quarter versus the market (t = −1.98). Accuracy — did the call's direction beat the
+         index? — was 46% at three months against a 48% base rate. A coin flip, slightly worse at the top
+         confidence level.</p>
+      <p>Most tools never run this test, or run it and bury the result. The finding is the most useful thing
+         on this site: a transparent, well-built summary of today's fundamentals <em>still</em> does not predict
+         next quarter's price. Markets are hard in exactly this way. Use the score to understand a company,
+         and use the evidence page to stay humble about what any score can do.</p>
+      <p class="learn-live"><a href="/evidence.html">Read all four studies →</a></p>
+    </section>
+
+    <section class="card" id="l-checklist">
+      <h2>11 · How to use this site without fooling yourself</h2>
+      <ol class="learn-list">
+        <li>Read the score as a description of today, never as a forecast.</li>
+        <li>Click <b>Compare</b> before judging any ratio — high or low only means something against peers.</li>
+        <li>Check the Trajectory section: one year of growth is a data point, five is a trend.</li>
+        <li>Look for ⚠ marks — when two sources disagree, find out why before trusting either.</li>
+        <li>Insider buying clusters matter; insider selling almost never does.</li>
+        <li>Log your own calls on the track record page and let time grade them. It is the fastest way to learn
+            whether your judgment beats an index fund — most people's does not, and finding out early is cheap.</li>
+      </ol>
+    </section>
+
+    <section class="card" id="glossary">
+      <h2>Glossary</h2>
+      <p class="sub">Every number on the site, in plain English — with how the formula uses it and what it can't tell you.</p>
+      <div id="glossaryList"></div>
+    </section>
+  </main>
+
+  <footer class="disclaimer">
+    <strong>Not financial advice.</strong> Crosscheck is for research and education only. Lessons describe
+    how to read public data; they are not recommendations. Always do your own research.
+  </footer>
+
+  <script src="glossary.js?v=17"></script>
+  <script>
+    (() => {
+      const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      // Table of contents from the lesson headings.
+      const toc = document.getElementById("learnToc");
+      toc.innerHTML = [...document.querySelectorAll("main .card h2")]
+        .filter((h) => h.closest("section").id !== "glossary")
+        .map((h) => `<a href="#${h.closest("section").id}">${esc(h.textContent.replace(/^\d+ · /, ""))}</a>`)
+        .join("") + `<a href="#glossary">Glossary</a>`;
+      // Glossary from the shared definitions.
+      const list = document.getElementById("glossaryList");
+      list.innerHTML = Object.entries(window.TERMS ?? {}).map(([key, t]) => `
+        <div class="gl-term" id="term-${esc(key)}">
+          <div class="gl-name">${esc(t.name)}</div>
+          <p>${esc(t.what)}</p>
+          <p class="gl-use"><b>In the formula:</b> ${esc(t.use)}</p>
+          <p class="gl-caveat"><b>What it can't tell you:</b> ${esc(t.caveat)}</p>
+          ${t.live ? `<p class="learn-live"><a href="/#${esc(t.live)}">See it on ${esc(t.live)} →</a></p>` : ""}
+        </div>`).join("");
+    })();
+  </script>
+</body>
+</html>
