@@ -16,7 +16,7 @@ import { getQuoteCached } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
-import { marketNews } from "./lib/news.js";
+import { marketNews, feedNews } from "./lib/news.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
@@ -382,6 +382,52 @@ app.get("/api/movers", (_req, res) => {
     console.error("movers failed:", err);
     res.json({ rows: [] });
   }
+});
+
+// Front-page feed tabs. Cached 5 minutes per (tab, limit, tickers); the
+// "you" tab is keyless (Google) so a watchlist costs no API budget.
+const feedCache = new Map();
+const parseTickers = (s, max) => [...new Set(String(s ?? "").toUpperCase().split(",").map((x) => x.trim()).filter((x) => TICKER_RE.test(x) && x !== "DEMO"))].slice(0, max);
+app.get("/api/feed", async (req, res) => {
+  try {
+    const tab = ["top", "markets", "world", "you"].includes(req.query.tab) ? req.query.tab : "top";
+    const limit = Math.min(40, Math.max(5, Number(req.query.limit) || 10));
+    const tickers = parseTickers(req.query.t, 6);
+    const key = `${tab}|${limit}|${tickers.join(",")}`;
+    const hit = feedCache.get(key);
+    if (hit && Date.now() - hit.at < 300_000) return res.json(hit.payload);
+    const names = moversMeta().names;
+    const items = await singleFlight(`feed:${key}`, () => feedNews({
+      tab,
+      apiKey: process.env.FINNHUB_API_KEY,
+      limit,
+      tickers: tickers.map((t) => ({ ticker: t, name: names[t]?.[0] ?? null })),
+    }));
+    const payload = { tab, items, asOf: new Date().toISOString() };
+    feedCache.set(key, { at: Date.now(), payload });
+    if (feedCache.size > 60) feedCache.delete(feedCache.keys().next().value);
+    res.json(payload);
+  } catch (err) {
+    console.error("feed failed:", err);
+    res.json({ items: [] });
+  }
+});
+
+// Watchlist quotes: a handful of tickers through the shared 2-minute cache.
+app.get("/api/quotes", async (req, res) => {
+  const apiKey = process.env.FINNHUB_API_KEY;
+  const list = parseTickers(req.query.t, 12);
+  if (!apiKey || !list.length) return res.json({ quotes: {} });
+  const quotes = {};
+  await Promise.all(list.map(async (t) => {
+    try {
+      const q = await getQuoteCached(t, apiKey);
+      if (q?.c) quotes[t] = { price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
+    } catch {
+      /* left out — the row shows a dash */
+    }
+  }));
+  res.json({ quotes });
 });
 
 // Homepage record tiles: the forward test's own numbers, from the same

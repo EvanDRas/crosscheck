@@ -1448,8 +1448,7 @@ function renderMarket(m) {
   const board = $("marketBoard");
   if (m.board?.length) {
     board.innerHTML = `
-      <h2>The big board</h2>
-      <p class="sub">Mega-caps right now, with the last 30 sessions — click any row for the full crosscheck.</p>
+      <h2>Big board</h2>
       <table class="mkt-table">
         ${m.board.map((r) => `
           <tr class="mkt-row" data-t="${esc(r.symbol)}">
@@ -1466,8 +1465,13 @@ function renderMarket(m) {
   renderScreen();
 
   newsData = { items: m.news ?? [], hasKey: Boolean(m.hasKey) };
+  lastUpdatedAt = Date.now();
+  renderToday();
+  renderHero();
+  if (feedTab === "top" && feedLimit === 10) feedItems = newsData.items;
   renderNewsCard();
-  if (moversData) renderHeat(); // verdict dots need screenData, which just arrived
+  renderWatch(); // verdict pills need screenData, which just arrived
+  if (moversData) renderHeat(); // so do the heat-tile dots
 }
 
 // ---------- news card: lead story, ticker tags, trending ----------
@@ -1494,21 +1498,70 @@ function tagChip(t) {
   return `<button type="button" class="news-tag mkt-row" data-t="${esc(t)}">${esc(t)}${isNum(dp) ? ` <span class="${chgCls(dp)}">${esc(fmtPct(dp, true))}</span>` : ""}</button>`;
 }
 
-function renderNewsCard() {
-  const newsEl = $("marketNews");
-  const items = newsData?.items ?? [];
-  if (!items.length) {
-    newsEl.hidden = true;
+// ---------- feed tabs: Top / Markets / World / For you ----------
+
+let feedTab = "top";
+let feedItems = [];
+let feedLimit = 10;
+let feedLoading = false;
+const FEED_TABS = [["top", "Top"], ["markets", "Markets"], ["world", "World"], ["you", "For you"]];
+const hasImg = (n) => /^https:\/\//i.test(n?.image ?? "");
+const youTickers = () => [...new Set([...readWatch(), ...readRecent()])].slice(0, 6);
+
+async function loadFeed(tab, limit = 10) {
+  feedTab = tab;
+  feedLimit = limit;
+  if (tab === "top" && limit === 10 && newsData) {
+    feedItems = newsData.items;
+    renderNewsCard();
     return;
   }
-  const hasImg = (n) => /^https:\/\//i.test(n.image ?? "");
-  const leadIdx = items.findIndex(hasImg);
-  const lead = leadIdx >= 0 ? items[leadIdx] : null;
-  const rest = items.filter((_, i) => i !== leadIdx);
-  const tagged = items.map((n) => ({ n, tags: tickersIn(n.headline) }));
+  const t = tab === "you" ? youTickers() : [];
+  if (tab === "you" && !t.length) {
+    feedItems = [];
+    renderNewsCard();
+    return;
+  }
+  feedLoading = true;
+  renderNewsCard();
+  try {
+    const res = await fetch(`/api/feed?tab=${tab}&limit=${limit}${t.length ? `&t=${encodeURIComponent(t.join(","))}` : ""}`);
+    if (res.ok && feedTab === tab) feedItems = (await res.json()).items ?? [];
+  } catch {
+    /* keep whatever was showing */
+  }
+  feedLoading = false;
+  renderNewsCard();
+}
+
+// The lead story lives in the hero, not the list — one dominant item is
+// what makes a front page read as a front page.
+function renderHero() {
+  const hero = $("heroLead");
+  const lead = (newsData?.items ?? []).find(hasImg);
+  if (!lead) {
+    hero.hidden = true;
+    return;
+  }
+  const tags = tickersIn(lead.headline);
+  hero.innerHTML = `
+    <a class="hero-link" href="${esc(safeHref(lead.link))}" target="_blank" rel="noopener noreferrer">
+      <img class="hero-img" src="${esc(lead.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">
+      <div class="hero-title">${esc(lead.headline)}</div>
+    </a>
+    <div class="news-meta">${esc(lead.source)}${lead.date ? ` · ${esc(relTime(lead.date))}` : ""}${tags.length ? ` <span class="news-tags">${tags.map(tagChip).join("")}</span>` : ""}</div>`;
+  hero.hidden = false;
+}
+
+function renderNewsCard() {
+  const newsEl = $("marketNews");
+  const items = feedItems;
+  const leadLink = feedTab === "top" ? (newsData?.items ?? []).find(hasImg)?.link : null;
+  const list = items.filter((n) => n.link !== leadLink);
+  const tagged = list.map((n) => ({ n, tags: n.tickers ?? tickersIn(n.headline) }));
   const counts = new Map();
   for (const { tags } of tagged) for (const t of tags) counts.set(t, (counts.get(t) ?? 0) + 1);
-  const trending = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t);
+  const trending = feedTab === "top" ? [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t) : [];
   const tagsFor = (n) => tagged.find((x) => x.n === n)?.tags ?? [];
   const item = (n) => `
     <li class="news-item${hasImg(n) ? " has-thumb" : ""}">
@@ -1518,19 +1571,153 @@ function renderNewsCard() {
         <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}${tagsFor(n).length ? ` <span class="news-tags">${tagsFor(n).map(tagChip).join("")}</span>` : ""}</div>
       </div>
     </li>`;
+  const empty = feedTab === "you" && !youTickers().length
+    ? `<p class="feed-empty">Star a few stocks and their news lands here. Try the suggestions under <b>Your stocks</b>.</p>`
+    : feedLoading && !list.length ? `<p class="feed-empty">Loading…</p>` : !list.length ? `<p class="feed-empty">Nothing here right now.</p>` : "";
   newsEl.innerHTML = `
-    <h2>Market news</h2>
-    <p class="sub">Merged from Google News${newsData.hasKey ? " and Finnhub" : ""} — deduplicated, newest first. Tickers mentioned are tagged with today's move.</p>
-    ${trending.length ? `<div class="news-trending"><span class="mkt-label">Trending in the news</span>${trending.map(tagChip).join("")}</div>` : ""}
-    ${lead ? `
-      <a class="news-lead" href="${esc(safeHref(lead.link))}" target="_blank" rel="noopener noreferrer">
-        <img class="news-lead-img" src="${esc(lead.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">
-        <div class="news-lead-title">${esc(lead.headline)}</div>
-        <div class="news-meta">${esc(lead.source)}${lead.date ? ` · ${esc(relTime(lead.date))}` : ""}</div>
-      </a>
-      ${tagsFor(lead).length ? `<div class="news-lead-tags">${tagsFor(lead).map(tagChip).join("")}</div>` : ""}` : ""}
-    <ul class="news-list">${rest.map(item).join("")}</ul>`;
+    <div class="news-tabs">${FEED_TABS.map(([k, label]) => `<button type="button" data-tab="${k}" class="${feedTab === k ? "active" : ""}">${label}</button>`).join("")}</div>
+    ${trending.length ? `<div class="news-trending"><span class="mkt-label">Trending</span>${trending.map(tagChip).join("")}</div>` : ""}
+    ${empty}
+    <ul class="news-list${feedLoading ? " loading" : ""}">${list.map(item).join("")}</ul>
+    ${list.length && !(feedTab === "you" && !youTickers().length) ? `<button type="button" class="load-more" data-more="1">${feedLoading ? "Loading…" : "More stories"}</button>` : ""}`;
   newsEl.hidden = false;
+}
+
+$("marketNews").addEventListener("click", (e) => {
+  const tab = e.target.closest?.("[data-tab]")?.dataset?.tab;
+  if (tab) {
+    loadFeed(tab, 10);
+    return;
+  }
+  if (e.target.closest?.("[data-more]")) loadFeed(feedTab, Math.min(40, feedLimit + 15));
+});
+
+// ---------- today bar: the daily ritual ----------
+
+let lastUpdatedAt = null;
+const readJSON = (key, fallback) => {
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    return v ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+const writeJSON = (key, v) => {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* private mode */ }
+};
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+function marketStatus() {
+  const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const mins = ny.getHours() * 60 + ny.getMinutes();
+  return ny.getDay() >= 1 && ny.getDay() <= 5 && mins >= 570 && mins < 960 ? "open" : "closed";
+}
+
+function bumpStreak() {
+  const today = localDay();
+  const s = readJSON("cc_streak", { last: null, count: 0 });
+  if (s.last === today) return s;
+  const yesterday = localDay(new Date(Date.now() - 86_400_000));
+  const next = { last: today, count: s.last === yesterday ? s.count + 1 : 1 };
+  writeJSON("cc_streak", next);
+  return next;
+}
+
+function renderToday() {
+  const s = bumpStreak();
+  const st = marketStatus();
+  const rounds = readJSON("cc_callit_today", { date: null, rounds: 0 });
+  const ago = lastUpdatedAt ? Math.max(0, Math.round((Date.now() - lastUpdatedAt) / 1000)) : null;
+  $("todayBar").innerHTML = `
+    <span class="today-date">${esc(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</span>
+    <span class="today-mkt ${st}"><i></i>Market ${st}</span>
+    <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
+    <span class="today-streak">${s.count}-day streak${rounds.date === localDay() && rounds.rounds ? ` · ${rounds.rounds} call${rounds.rounds === 1 ? "" : "s"} today` : ""}</span>
+    <span class="today-tag">Fundamentals cross-checked against SEC filings — track record public.</span>`;
+}
+setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
+
+// ---------- watchlist ----------
+
+const WATCH_KEY = "cc_watch";
+const readWatch = () => readJSON(WATCH_KEY, []).filter((t) => typeof t === "string").slice(0, 12);
+let watchQuotes = {};
+
+function toggleWatch(t) {
+  const w = readWatch();
+  writeJSON(WATCH_KEY, w.includes(t) ? w.filter((x) => x !== t) : [t, ...w].slice(0, 12));
+  refreshStars();
+  loadWatchQuotes();
+  if (feedTab === "you") loadFeed("you", 10);
+}
+
+const starBtn = (t) => {
+  const on = readWatch().includes(t);
+  return `<button type="button" class="star${on ? " on" : ""}" data-star="${esc(t)}" title="${on ? "Unwatch" : "Watch"} ${esc(t)}">${on ? "★" : "☆"}</button>`;
+};
+
+function refreshStars() {
+  const w = readWatch();
+  document.querySelectorAll("[data-star]").forEach((b) => {
+    const on = w.includes(b.dataset.star);
+    b.classList.toggle("on", on);
+    if (b.classList.contains("star")) b.textContent = on ? "★" : "☆";
+  });
+}
+
+// Capture phase so a star inside a clickable row never also opens the row.
+document.addEventListener("click", (e) => {
+  const b = e.target.closest?.("[data-star]");
+  if (!b) return;
+  e.preventDefault();
+  e.stopPropagation();
+  toggleWatch(b.dataset.star);
+}, true);
+
+async function loadWatchQuotes() {
+  const w = readWatch();
+  if (!w.length || !hasKey) {
+    watchQuotes = {};
+    renderWatch();
+    return;
+  }
+  try {
+    const res = await fetch(`/api/quotes?t=${encodeURIComponent(w.join(","))}`);
+    if (res.ok) watchQuotes = (await res.json()).quotes ?? {};
+  } catch {
+    /* rows show dashes */
+  }
+  renderWatch();
+}
+
+function renderWatch() {
+  const card = $("watchCard");
+  const w = readWatch();
+  if (!w.length) {
+    const byMove = [...(moversData?.rows ?? [])].sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).map((r) => r.ticker);
+    const sugg = [...new Set([...readRecent(), ...byMove])].slice(0, 6);
+    card.innerHTML = `
+      <h2>Your stocks</h2>
+      <p class="watch-empty">Star any stock and it lives here — price, verdict, and its own news under <b>For you</b>.</p>
+      ${sugg.length ? `<div class="watch-sugg">${sugg.map((t) => `<button type="button" class="chip" data-star="${esc(t)}">☆ ${esc(t)}</button>`).join("")}</div>` : ""}`;
+    return;
+  }
+  card.innerHTML = `
+    <h2>Your stocks</h2>
+    <table class="mkt-table watch-table">
+      ${w.map((t) => {
+        const q = watchQuotes[t];
+        const v = screenData.find((r) => r.ticker === t);
+        return `<tr class="mkt-row" data-t="${esc(t)}">
+          <td class="mkt-sym">${esc(t)}</td>
+          <td class="num">${q ? esc(fmtPrice(q.price)) : "—"}</td>
+          <td class="num">${q && isNum(q.changePercent) ? `<span class="badge ${chgCls(q.changePercent)}">${esc(fmtPct(q.changePercent, true))}</span>` : ""}</td>
+          <td>${v ? `<span class="pill-sm ${verdictClass(v.verdict)}">${esc(v.verdict)}</span>` : ""}</td>
+          <td class="star-cell">${starBtn(t)}</td>
+        </tr>`;
+      }).join("")}
+    </table>`;
 }
 
 // Verdict screen state: the payload survives refreshes; sort and filter are
@@ -1556,10 +1743,7 @@ function renderScreen() {
   const arrow = (k) => (screenSort.key === k ? (screenSort.dir === -1 ? " ↓" : " ↑") : "");
   scr.innerHTML = `
     <h2>Verdict screen</h2>
-    <p class="sub">The formula's latest pass over its fixed ${screenData.length}-stock universe
-      (logged ${esc(screenData[0].date)}). A mechanical screen — every one of these calls is
-      graded in public on the <a href="/ledger.html">track record</a>, and the formula's backtests are on the
-      <a href="/evidence.html">evidence page</a>. Not advice. Click a row for the full picture.</p>
+    <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData[0].date)}) · graded in public on the <a href="/ledger.html">track record</a> · not advice.</p>
     <div class="screen-filters">
       ${["ALL", "BUY", "HOLD", "SELL"].map((g) =>
         `<button type="button" data-f="${g}" class="${screenFilter === g ? "active" : ""}">${SCREEN_LABELS[g]} · ${counts[g]}</button>`).join("")}
@@ -1573,7 +1757,7 @@ function renderScreen() {
           ${rows.map((r, i) => `
             <tr class="mkt-row" data-t="${esc(r.ticker)}">
               <td class="rank">${i + 1}</td>
-              <td class="mkt-sym">${esc(r.ticker)}</td>
+              <td class="mkt-sym">${esc(r.ticker)} ${starBtn(r.ticker)}</td>
               <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
               <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
               <td class="opt">${r.nt ? `<span class="pill-sm ${verdictClass(r.nt)}">${esc(r.nt)}</span>` : "—"}</td>
@@ -1633,8 +1817,6 @@ function renderHeat() {
   const avg = (list) => list.reduce((s, r) => s + r.changePercent, 0) / list.length;
   card.innerHTML = `
     <h2>Sector heat map</h2>
-    <p class="sub">The 50-stock universe by sector, colored by today's move — the shape of the day at a glance.
-      Click any tile for the full analysis.</p>
     <div class="breadth" title="Advancing vs declining across the universe">
       <div class="breadth-bar">
         <span class="breadth-adv" style="width:${((adv / rows.length) * 100).toFixed(1)}%"></span>
@@ -1681,7 +1863,11 @@ function renderMovers(m) {
   const card = $("moversCard");
   const rows = (m.rows ?? []).filter((r) => isNum(r.changePercent));
   renderHeat();
-  if (newsData) renderNewsCard(); // ticker tags need the quotes that just arrived
+  if (newsData) {
+    renderHero();
+    renderNewsCard(); // ticker tags need the quotes that just arrived
+  }
+  if (!readWatch().length) renderWatch(); // suggestions come from the movers
   // The game needs the universe list (for random picks) and a Tiingo key.
   const gameCard = $("callitCard");
   if (m.universe?.length && hasTiingo && window.mountCallIt) {
@@ -1701,8 +1887,7 @@ function renderMovers(m) {
     ["Losers", sorted.slice(-5).reverse()],
   ];
   card.innerHTML = `
-    <h2>Today's movers</h2>
-    <p class="sub">Biggest moves across the 50-stock universe right now. Click through for the whole story.</p>
+    <h2>Movers</h2>
     <div class="movers-cols">
       ${cols.map(([label, list]) => `
         <div>
@@ -1738,9 +1923,8 @@ function renderRecord(s) {
     s.worst && s.graded >= 5 ? ["Worst aged call", `${esc(s.worst.ticker)} ${exc(s.worst.excessPct)}`, ""] : null,
   ].filter(Boolean);
   card.innerHTML = `
-    <h2>The forward test, live</h2>
-    <p class="sub">Every verdict the formula logs is frozen and graded against the S&P in public —
-      wins and losses alike. The full graded ledger is on the <a href="/ledger.html">track record</a> page.</p>
+    <h2>The forward test</h2>
+    <p class="sub">Every call frozen and graded vs the S&amp;P, wins and losses alike — <a href="/ledger.html">full ledger</a>.</p>
     <div class="mkt-strip record-strip">
       ${tiles.map(([label, val, cls]) => `
         <div class="mkt-tile">
@@ -1771,8 +1955,7 @@ function renderMoments() {
   }
   card.innerHTML = `
     <h2>Time machine moments</h2>
-    <p class="sub">What would the formula have said — knowing only what was filed and priced by that day?
-      Each call is graded against everything since. No hindsight, no excuses.</p>
+    <p class="sub">Only what was filed and priced by that day — then graded against everything since.</p>
     <div class="intro-chips">
       ${MOMENTS.map(([t, d, label]) =>
         `<button type="button" class="tm-chip" data-t="${esc(t)}" data-d="${esc(d)}">${esc(label)}</button>`).join("")}
@@ -1811,10 +1994,8 @@ function renderLearn() {
     ["l-checklist", "How to use this site without fooling yourself"],
   ];
   card.innerHTML = `
-    <h2>Learn as you look</h2>
-    <p class="sub">Every number here has a plain-English explanation — click the <span class="term-q">?</span> beside
-      any key number on a result page, or read the <a href="/learn.html">lessons</a> built on live data.</p>
-    <div class="learn-cols">
+    <h2>Learn</h2>
+    <div class="learn-cols stack">
       <div class="learn-concept">
         <div class="mkt-label">Today's concept</div>
         <div class="learn-name">${esc(t.name)}</div>
@@ -1841,9 +2022,12 @@ $("learnCard").addEventListener("click", (e) => {
 });
 
 async function loadMarket() {
+  renderToday();
   renderRecent();
   renderMoments();
   renderLearn();
+  renderWatch();
+  loadWatchQuotes();
   const grab = async (url, render) => {
     try {
       const res = await fetch(url);
@@ -1859,7 +2043,7 @@ async function loadMarket() {
   ]);
 }
 
-for (const id of ["marketBoard", "screenCard", "moversCard", "heatCard", "marketNews"]) {
+for (const id of ["marketBoard", "screenCard", "moversCard", "heatCard", "marketNews", "heroLead", "watchCard"]) {
   $(id).addEventListener("click", (e) => {
     const t = e.target.closest?.(".mkt-row")?.dataset?.t;
     if (t) {

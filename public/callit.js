@@ -99,6 +99,13 @@
       if (youRight) score.you += 1;
       if (fRight) score.formula += 1;
       saveScore(score);
+      // Daily count for the front page's today bar (its own streak logic).
+      try {
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const t = JSON.parse(localStorage.getItem("cc_callit_today")) ?? {};
+        localStorage.setItem("cc_callit_today", JSON.stringify({ date: today, rounds: (t.date === today ? t.rounds : 0) + 1 }));
+      } catch { /* private mode */ }
       root.innerHTML = `
         <div class="callit-head"><b>${esc(round.ticker)}</b> · ${esc(round.date)}</div>
         <div class="callit-reveal">

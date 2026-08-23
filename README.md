@@ -80,10 +80,20 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   Every round is a point-in-time reconstruction (no hindsight on either
   side) — the most honest demonstration on the site of how hard prediction
   is. On the homepage and the Learn page; needs a Tiingo key.
-- **News that pops**: a lead story with photo, every headline tagged with
-  the universe tickers it mentions (with today's move, clickable), and a
-  "trending in the news" row derived from those mentions. Change badges and
-  refresh-flash on the index strip; verdict dots on every heat-map tile.
+- **A real front page**: newspaper hierarchy — a hero lead story, a today
+  bar (market open/closed, live "updated Xs ago", your visit streak), and
+  three columns: your watchlist, the news feed, and the game/record rail.
+- **Feed tabs — Top / Markets / World / For you**: world and business news
+  from Google's topic feeds (keyless) merged with the wire items; **For
+  you** builds a feed from the stocks you've starred — company news per
+  ticker, keyless, relevance-filtered. "More stories" extends any tab.
+- **Watchlist**: star any stock anywhere (screen rows, suggestions) and it
+  lives in "Your stocks" — live price, today's move, and the formula's
+  latest verdict side by side — and powers the For you feed.
+- **News that pops**: every headline tagged with the universe tickers it
+  mentions (with today's move, clickable), and a "trending" row derived
+  from those mentions. Change badges and refresh-flash on the index strip;
+  verdict dots on every heat-map tile.
 - **Cold-start friendly**: the 50-quote movers sweep runs in the background
   and the endpoint answers progressively (partial payloads, the page
   re-polls every 4s), concurrent loads share one computation, and refreshes
