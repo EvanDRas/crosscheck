@@ -1624,10 +1624,13 @@ function marketStatus() {
 
 function bumpStreak() {
   const today = localDay();
-  const s = readJSON("cc_streak", { last: null, count: 0 });
-  if (s.last === today) return s;
+  const s = readJSON("cc_streak", { last: null, count: 0, best: 0 });
+  if (s.last === today) return { best: s.count, ...s };
   const yesterday = localDay(new Date(Date.now() - 86_400_000));
-  const next = { last: today, count: s.last === yesterday ? s.count + 1 : 1 };
+  const count = s.last === yesterday ? s.count + 1 : 1;
+  // Remembering the best run is what makes breaking a streak sting — and
+  // the sting is the mechanic.
+  const next = { last: today, count, best: Math.max(s.best ?? 0, s.count ?? 0, count) };
   writeJSON("cc_streak", next);
   return next;
 }
@@ -1641,7 +1644,7 @@ function renderToday() {
     <span class="today-date">${esc(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</span>
     <span class="today-mkt ${st}"><i></i>Market ${st}</span>
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
-    <span class="today-streak">${s.count}-day streak${rounds.date === localDay() && rounds.rounds ? ` · ${rounds.rounds} call${rounds.rounds === 1 ? "" : "s"} today` : ""}</span>
+    <span class="today-streak">${s.count}-day streak${(s.best ?? 0) > s.count ? ` · best ${s.best}` : ""}${rounds.date === localDay() && rounds.rounds ? ` · ${rounds.rounds} call${rounds.rounds === 1 ? "" : "s"} today` : ""}</span>
     <span class="today-tag">Fundamentals cross-checked against SEC filings — track record public.</span>`;
 }
 setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
@@ -1683,6 +1686,38 @@ document.addEventListener("click", (e) => {
   toggleWatch(b.dataset.star);
 }, true);
 
+// "Since your last visit": once per browser session, diff current watchlist
+// prices against the prices stored at the END of the previous session —
+// the payoff that makes returning to the page feel like something happened.
+let watchDelta = null;
+function computeWatchDeltas() {
+  try {
+    if (sessionStorage.getItem("cc_watch_session")) {
+      watchDelta = readJSON("cc_watch_delta", null);
+      return;
+    }
+    const prev = readJSON("cc_watch_seen", {});
+    const deltas = [];
+    for (const [t, q] of Object.entries(watchQuotes)) {
+      const p = prev[t];
+      if (p?.price && q.price && Math.abs(q.price - p.price) / p.price >= 0.005) {
+        deltas.push({ t, pct: (100 * (q.price - p.price)) / p.price });
+      }
+    }
+    watchDelta = deltas.length ? { deltas: deltas.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 4) } : null;
+    writeJSON("cc_watch_delta", watchDelta);
+    sessionStorage.setItem("cc_watch_session", "1");
+  } catch {
+    /* private mode */
+  }
+}
+
+function rememberWatchPrices() {
+  const seen = readJSON("cc_watch_seen", {});
+  for (const [t, q] of Object.entries(watchQuotes)) if (q.price) seen[t] = { price: q.price, at: Date.now() };
+  writeJSON("cc_watch_seen", seen);
+}
+
 async function loadWatchQuotes() {
   const w = readWatch();
   if (!w.length || !hasKey) {
@@ -1696,6 +1731,8 @@ async function loadWatchQuotes() {
   } catch {
     /* rows show dashes */
   }
+  computeWatchDeltas();
+  rememberWatchPrices();
   renderWatch();
 }
 
@@ -1725,7 +1762,9 @@ function renderWatch() {
           <td class="star-cell">${starBtn(t)}</td>
         </tr>`;
       }).join("")}
-    </table>`;
+    </table>
+    ${watchDelta?.deltas?.length ? `<p class="watch-delta">Since your last visit: ${watchDelta.deltas.map((d) =>
+      `<button type="button" class="watch-delta-item mkt-row ${d.pct > 0 ? "pos" : "neg"}" data-t="${esc(d.t)}">${esc(d.t)} ${esc(fmtPct(d.pct, true))}</button>`).join(" ")}</p>` : ""}`;
 }
 
 // Verdict screen state: the payload survives refreshes; sort and filter are
