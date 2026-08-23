@@ -33,6 +33,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
 - **Tiingo** (optional free key): fresh split/dividend-adjusted closes for
   tickers the local panel doesn't cover — live chart + 52-week stats for any
   US name, and total-return ledger grading instead of the raw-quote fallback.
+  It also unlocks the Time Machine, the homepage moments row, and the entire
+  Daily 5 game — it's the key that makes the fun parts work.
 - **News** is aggregated server-side from Google News RSS (spans hundreds of
   publishers), Yahoo Finance RSS, and Finnhub company-news — parsed, filtered
   for relevance (every item must mention the company's core name, a distinctive
@@ -58,7 +60,7 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   50-stock batch universe by the formula's latest logged score — overall,
   near-term, and long-term verdicts per row, served straight from the local
   ledger (zero API calls). Click any row for the full analysis. Populates
-  after the first `npm run batch`; every call shown is graded in public on
+  after the first `npm run batch`; every call shown is graded on
   the track record page.
 - **Visual, not just tabular**: a sector heat map of the whole batch
   universe colored by today's move, an advancing/declining breadth bar, and
@@ -73,13 +75,16 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   calculator. Every key number on a result page has a `?` that opens its
   definition in place: what it is, and what it can't tell you. The homepage
   rotates one concept a day with a live example.
-- **Call it — the game**: a real company's real numbers on a random past
-  date, ticker hidden. You call whether it beat the S&P from that day to
-  now; the truth is revealed alongside what the formula would have said with
-  the same information. Scores accumulate locally, you versus the formula.
-  Every round is a point-in-time reconstruction (no hindsight on either
-  side) — the most honest demonstration on the site of how hard prediction
-  is. On the homepage and the Learn page; needs a Tiingo key.
+- **The Daily 5**: five mystery stocks a day — real companies' real numbers
+  on real past dates, tickers hidden, the SAME five for every player
+  (seeded by the date). Call whether each beat the S&P from that day to
+  now; the reveal shows the truth and what the formula said with the same
+  information. Finish the five, copy your result line ("Me 3/5 · Formula
+  2/5") and compare with friends. Playing it daily is what keeps your
+  streak alive. Practice mode is unlimited. Every round is a point-in-time
+  reconstruction — no hindsight on either side — which makes it the most
+  honest demonstration on the site of how hard prediction is. On the
+  homepage and the Learn page; needs the free Tiingo key.
 - **A real front page**: newspaper hierarchy — a hero lead story, a today
   bar (market open/closed, live "updated Xs ago", your visit streak), and
   three columns: your watchlist, the news feed, and the game/record rail.
