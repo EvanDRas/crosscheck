@@ -12,6 +12,10 @@ that came back null).
 Free and MIT-licensed; runs on your machine with your own free API keys.
 Non-programmer setup guide: [FRIENDS_SETUP.md](FRIENDS_SETUP.md).
 
+![The front page: market overview, sector heat map, news feed, and the Daily 5 game](docs/screenshots/front-page.png)
+
+![A full analysis — the DEMO ticker, so every number here is fictional sample data](docs/screenshots/demo-verdict.png)
+
 **Not financial advice.** Research/education only. Data can be delayed,
 incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
 
