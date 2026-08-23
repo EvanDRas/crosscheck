@@ -8,7 +8,7 @@ window.TERMS = {
   pe: {
     name: "P/E ratio (TTM)",
     what: "Price divided by the last twelve months of earnings per share. A P/E of 30× means you are paying $30 for every $1 of yearly profit — roughly the years of current profit it would take to earn back the price.",
-    use: "Valuation category. Lower scores higher, but only inside a sane range: negative earnings get no score rather than a fake one. Crosscheck computes it split-safely as market cap ÷ net income, so a stock split never distorts it.",
+    use: "Valuation category. Lower scores higher, but only inside a sane range: negative earnings get no score rather than a fake one. The displayed value is the vendor's, cross-checked against a P/E built from SEC-filed earnings — when they disagree, the page says so.",
     caveat: "Cheap can mean cheap for a reason (a shrinking business), and expensive can be justified by growth. A P/E alone says nothing about the future — which is why the formula pairs it with growth (PEG).",
     live: "NVDA",
   },
@@ -57,7 +57,7 @@ window.TERMS = {
   revenueGrowth: {
     name: "Revenue growth (YoY)",
     what: "This year's trailing revenue versus the same period a year earlier.",
-    use: "Growth category. Crosscheck assembles trailing-twelve-month revenue from SEC filings itself, including synthesizing the fourth quarter from the annual report minus the three quarterlies.",
+    use: "Growth category. The scored value is the vendor's; as a check, Crosscheck also assembles trailing-twelve-month revenue from SEC filings itself (synthesizing Q4 from the annual report minus the three quarterlies) and flags the page when the two disagree.",
     caveat: "One year of growth can be an acquisition, a price hike, or a one-off. The Trajectory section shows several years so you can tell a trend from a blip.",
     live: "NVDA",
   },
@@ -100,7 +100,7 @@ window.TERMS = {
     name: "52-week range",
     what: "The highest and lowest prices over the past year, and where today's price sits between them (0% = at the low, 100% = at the high).",
     use: "Momentum category: position in the range is the formula's only momentum input.",
-    caveat: "Crosscheck tested this honestly: across 274 months of data, buying recent winners had no edge (t = −0.24). The momentum category is kept small (10%) for exactly that reason — see the Evidence page.",
+    caveat: "Crosscheck tested this honestly: across 274 months of data, buying recent winners had no edge (t = −0.24). The 10% weight was set before that test and stays because the formula is frozen mid-forward-test — the test is why you should read this category skeptically. See the Evidence page.",
     live: "NVDA",
   },
   marketCap: {
@@ -118,15 +118,15 @@ window.TERMS = {
     live: "DEMO",
   },
   confidence: {
-    name: "Confidence",
-    what: "How many of the six categories had enough data to score. High means all six; lower means the verdict rests on fewer legs.",
+    name: "Data coverage (shown as Confidence)",
+    what: "How many of the six categories had enough data to score. High means five or six of the six; lower means the verdict rests on fewer legs.",
     use: "Fewer than two scorable categories means NOT ENOUGH DATA instead of a fake verdict. Degraded results are never logged to the track record.",
     caveat: "High confidence means the inputs were present, not that the call is right.",
     live: "DEMO",
   },
   analystView: {
     name: "Analyst view",
-    what: "The mix of Buy / Hold / Sell ratings from Wall Street analysts covering the stock, and how that mix has drifted over six months.",
+    what: "The mix of Buy / Hold / Sell ratings from Wall Street analysts covering the stock, and how that mix has drifted over recent months.",
     use: "Analyst category (15%).",
     caveat: "Analysts are structurally optimistic — Sells are rare because firms want banking business and access. A downgrade trend matters more than the level.",
     live: "INTC",
@@ -162,7 +162,7 @@ window.TERMS = {
   ttm: {
     name: "Trailing twelve months (TTM)",
     what: "The most recent four quarters added together — a rolling year that updates every quarter instead of waiting for the annual report.",
-    use: "All fundamentals are TTM so that a company's fourth quarter isn't stale for a year.",
+    use: "Fundamentals are TTM where the source provides it, so a company's fourth quarter isn't stale for a year; a few vendor fields fall back to annual figures when no TTM exists.",
     caveat: "Companies report the fourth quarter only inside the annual report, so TTM has to be synthesized: annual minus the three quarterlies. Crosscheck does this from SEC data directly.",
     live: "AAPL",
   },

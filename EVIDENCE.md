@@ -22,7 +22,9 @@ The EDGAR fundamentals input is rebuilt from scratch by
 The 52-week-position score (the whole Momentum category), computed monthly
 2003–2026 over ~474 S&P names/month, held one month, gross of costs:
 
-- Top-vs-bottom quintile spread: **−0.89%/yr, t = −0.24, hit rate 54%.**
+- Top-vs-bottom quintile spread: **−0.89%/yr, t = −0.24, hit rate 54%** (hit
+  rate = share of months the top quintile beat the bottom; above 50% while
+  the average spread is negative just means the losing months lost bigger).
 - Verdict: **no predictive power.** Null in both halves of the sample.
 
 ## Study 2 — five famous dates, full point-in-time (scripts/pit_verdict.mjs)
@@ -73,6 +75,8 @@ scripts/fetch_edgar_topup.py):
 
 **Hypothesis A — "adding Valuation + Health (the glamour brakes) removes the
 negative tilt in the top band": REJECTED.** On the identical call sample
+(identical between the two variants in this table — not the same sample as
+Study 3's 18,150 calls, which is why the spreads differ slightly)
 (5 of 6 categories, ~85% of formula weight; only Analyst untestable):
 
 | variant | STRONG BUY excess (qtr) | annual view |

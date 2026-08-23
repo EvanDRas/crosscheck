@@ -160,9 +160,12 @@ function renderCompany(d) {
     const delta = isNum(q.change)
       ? `${arrow} ${q.change > 0 ? "+" : ""}${fmtNum(q.change)} (${q.changePercent > 0 ? "+" : ""}${fmtNum(q.changePercent)}%)`
       : "";
+    // On weekends the quote is Friday's — calling it "today" is wrong.
+    const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+    const dayLabel = ny.getDay() === 0 || ny.getDay() === 6 ? "last session" : "today";
     priceHtml = `
       <div class="price-now">${fmtMoney(q.price, currency)}</div>
-      <div class="price-delta ${dir}">${esc(delta)} today</div>
+      <div class="price-delta ${dir}">${esc(delta)} ${dayLabel}</div>
       <div class="price-sub">Prev close ${fmtMoney(q.previousClose, currency) ?? "N/A"} · as of ${new Date(d.asOf).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>`;
   }
 
@@ -219,8 +222,15 @@ function horizonBlockHtml(s) {
 function renderVerdict(d) {
   const s = d.scoring;
   const meters = s.categories.map((c) => {
+    // Disputed inputs stay disputed where the decision forms: a category
+    // score built on a value the SEC cross-check contradicts carries the
+    // same ⚠ here as in Key numbers.
     const detail = c.details
-      .map((m) => `${esc(m.label)} ${esc(fmtDetailValue(m) ?? "N/A")}${m.score != null ? ` → ${m.score}` : ""}`)
+      .map((m) => {
+        const p = m.key ? d.metricProvenance?.[m.key] : null;
+        const mark = p?.src === "conflict" ? ` <span class="prov prov-warn" title="Sources disagree on this number — Finnhub ${esc(String(p.finnhub))} vs SEC filings ${esc(String(p.edgar))}">⚠</span>` : "";
+        return `${esc(m.label)} ${esc(fmtDetailValue(m) ?? "N/A")}${m.score != null ? ` → ${m.score}` : ""}${mark}`;
+      })
       .join(" · ");
     if (!c.available) {
       return `
@@ -256,7 +266,7 @@ function renderVerdict(d) {
        <div class="verdict-conf">${s.availableCount}/${s.totalCategories} categories had data</div>`
     : `<div class="verdict-score">${Math.round(s.score)}<small>/100</small></div>
        <div class="verdict-pill ${verdictClass(s.verdict)}">${esc(s.verdict)}</div>
-       <div class="verdict-conf">Confidence: ${esc(s.confidence)} (${s.availableCount}/${s.totalCategories} categories)</div>`;
+       <div class="verdict-conf">Data coverage: ${esc(s.confidence)} (${s.availableCount}/${s.totalCategories} categories) — how much was measurable, not how sure the call is</div>`;
 
   // Honest-evidence line (see EVIDENCE.md): backtests of the testable
   // components found no predictive power, and the very highest scores
@@ -264,7 +274,7 @@ function renderVerdict(d) {
   // forecast — the ledger is the ongoing test.
   const evidence = s.insufficientData
     ? ""
-    : `<div class="scoring-note evidence-note">Backtested honestly: this formula (16,497 point-in-time calls, 2011–2024) showed <b>no predictive power</b>${s.score >= 72 ? ", and its most confident calls historically <b>underperformed</b> the index" : ""} — a score describes current fundamentals, it does not forecast returns (see EVIDENCE.md; the <a href="/ledger.html">ledger</a> is the live test).</div>`;
+    : `<div class="scoring-note evidence-note">Backtested honestly: this formula (16,497 point-in-time calls, 2011–2024, ~85% of its weight tested) showed <b>no predictive power</b>${s.score >= 74 ? ", and its most confident calls historically <b>underperformed</b> the index" : ""} — a score describes current fundamentals, it does not forecast returns (<a href="/evidence.html">the evidence</a>; the <a href="/ledger.html">ledger</a> is the live test).</div>`;
 
   // Your call, not the formula's: logged to a private, append-only track
   // record and graded against the index over time — the feature that tells
@@ -593,6 +603,16 @@ function renderRange(d) {
     el.range.innerHTML = `<h2>52-week range</h2><p class="sub">Not enough data to draw the range.</p>`;
     return;
   }
+  // Share-class sanity: a price orders of magnitude outside its own range
+  // (BRK.B quoted at $495 against a $698k–$806k "range") is vendor data for
+  // a different share class — say so instead of drawing a lie.
+  if (price < m.low52 / 5 || price > m.high52 * 5) {
+    el.range.innerHTML = `<h2>52-week range</h2>
+      <p class="sub">The quoted price (${esc(fmtMoney(price) ?? price)}) sits far outside the vendor's 52-week range
+      (${esc(fmtMoney(m.low52) ?? "?")}–${esc(fmtMoney(m.high52) ?? "?")}) — this looks like data for a different share
+      class. The range, momentum input, and EPS estimates are unreliable for this ticker.</p>`;
+    return;
+  }
   const pos = Math.min(1, Math.max(0, (price - m.low52) / (m.high52 - m.low52)));
   const pct = pos * 100;
   const labelPct = Math.min(91, Math.max(9, pct)); // keep the price label inside the card
@@ -696,7 +716,9 @@ function nextEarningsLine(d) {
   if (!n?.date) return "";
   const days = Math.round((Date.parse(n.date) - Date.now()) / 86_400_000);
   const when = { amc: "after the close", bmo: "before the open", dmh: "during market hours" }[n.hour] ?? "";
-  const est = isNum(n.epsEstimate) ? ` — street expects EPS ${fmtNum(n.epsEstimate)}` : "";
+  // An EPS estimate at or above the share price is share-class garbage.
+  const est = isNum(n.epsEstimate) && (!isNum(d.quote?.price) || n.epsEstimate < d.quote.price)
+    ? ` — street expects EPS ${fmtNum(n.epsEstimate)}` : "";
   return ` <b>Next report: ${esc(n.date)}${days >= 0 ? ` (in ${days} day${days === 1 ? "" : "s"}${when ? `, ${when}` : ""})` : ""}${est}.</b> Earnings days are the year's biggest single-day moves — know the date before money moves.`;
 }
 
@@ -847,7 +869,7 @@ function buildBrief(d) {
   L.push("");
   L.push(`Generated ${new Date(d.asOf).toLocaleString("en-US")} by Crosscheck (github.com/EvanDRas/crosscheck) — sources: Finnhub API, SEC EDGAR filings; news merged from Google News RSS, Yahoo Finance RSS, Finnhub. Data may be delayed, incomplete, or wrong. Research/education only — not financial advice.`);
   if (d.demo) L.push("", "**WARNING: this is the app's DEMO ticker — every number and headline below is fictional sample data.**");
-  if (d.warnings?.length) L.push("", `Partial data — failed sources: ${d.warnings.join("; ")}`);
+  if (d.warnings?.length) L.push("", `Data notes (failures and source disagreements): ${d.warnings.join("; ")}`);
 
   L.push("", "## Company");
   L.push(line("Exchange / industry", [p.exchange, p.industry].filter(Boolean).join(" / ") || null));
@@ -1141,7 +1163,12 @@ function render(d) {
   $("shareCardBtn").hidden = Boolean(d.demo); // a share card of fictional data helps no one
 
   if (d.warnings?.length) {
-    el.warnings.textContent = `Partial data — some sources failed: ${d.warnings.join("; ")}`;
+    // Disagreements are not outages — label the banner by what it holds.
+    const disputes = d.warnings.filter((w) => /disagree|says|imply|share class/i.test(w)).length;
+    const label = disputes === d.warnings.length
+      ? "Sources disagree on some numbers — check before trusting"
+      : disputes ? "Data notes" : "Partial data — some sources failed";
+    el.warnings.textContent = `${label}: ${d.warnings.join("; ")}`;
     el.warnings.hidden = false;
   }
 

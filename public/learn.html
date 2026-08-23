@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Learn — Crosscheck</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2214%22 fill=%22%230c0d0f%22/><rect x=%223%22 y=%223%22 width=%2294%22 height=%2294%22 rx=%2212%22 fill=%22none%22 stroke=%22%234f86c6%22 stroke-width=%226%22/><text x=%2250%22 y=%2274%22 font-family=%22Georgia,serif%22 font-size=%2266%22 font-weight=%22bold%22 fill=%22%23e9eaec%22 text-anchor=%22middle%22>C</text></svg>" />
-  <link rel="stylesheet" href="style.css?v=25" />
+  <link rel="stylesheet" href="style.css?v=26" />
 </head>
 <body>
   <header class="topbar">
@@ -40,9 +40,9 @@
     <section class="card" id="l-verdict">
       <h2>1 · How to read a verdict</h2>
       <p>The 0–100 score is a weighted sum of six categories — Valuation 20, Profitability 20, Growth 20,
-         Financial health 15, Momentum 10, Analyst view 15. Each metric is mapped to 0–100 through a fixed curve
-         you can see on the result page itself (hover any bar). If a category has no data, its weight is
-         redistributed rather than scored as zero.</p>
+         Financial health 15, Momentum 10, Analyst view 15. Each metric is mapped to 0–100 through a fixed curve,
+         and the detail line under every bar shows each input and the score it mapped to. If a category has no data,
+         its weight is redistributed rather than scored as zero.</p>
       <p>Verdict bands are calibrated so each label is a percentile of the universe: <b>STRONG BUY</b> is the top
          tier of scores, <b>STRONG SELL</b> the bottom. A verdict is therefore a <em>ranking of the present</em>,
          not a forecast — a STRONG BUY means the numbers look better than most companies' numbers today.</p>
@@ -97,7 +97,8 @@
       <h2>5 · Momentum and the 52-week range — tested, found wanting</h2>
       <p>Where a price sits in its one-year range is the formula's only momentum input. The folk wisdom says
          winners keep winning. Crosscheck tested that claim on 274 months of S&amp;P data: the edge was
-         statistically zero (t = −0.24). That is why momentum carries only 10% of the score.</p>
+         statistically zero (t = −0.24). Momentum's small 10% weight was set before that test — and the test
+         is why you should read the momentum bar with the most skepticism of the six.</p>
       <p>The lesson is bigger than momentum: every popular "signal" deserves this treatment. If a rule sounds
          obvious and profitable, ask who tested it and whether they used only information available at the time.</p>
       <p class="learn-live"><a href="/evidence.html">Read the momentum study →</a> <a href="/#NVDA">A stock near its high: NVDA →</a></p>
@@ -108,7 +109,7 @@
       <p>Wall Street ratings skew optimistic by construction: Sells are rare because firms want access to
          management and investment-banking business. A stock with 30 Buys and 2 Holds is normal, not
          remarkable. What carries information is the <em>drift</em> — ratings moving toward Sell over months —
-         which the analyst card shows as a six-month trend.</p>
+         which the analyst card shows as a recent-months trend.</p>
       <p class="learn-live"><a href="/#INTC">Watch the drift: INTC →</a> <a href="/#TSLA">A divided street: TSLA →</a></p>
     </section>
 
@@ -156,7 +157,8 @@
          confidence level.</p>
       <p>Most tools never run this test, or run it and bury the result. The finding is the most useful thing
          on this site: a transparent, well-built summary of today's fundamentals <em>still</em> does not predict
-         next quarter's price. Markets are hard in exactly this way. Use the score to understand a company,
+         next quarter's price. And every backtest figure here is <b>gross of trading costs and taxes</b> — real
+         results would be worse. Markets are hard in exactly this way. Use the score to understand a company,
          and use the evidence page to stay humble about what any score can do.</p>
       <p class="learn-live"><a href="/evidence.html">Read all four studies →</a></p>
     </section>
@@ -169,6 +171,8 @@
         <li>Check the Trajectory section: one year of growth is a data point, five is a trend.</li>
         <li>Look for ⚠ marks — when two sources disagree, find out why before trusting either.</li>
         <li>Insider buying clusters matter; insider selling almost never does.</li>
+        <li>Remember what the benchmark means: everything here is graded against an S&amp;P 500 index fund
+            because that is the no-effort alternative. Beating it is the bar; matching it is the sane default.</li>
         <li>Log your own calls on the track record page and let time grade them. It is the fastest way to learn
             whether your judgment beats an index fund — most people's does not, and finding out early is cheap.</li>
       </ol>
@@ -186,8 +190,8 @@
     how to read public data; they are not recommendations. Always do your own research.
   </footer>
 
-  <script src="glossary.js?v=25"></script>
-  <script src="callit.js?v=25"></script>
+  <script src="glossary.js?v=26"></script>
+  <script src="callit.js?v=26"></script>
   <script>
     // The game: universe list from /api/movers (keyless installs still get
     // the list; the Time Machine itself needs a Tiingo key and says so).
