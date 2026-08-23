@@ -1535,10 +1535,18 @@ async function loadFeed(tab, limit = 10) {
 }
 
 // The lead story lives in the hero, not the list — one dominant item is
-// what makes a front page read as a front page.
+// what makes a front page read as a front page. Prefer a market story for
+// the slot: the wire mix includes world news, and a stock site leading
+// with geopolitics reads off-brand.
+const MARKETISH = /\b(stocks?|shares|markets?|nasdaq|s&p|dow|earnings|fed|wall street|investors?|rally|selloff|inflation|tariffs?)\b/i;
+function pickLead() {
+  const items = newsData?.items ?? [];
+  return items.find((n) => hasImg(n) && (tickersIn(n.headline).length || MARKETISH.test(n.headline))) ?? items.find(hasImg);
+}
+
 function renderHero() {
   const hero = $("heroLead");
-  const lead = (newsData?.items ?? []).find(hasImg);
+  const lead = pickLead();
   if (!lead) {
     hero.hidden = true;
     return;
@@ -1556,7 +1564,7 @@ function renderHero() {
 function renderNewsCard() {
   const newsEl = $("marketNews");
   const items = feedItems;
-  const leadLink = feedTab === "top" ? (newsData?.items ?? []).find(hasImg)?.link : null;
+  const leadLink = feedTab === "top" ? pickLead()?.link : null;
   const list = items.filter((n) => n.link !== leadLink);
   const tagged = list.map((n) => ({ n, tags: n.tickers ?? tickersIn(n.headline) }));
   const counts = new Map();

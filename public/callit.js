@@ -38,6 +38,22 @@
     return d.toISOString().slice(0, 10);
   }
 
+  // Variety guard: never re-serve a ticker the player has seen in the last
+  // several rounds (a reviewer got TSLA twice in a row — that reads as
+  // broken and lets players meta-guess).
+  const RECENT_KEY = "cc_callit_recent";
+  const readRecentTickers = () => {
+    try {
+      const a = JSON.parse(localStorage.getItem(RECENT_KEY));
+      return Array.isArray(a) ? a.filter((t) => typeof t === "string") : [];
+    } catch {
+      return [];
+    }
+  };
+  const pushRecentTicker = (t) => {
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify([t, ...readRecentTickers().filter((x) => x !== t)].slice(0, 8))); } catch { /* private mode */ }
+  };
+
   const verdictCall = (v) => (/BUY/.test(v ?? "") ? "beat" : /SELL/.test(v ?? "") ? "trail" : null);
   const verdictClass = (v) => ({ "STRONG BUY": "v-strongbuy", BUY: "v-buy", HOLD: "v-hold", SELL: "v-sell", "STRONG SELL": "v-strongsell" }[v] ?? "v-nodata");
 
@@ -127,8 +143,11 @@
       busy = true;
       root.innerHTML = `<p class="callit-msg">Reconstructing a past day…</p>`;
       let lastErr = "Could not build a round right now.";
+      const seen = readRecentTickers();
+      const pool = tickers.filter((t) => !seen.includes(t));
       for (let attempt = 0; attempt < 4; attempt++) {
-        const t = tickers[Math.floor(Math.random() * tickers.length)];
+        const from = pool.length ? pool : tickers;
+        const t = from[Math.floor(Math.random() * from.length)];
         const d = randomDate();
         try {
           const res = await fetch(`/api/timemachine?ticker=${encodeURIComponent(t)}&date=${d}`);
@@ -140,6 +159,7 @@
           }
           if (body.scoring?.insufficientData || !isNum(body.outcome?.excess)) continue;
           round = body;
+          pushRecentTicker(t);
           busy = false;
           renderRound();
           return;
