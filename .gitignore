@@ -8,3 +8,6 @@ data/*
 !data/universe.json
 __pycache__/
 scripts/local_paths.py
+
+# Launch notes are working files, not part of the product.
+launch/

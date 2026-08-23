@@ -5,7 +5,7 @@
 Type a ticker, get the whole picture: live quote, company profile, fundamentals
 cross-checked against SEC filings, analyst ratings, earnings history, peers,
 relevance-filtered news — and a transparent 0–100 verdict (STRONG BUY → STRONG
-SELL) you can pick apart category by category, from the only analyzer that
+SELL) you can pick apart category by category, from an analyzer that
 publishes its own backtests ([EVIDENCE.md](EVIDENCE.md) — including the ones
 that came back null).
 

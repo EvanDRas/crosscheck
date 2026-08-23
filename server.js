@@ -46,6 +46,19 @@ app.use((req, res, next) => {
   next();
 });
 
+// Browsers stamp Sec-Fetch-Site on requests; a cross-site value means some
+// other website's page initiated the call (drive-by <img> tricks against
+// localhost). Block those for state-changing or quota-burning routes —
+// curl and same-origin app requests are unaffected.
+app.use((req, res, next) => {
+  const sfs = req.headers["sec-fetch-site"];
+  if (sfs && sfs !== "none" && sfs !== "same-origin"
+      && (req.method === "POST" || req.path === "/api/analyze" || req.path === "/api/timemachine")) {
+    return res.status(403).json({ error: "Cross-site requests are not allowed." });
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json({ limit: "16kb" }));
 
