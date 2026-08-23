@@ -24,8 +24,11 @@ function deltaCell(v) {
 }
 
 function renderSummary(data) {
-  // Same hygiene as the aggregates: aged, total-return-graded rows only.
-  const graded = data.entries.filter((e) => e.excess != null && e.ageDays > 0 && e.basis === "tr");
+  // Same hygiene as the aggregates AND the homepage tiles: current-era,
+  // aged, total-return-graded rows only — one definition of "graded"
+  // everywhere, or the site contradicts itself about its headline number.
+  const era = data.entries.some((e) => e.formulaVersion === "v2") ? "v2" : "v1";
+  const graded = data.entries.filter((e) => (e.formulaVersion ?? "v1") === era && e.excess != null && e.ageDays > 0 && e.basis === "tr");
   const dates = data.entries.map((e) => e.date).sort();
   const avgExcess = graded.length ? graded.reduce((a, e) => a + e.excess, 0) / graded.length : null;
   const wins = graded.length ? graded.filter((e) => e.excess > 0).length : 0;
@@ -38,7 +41,7 @@ function renderSummary(data) {
   const tiles = [
     ["Calls logged", String(data.entries.length)],
     ["First call", dates[0] ?? "—"],
-    ["Graded (aged, TR-basis)", String(graded.length)],
+    ["Graded (current era, aged, TR)", String(graded.length)],
     ["Avg vs SPY (graded)", graded.length ? pct(avgExcess) : "—"],
     ["Beat SPY", graded.length ? `${wins} of ${graded.length}` : "—"],
     ["Formula eras", eras || "—"],
@@ -46,8 +49,8 @@ function renderSummary(data) {
   $("summaryCard").innerHTML = `
     <h2>Summary</h2>
     <p class="sub">As of ${new Date(data.asOf).toLocaleString("en-US")}. Total-return grading: split- and
-    dividend-adjusted closes (call date &rarr; latest) from the local research panel, SPY measured the same
-    way over the same window. Costs excluded.</p>
+    dividend-adjusted closes (call date &rarr; latest), SPY measured the same way over the same window.
+    SPY is an S&amp;P 500 index fund — shorthand for "the market." Costs excluded.</p>
     <div class="kn-grid">
       ${tiles.map(([l, v]) => `<div class="kn-tile"><div class="kn-label">${esc(l)}</div><div class="kn-value">${esc(v)}</div></div>`).join("")}
     </div>`;

@@ -99,7 +99,24 @@
 
     const dailyState = () => {
       const d = readJSON("cc_callit_daily", null);
-      return d?.date === localDay() ? d : { date: localDay(), rounds: [] };
+      if (d?.date !== localDay()) return { date: localDay(), rounds: [] };
+      // Trust nothing from storage verbatim — a bad write should not wedge
+      // the day (and stray test rows should never render).
+      d.rounds = (Array.isArray(d.rounds) ? d.rounds : []).filter((r) => /^[A-Z]{1,6}(\.[AB])?$/.test(r?.t ?? "")).slice(0, 5);
+      return d;
+    };
+
+    // Playing the Daily 5 is what keeps the streak alive — first daily
+    // reveal of the day bumps it (merely loading the page does not).
+    const bumpPlayStreak = () => {
+      const today = localDay();
+      const s = readJSON("cc_streak", { last: null, count: 0, best: 0 });
+      if (s.last === today) return;
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+      const count = s.last === yesterday ? s.count + 1 : 1;
+      writeJSON("cc_streak", { last: today, count, best: Math.max(s.best ?? 0, s.count ?? 0, count) });
     };
 
     const scoreLine = () => `
@@ -139,7 +156,7 @@
           <button type="button" class="callit-btn" data-act="practice">Practice rounds</button>
         </div>
         ${scoreLine()}
-        <p class="callit-note">A new five drops tomorrow.</p>`;
+        <p class="callit-note">The formula made its calls from the same numbers${f <= you ? " — and you matched or beat it. That's the point: today's numbers don't know the future" : ""}. A new five drops tomorrow.</p>`;
     }
 
     function renderRound() {
@@ -183,6 +200,7 @@
         const d = dailyState();
         d.rounds.push({ t: round.ticker, d: round.date, you: youRight, formula: fRight });
         writeJSON("cc_callit_daily", d);
+        bumpPlayStreak();
         nextLabel = d.rounds.length >= 5 ? "See today's result" : "Next mystery";
       }
       root.innerHTML = `
@@ -207,24 +225,42 @@
       root.innerHTML = `<p class="callit-msg">Reconstructing a past day…</p>`;
       let lastErr = "Could not build a round right now.";
       const d = dailyState();
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       for (let attempt = 0; attempt < 8; attempt++) {
         const pick = m === "daily" ? seededPick(tickers, d.date, d.rounds.length, attempt) : randomPick(tickers);
-        try {
-          const res = await fetch(`/api/timemachine?ticker=${encodeURIComponent(pick.t)}&date=${pick.d}`);
-          const body = await res.json();
-          if (!res.ok) {
-            lastErr = body?.error ?? lastErr;
-            if (res.status === 422 && /tiingo|key/i.test(lastErr)) break;
-            continue;
+        // Determinism rule for the daily: only DATA verdicts (this candidate
+        // has no usable point-in-time round — same for every player) advance
+        // the seeded attempt counter. Transient failures (rate limits,
+        // network) retry the SAME candidate, so two friends' sequences
+        // can't diverge just because one server hit a 429.
+        let played = false;
+        for (let tries = 0; tries < 3; tries++) {
+          try {
+            const res = await fetch(`/api/timemachine?ticker=${encodeURIComponent(pick.t)}&date=${pick.d}`);
+            const body = await res.json();
+            if (res.status === 422) {
+              lastErr = body?.error ?? lastErr;
+              if (/tiingo|key/i.test(lastErr)) { busy = false; return renderHome(lastErr); }
+              break; // deterministic rejection — next candidate
+            }
+            if (!res.ok) {
+              lastErr = body?.error ?? lastErr;
+              await sleep(1500); // transient — same candidate again
+              continue;
+            }
+            if (body.scoring?.insufficientData || !isNum(body.outcome?.excess)) break; // deterministic — next candidate
+            round = body;
+            played = true;
+            break;
+          } catch {
+            await sleep(1500); // network hiccup — same candidate again
           }
-          if (body.scoring?.insufficientData || !isNum(body.outcome?.excess)) continue;
-          round = body;
+        }
+        if (played) {
           if (m !== "daily") pushRecentTicker(pick.t);
           busy = false;
           renderRound();
           return;
-        } catch {
-          /* try the next candidate */
         }
       }
       busy = false;

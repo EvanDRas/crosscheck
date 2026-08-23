@@ -214,7 +214,8 @@ const INDICES = [
   ["DIA", "Dow"],
   ["IWM", "Russell 2000"],
 ];
-const BOARD = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA"];
+// (The old mega-cap "big board" was cut: it was the third surface showing
+// the same seven quotes the heat map and movers already carry.)
 
 // Browsable verdict screen: the daily batch already logs the whole fixed
 // 50-stock universe, so the landing page can rank it from disk — zero API
@@ -235,8 +236,6 @@ function buildScreen() {
         score: e.score,
         verdict: e.verdict,
         confidence: e.confidence ?? null,
-        nt: e.ntVerdict ?? null,
-        lt: e.ltVerdict ?? null,
         date: e.date,
       }));
   } catch {
@@ -289,10 +288,9 @@ async function buildMarket() {
         return null;
       }
     };
-    const sparkSyms = [...INDICES.map(([s]) => s), ...BOARD];
-    const [indices, board, news, sparkPairs] = await Promise.all([
+    const sparkSyms = INDICES.map(([s]) => s);
+    const [indices, news, sparkPairs] = await Promise.all([
       apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
-      apiKey ? Promise.all(BOARD.map((s) => quoteRow([s, s]))) : [],
       marketNews(apiKey).catch(() => []),
       hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkFor(s)])) : [],
     ]);
@@ -302,7 +300,6 @@ async function buildMarket() {
       asOf: new Date().toISOString(),
       hasKey: Boolean(apiKey),
       indices: indices.filter(Boolean),
-      board: board.filter(Boolean),
       news,
       screen: buildScreen(),
       sparks,
@@ -453,14 +450,16 @@ async function buildHomeStats() {
     const partial = warnings.some((w) => /Graded \d+ of|grading failed/.test(w));
     const era = rows.filter((r) => (r.formulaVersion ?? "v1") === SCORING_VERSION);
     const graded = era.filter((r) => r.excess != null && r.ageDays > 0 && r.basis !== "raw");
-    const beat = graded.filter((r) => r.excess > 0).length;
+    // The hit rate only counts calls that have had a month to breathe —
+    // week-old "accuracy" is noise, and EVIDENCE.md says judge in months.
+    const seasoned = graded.filter((r) => r.ageDays >= 30);
     const best = graded.length ? graded.reduce((a, b) => (b.excess > a.excess ? b : a)) : null;
     const worst = graded.length ? graded.reduce((a, b) => (b.excess < a.excess ? b : a)) : null;
     const payload = {
       calls: entries.length,
       days: new Set(entries.map((e) => e.date)).size,
       graded: graded.length,
-      beatPct: graded.length ? (100 * beat) / graded.length : null,
+      beatPct: seasoned.length >= 30 ? (100 * seasoned.filter((r) => r.excess > 0).length) / seasoned.length : null,
       best: best ? { ticker: best.ticker, excessPct: 100 * best.excess } : null,
       worst: worst ? { ticker: worst.ticker, excessPct: 100 * worst.excess } : null,
       asOf: new Date().toISOString(),
@@ -615,6 +614,23 @@ app.get("/api/stream", (req, res) => {
 //  2. "tr" via Tiingo's adjusted closes for tickers the panel doesn't cover.
 //  3. "raw" — live quote vs the logged price/SPY level. Breaks across splits,
 //     excludes dividends — rows carry basis so the page can say which.
+const GRADE_STORE = path.join(__dirname, "data", "grade_store.json");
+function readGradeStore() {
+  try {
+    const s = JSON.parse(fs.readFileSync(GRADE_STORE, "utf8"));
+    return { anchors: s.anchors ?? {}, latest: s.latest ?? {} };
+  } catch {
+    return { anchors: {}, latest: {} };
+  }
+}
+function writeGradeStore(s) {
+  try {
+    fs.writeFileSync(GRADE_STORE, JSON.stringify(s));
+  } catch {
+    /* disk trouble — grading still works, just without the checkpoint */
+  }
+}
+
 async function gradeEntries(entries, { rawQuotes = true } = {}) {
   const apiKey = process.env.FINNHUB_API_KEY;
   const warnings = [];
@@ -632,13 +648,26 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
 
   const tGrades = {};
   if (hasTiingoKey()) {
-    // Group missing (ticker, date) pairs by ticker: one series fetch grades
-    // every date for that ticker at once. Newest tickers first, so a capped
-    // load still grades what the top of the ledger shows; series are cached
-    // for an hour, so consecutive loads finish whatever was left out.
+    // Persistent checkpoints: a pair's anchor leg never changes, and the
+    // latest-close leg changes once per market day — so a warmed install
+    // grades the entire ledger from disk with zero API calls, and the
+    // per-load fetch cap only throttles first-ever warmup.
+    const store = readGradeStore();
+    const todayMkt = marketDate();
+    for (const e of entries) {
+      const k = `${e.ticker}|${e.date}`;
+      if (grades[k] || tGrades[k]) continue;
+      const a = store.anchors[k];
+      const l = store.latest[e.ticker];
+      if (a && l && l.day === todayMkt) tGrades[k] = { ...a, latestDate: l.latestDate, latestClose: l.latestClose };
+    }
+    // Group still-missing pairs by ticker: one series fetch grades every
+    // date for that ticker at once. Newest tickers first, so a capped load
+    // still grades what the top of the ledger shows.
     const byTicker = new Map();
     for (const e of [...entries].reverse()) {
-      if (grades[`${e.ticker}|${e.date}`]) continue;
+      const k = `${e.ticker}|${e.date}`;
+      if (grades[k] || tGrades[k]) continue;
       if (!byTicker.has(e.ticker)) byTicker.set(e.ticker, new Set());
       byTicker.get(e.ticker).add(e.date);
     }
@@ -646,13 +675,20 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
     const capped = [...byTicker.entries()].slice(0, MAX_TICKERS);
     const settled = await Promise.allSettled(capped.map(([t, dates]) => tiingoGradeMany(t, [...dates])));
     let tiingoFailed = 0;
+    let storeDirty = false;
     capped.forEach(([t], i) => {
       if (settled[i].status === "fulfilled") {
-        for (const [date, g] of Object.entries(settled[i].value)) tGrades[`${t}|${date}`] = g;
+        for (const [date, g] of Object.entries(settled[i].value)) {
+          tGrades[`${t}|${date}`] = g;
+          store.anchors[`${t}|${date}`] = { anchorDate: g.anchorDate, anchorClose: g.anchorClose };
+          store.latest[t] = { latestDate: g.latestDate, latestClose: g.latestClose, day: todayMkt };
+          storeDirty = true;
+        }
       } else {
         tiingoFailed++;
       }
     });
+    if (storeDirty) writeGradeStore(store);
     if (tiingoFailed) warnings.push(`Tiingo grading failed for ${tiingoFailed} ticker(s) this load.`);
     if (byTicker.size > MAX_TICKERS) {
       warnings.push(`Graded ${MAX_TICKERS} of ${byTicker.size} tickers this load (free-tier protection) — reload in a few minutes for the rest.`);
@@ -698,7 +734,11 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
     let nowPrice = null;
     let basis = null;
     let frozen = false;
-    if (g) {
+    if (g && g.latestDate <= g.anchorDate) {
+      // No trading session has passed since the call (weekend/same-day):
+      // 0.00% vs 0.00% is not a graded outcome, it's the absence of one.
+      // Leave the row ungraded until a close exists after the anchor.
+    } else if (g) {
       basis = "tr";
       ret = (g.latestClose - g.anchorClose) / g.anchorClose;
       nowPrice = Math.round(g.latestClose * 100) / 100;
@@ -812,7 +852,7 @@ app.get("/api/picks", async (_req, res) => {
     // Accuracy the honest way: a buy is right if it beat SPY, a sell/avoid is
     // right if the stock trailed SPY. Same-day rows are excluded (no time has
     // passed to grade).
-    const graded = rows.filter((r) => r.excess != null && r.ageDays > 0);
+    const graded = rows.filter((r) => r.excess != null && r.ageDays > 0 && Math.abs(r.excess) > 1e-9);
     const correct = graded.filter((r) => (r.direction === "buy" ? r.excess > 0 : r.excess < 0)).length;
     res.json({
       entries: rows,

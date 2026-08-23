@@ -328,6 +328,7 @@ function niceTicks(lo, hi, target = 4) {
 function histSourceLabel(h) {
   if (h.source === "sp500-panel") return `Local S&P daily panel — updated through ${h.through}`;
   if (h.source === "tiingo-archive") return `Local Tiingo research archive (static snapshot) — through ${h.through}; adjusted close`;
+  if (h.source === "tiingo-api") return `Live Tiingo data through ${h.through} — split/dividend-adjusted, updates daily`;
   if (h.source === "demo") return "Fictional demo series";
   return `Local data through ${h.through}`;
 }
@@ -1445,21 +1446,7 @@ function renderMarket(m) {
     strip.hidden = false;
   } else strip.hidden = true;
 
-  const board = $("marketBoard");
-  if (m.board?.length) {
-    board.innerHTML = `
-      <h2>Big board</h2>
-      <table class="mkt-table">
-        ${m.board.map((r) => `
-          <tr class="mkt-row" data-t="${esc(r.symbol)}">
-            <td class="mkt-sym">${esc(r.symbol)}</td>
-            <td class="spark-cell">${sparkSvg(sparks[r.symbol])}</td>
-            <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
-            <td class="num"><span class="badge ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</span></td>
-          </tr>`).join("")}
-      </table>`;
-    board.hidden = false;
-  } else board.hidden = true;
+  // (Big board cut — the heat map and movers already carry those quotes.)
 
   screenData = m.screen ?? [];
   renderScreen();
@@ -1628,32 +1615,36 @@ function marketStatus() {
   return ny.getDay() >= 1 && ny.getDay() <= 5 && mins >= 570 && mins < 960 ? "open" : "closed";
 }
 
-function bumpStreak() {
-  const today = localDay();
+// The streak belongs to PLAYING the Daily 5 (callit.js owns bumping it on
+// the first daily reveal of the day) — a streak for merely loading a page
+// attaches the "don't break the chain" pressure to the wrong action.
+function readStreak() {
   const s = readJSON("cc_streak", { last: null, count: 0, best: 0 });
-  if (s.last === today) return { best: s.count, ...s };
+  const today = localDay();
   const yesterday = localDay(new Date(Date.now() - 86_400_000));
-  const count = s.last === yesterday ? s.count + 1 : 1;
-  // Remembering the best run is what makes breaking a streak sting — and
-  // the sting is the mechanic.
-  const next = { last: today, count, best: Math.max(s.best ?? 0, s.count ?? 0, count) };
-  writeJSON("cc_streak", next);
-  return next;
+  const current = s.last === today || s.last === yesterday ? s.count : 0;
+  return { current, best: Math.max(s.best ?? 0, s.count ?? 0), playedToday: s.last === today };
 }
 
 function renderToday() {
-  const s = bumpStreak();
+  const s = readStreak();
   const st = marketStatus();
-  const rounds = readJSON("cc_callit_today", { date: null, rounds: 0 });
+  const daily = readJSON("cc_callit_daily", { date: null, rounds: [] });
+  const played = daily.date === localDay() ? daily.rounds.length : 0;
   const ago = lastUpdatedAt ? Math.max(0, Math.round((Date.now() - lastUpdatedAt) / 1000)) : null;
   $("todayBar").innerHTML = `
     <span class="today-date">${esc(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</span>
     <span class="today-mkt ${st}"><i></i>Market ${st}</span>
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
-    <span class="today-streak">${s.count}-day streak${(s.best ?? 0) > s.count ? ` · best ${s.best}` : ""}${rounds.date === localDay() && rounds.rounds ? ` · ${rounds.rounds} call${rounds.rounds === 1 ? "" : "s"} today` : ""}</span>
-    <span class="today-tag">Fundamentals cross-checked against SEC filings — track record public.</span>`;
+    <button type="button" class="today-daily" data-scroll="callitCard">Daily 5: ${played >= 5 ? "done" : `${played}/5`}${s.current ? ` · ${s.current}-day streak` : ""}${s.best > s.current ? ` · best ${s.best}` : ""}</button>
+    <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
 setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
+
+$("todayBar").addEventListener("click", (e) => {
+  const target = e.target.closest?.("[data-scroll]")?.dataset?.scroll;
+  if (target) document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
 
 // ---------- watchlist ----------
 
@@ -1800,7 +1791,9 @@ function renderScreen() {
   const arrow = (k) => (screenSort.key === k ? (screenSort.dir === -1 ? " ↓" : " ↑") : "");
   scr.innerHTML = `
     <h2>Verdict screen</h2>
-    <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData[0].date)}) · graded in public on the <a href="/ledger.html">track record</a> · not advice.</p>
+    <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData[0].date)}) ·
+      every call graded on the <a href="/ledger.html">track record</a> · not advice — the formula's own
+      <a href="/evidence.html">backtests</a> showed no predictive edge.</p>
     <div class="screen-filters">
       ${["ALL", "BUY", "HOLD", "SELL"].map((g) =>
         `<button type="button" data-f="${g}" class="${screenFilter === g ? "active" : ""}">${SCREEN_LABELS[g]} · ${counts[g]}</button>`).join("")}
@@ -1808,7 +1801,7 @@ function renderScreen() {
     <div class="screen-scroll">
       <table class="mkt-table screen-table">
         <thead>
-          <tr><th>#</th><th class="sortable" data-sort="ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score">Score${arrow("score")}</th><th>Verdict</th><th class="opt">Near-term</th><th class="opt">Long-term</th></tr>
+          <tr><th>#</th><th class="sortable" data-sort="ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score">Score${arrow("score")}</th><th>Verdict</th></tr>
         </thead>
         <tbody>
           ${rows.map((r, i) => `
@@ -1817,8 +1810,6 @@ function renderScreen() {
               <td class="mkt-sym">${esc(r.ticker)} ${starBtn(r.ticker)}</td>
               <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
               <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
-              <td class="opt">${r.nt ? `<span class="pill-sm ${verdictClass(r.nt)}">${esc(r.nt)}</span>` : "—"}</td>
-              <td class="opt">${r.lt ? `<span class="pill-sm ${verdictClass(r.lt)}">${esc(r.lt)}</span>` : "—"}</td>
             </tr>`).join("")}
         </tbody>
       </table>
@@ -1978,19 +1969,20 @@ function renderRecord(s) {
     return;
   }
   const exc = (v) => (isNum(v) ? `${v > 0 ? "+" : ""}${fmtNum(v, 1)}% vs SPY` : "—");
-  // Small-sample guards: a hit rate off one aged call is noise dressed up
-  // as a number — hold the tiles back until enough calls have aged.
+  // The server only reports a hit rate once enough calls are 30+ days old —
+  // until then the honest label is "too early", not a green number.
   const tiles = [
     ["Calls logged", String(s.calls), ""],
     ["Days running", String(s.days), ""],
     ["Graded so far", String(s.graded), ""],
-    ["Beat the S&P", isNum(s.beatPct) && s.graded >= 10 ? `${fmtNum(s.beatPct, 0)}%` : "too early", isNum(s.beatPct) && s.graded >= 10 && s.beatPct >= 50 ? "pos" : ""],
+    ["Beat the S&P (30d+ calls)", isNum(s.beatPct) ? `${fmtNum(s.beatPct, 0)}%` : "too early", isNum(s.beatPct) && s.beatPct >= 53 ? "pos" : ""],
     s.best && s.graded >= 5 ? ["Best aged call", `${esc(s.best.ticker)} ${exc(s.best.excessPct)}`, s.best.excessPct > 0 ? "pos" : ""] : null,
     s.worst && s.graded >= 5 ? ["Worst aged call", `${esc(s.worst.ticker)} ${exc(s.worst.excessPct)}`, ""] : null,
   ].filter(Boolean);
   card.innerHTML = `
     <h2>The forward test</h2>
-    <p class="sub">Every call frozen and graded vs the S&amp;P, wins and losses alike — <a href="/ledger.html">full ledger</a>.</p>
+    <p class="sub">Every call frozen and graded vs the S&amp;P, wins and losses alike — <a href="/ledger.html">full ledger</a>.
+      Young calls read like a coin flip; that matches the <a href="/evidence.html">backtests</a>.</p>
     <div class="mkt-strip record-strip">
       ${tiles.map(([label, val, cls]) => `
         <div class="mkt-tile">
@@ -2109,7 +2101,7 @@ async function loadMarket() {
   ]);
 }
 
-for (const id of ["marketBoard", "screenCard", "moversCard", "heatCard", "marketNews", "heroLead", "watchCard"]) {
+for (const id of ["screenCard", "moversCard", "heatCard", "marketNews", "heroLead", "watchCard"]) {
   $(id).addEventListener("click", (e) => {
     const t = e.target.closest?.(".mkt-row")?.dataset?.t;
     if (t) {
@@ -2267,6 +2259,9 @@ async function checkSetup() {
     hasTiingo = Boolean(h.hasTiingo);
     el.setup.hidden = hasKey;
     renderMoments(); // flags arrived after the first landing render
+    // The intro time-machine chip needs Tiingo — a keyless friend clicking
+    // it got a bare error page. Hide it until the key exists.
+    document.querySelectorAll("#introChips .tm-chip").forEach((b) => { b.hidden = !hasTiingo; });
   } catch {
     /* server unreachable — the analyze path will surface it */
   }
@@ -2291,11 +2286,10 @@ $("setupSaveBtn").addEventListener("click", async () => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? "Setup failed.");
     btn.textContent = "✓ Saved — you're live";
-    hasKey = true;
-    setTimeout(() => {
-      el.setup.hidden = true;
-      el.input.focus();
-    }, 900);
+    // Reload so every key-gated surface (indices, movers, heat map, Daily 5,
+    // moments) comes alive at once — without this the page looked dead for
+    // up to two minutes after a successful setup.
+    setTimeout(() => location.reload(), 900);
   } catch (err) {
     errEl.textContent = err.message;
     errEl.hidden = false;
@@ -2305,6 +2299,8 @@ $("setupSaveBtn").addEventListener("click", async () => {
 });
 
 checkSetup();
+
+$("setupDemoBtn")?.addEventListener("click", () => go("DEMO"));
 
 // Deep link: /#AAPL analyzes on load; otherwise land on the market overview.
 if (location.hash.length > 1) analyze(location.hash.slice(1));

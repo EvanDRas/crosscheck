@@ -1360,3 +1360,31 @@ a:hover { text-decoration: underline; }
 .watch-delta-item:hover { text-decoration: underline; }
 
 .hero-title-xl { font-size: 26px; padding: 14px 0 4px; }
+
+/* review fixes: rail-sized record strip, mobile time-machine grid, header date on phones */
+.record-strip { grid-template-columns: 1fr 1fr; justify-content: stretch; }
+.record-strip .mkt-tile { padding-right: 12px; }
+@media (max-width: 560px) {
+  .tm-outcome { grid-template-columns: 1fr; }
+  #dateInput { display: none; }
+}
+.setup-demo {
+  background: transparent;
+  border: 1px solid var(--baseline);
+  color: var(--ink-2);
+  border-radius: 3px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.setup-demo:hover { border-color: var(--accent); color: var(--ink); }
+.today-daily {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.today-daily:hover { color: var(--accent); }
