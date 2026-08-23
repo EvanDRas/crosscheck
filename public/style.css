@@ -1358,3 +1358,5 @@ a:hover { text-decoration: underline; }
 .watch-delta-item.pos { color: var(--good); }
 .watch-delta-item.neg { color: var(--critical); }
 .watch-delta-item:hover { text-decoration: underline; }
+
+.hero-title-xl { font-size: 26px; padding: 14px 0 4px; }

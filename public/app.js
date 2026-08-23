@@ -1541,7 +1541,13 @@ async function loadFeed(tab, limit = 10) {
 const MARKETISH = /\b(stocks?|shares|markets?|nasdaq|s&p|dow|earnings|fed|wall street|investors?|rally|selloff|inflation|tariffs?)\b/i;
 function pickLead() {
   const items = newsData?.items ?? [];
-  return items.find((n) => hasImg(n) && (tickersIn(n.headline).length || MARKETISH.test(n.headline))) ?? items.find(hasImg);
+  // Preference order: market photo story, any photo story, market text
+  // story, anything — a keyless install gets no photos (Google RSS carries
+  // none), and a dead hero slot reads as broken.
+  return items.find((n) => hasImg(n) && (tickersIn(n.headline).length || MARKETISH.test(n.headline)))
+    ?? items.find(hasImg)
+    ?? items.find((n) => tickersIn(n.headline).length || MARKETISH.test(n.headline))
+    ?? items[0];
 }
 
 function renderHero() {
@@ -1554,8 +1560,8 @@ function renderHero() {
   const tags = tickersIn(lead.headline);
   hero.innerHTML = `
     <a class="hero-link" href="${esc(safeHref(lead.link))}" target="_blank" rel="noopener noreferrer">
-      <img class="hero-img" src="${esc(lead.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">
-      <div class="hero-title">${esc(lead.headline)}</div>
+      ${hasImg(lead) ? `<img class="hero-img" src="${esc(lead.image)}" alt="" referrerpolicy="no-referrer" onerror="this.parentElement.querySelector('.hero-title')?.classList.add('hero-title-xl'); this.remove()">` : ""}
+      <div class="hero-title${hasImg(lead) ? "" : " hero-title-xl"}">${esc(lead.headline)}</div>
     </a>
     <div class="news-meta">${esc(lead.source)}${lead.date ? ` · ${esc(relTime(lead.date))}` : ""}${tags.length ? ` <span class="news-tags">${tags.map(tagChip).join("")}</span>` : ""}</div>`;
   hero.hidden = false;
@@ -1741,7 +1747,11 @@ function renderWatch() {
   const w = readWatch();
   if (!w.length) {
     const byMove = [...(moversData?.rows ?? [])].sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).map((r) => r.ticker);
-    const sugg = [...new Set([...readRecent(), ...byMove])].slice(0, 6);
+    // Keyless installs have no movers — fall back to the universe list so
+    // the empty state still offers something to star (For you news is
+    // keyless, so starring pays off immediately either way).
+    const pool = byMove.length ? byMove : (moversData?.universe ?? []);
+    const sugg = [...new Set([...readRecent(), ...pool])].slice(0, 6);
     card.innerHTML = `
       <h2>Your stocks</h2>
       <p class="watch-empty">Star any stock and it lives here — price, verdict, and its own news under <b>For you</b>.</p>
@@ -1923,7 +1933,16 @@ function renderMovers(m) {
       callitMounted = true;
     }
     gameCard.hidden = false;
-  } else gameCard.hidden = true;
+  } else if (m.universe?.length && !callitMounted) {
+    // Tease the game instead of vanishing — the Daily 5 is the best reason
+    // to bother adding the free key.
+    $("callitMount").innerHTML = `<p class="callit-msg">The Daily 5 — five mystery stocks a day, same five for everyone,
+      you versus the formula — needs a free <a href="https://www.tiingo.com" target="_blank" rel="noopener noreferrer">Tiingo</a> key.
+      Add it and today's five unlock.</p>`;
+    gameCard.hidden = false;
+  } else if (!callitMounted) {
+    gameCard.hidden = true;
+  }
   if (rows.length < 10) {
     card.hidden = true;
     return;
