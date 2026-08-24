@@ -411,7 +411,7 @@ const feedCache = new Map();
 const parseTickers = (s, max) => [...new Set(String(s ?? "").toUpperCase().split(",").map((x) => x.trim()).filter((x) => TICKER_RE.test(x) && x !== "DEMO"))].slice(0, max);
 app.get("/api/feed", async (req, res) => {
   try {
-    const tab = ["top", "markets", "world", "you"].includes(req.query.tab) ? req.query.tab : "top";
+    const tab = ["top", "markets", "world", "you", "briefing"].includes(req.query.tab) ? req.query.tab : "top";
     const limit = Math.min(40, Math.max(5, Number(req.query.limit) || 10));
     const tickers = parseTickers(req.query.t, 6);
     const key = `${tab}|${limit}|${tickers.join(",")}`;
@@ -423,6 +423,7 @@ app.get("/api/feed", async (req, res) => {
       apiKey: process.env.FINNHUB_API_KEY,
       limit,
       tickers: tickers.map((t) => ({ ticker: t, name: names[t]?.[0] ?? null })),
+      names,
     }));
     const payload = { tab, items, asOf: new Date().toISOString() };
     feedCache.set(key, { at: Date.now(), payload });

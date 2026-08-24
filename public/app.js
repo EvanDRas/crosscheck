@@ -1522,7 +1522,7 @@ let feedItems = [];
 let feedLimit = 10;
 let feedLoading = false;
 let feedInitialized = false;
-const FEED_TABS = [["top", "Top"], ["markets", "Markets"], ["world", "World"], ["you", "For you"]];
+const FEED_TABS = [["briefing", "Briefing"], ["you", "For you"], ["top", "Top"], ["markets", "Markets"], ["world", "World"]];
 const hasImg = (n) => /^https:\/\//i.test(n?.image ?? "");
 const youTickers = () => [...new Set([...readWatch(), ...readRecent()])].slice(0, 6);
 
@@ -1595,12 +1595,21 @@ function renderNewsCard() {
   for (const { tags } of tagged) for (const t of tags) counts.set(t, (counts.get(t) ?? 0) + 1);
   const trending = feedTab === "top" ? [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t) : [];
   const tagsFor = (n) => tagged.find((x) => x.n === n)?.tags ?? [];
+  // Impact badge: an honest attention heuristic (topic + how many outlets
+  // ran the story), labeled as a guide to reading order — not a forecast.
+  const impactBadge = (n) => {
+    const title = "Heuristic: macro topic + how many outlets ran this story — a guide to reading order, not a prediction";
+    if ((n.impact ?? 0) >= 3) return `<span class="impact hi" title="${title}">market-moving</span> `;
+    if ((n.impact ?? 0) === 2) return `<span class="impact mid" title="${title}">notable</span> `;
+    return "";
+  };
   const item = (n) => `
     <li class="news-item${hasImg(n) ? " has-thumb" : ""}">
       ${hasImg(n) ? `<img class="news-thumb" src="${esc(n.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('li').classList.remove('has-thumb'); this.remove()">` : ""}
       <div class="news-body">
         <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
-        <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}${tagsFor(n).length ? ` <span class="news-tags">${tagsFor(n).map(tagChip).join("")}</span>` : ""}</div>
+        ${feedTab === "briefing" && n.summary ? `<p class="news-summary">${esc(n.summary)}</p>` : ""}
+        <div class="news-meta">${impactBadge(n)}${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}${(n.covered ?? 1) >= 2 ? ` · ${n.covered} outlets` : ""}${tagsFor(n).length ? ` <span class="news-tags">${tagsFor(n).map(tagChip).join("")}</span>` : ""}</div>
       </div>
     </li>`;
   const empty = feedTab === "you" && !youTickers().length
@@ -1608,6 +1617,7 @@ function renderNewsCard() {
     : feedLoading && !list.length ? `<p class="feed-empty">Loading…</p>` : !list.length ? `<p class="feed-empty">Nothing here right now.</p>` : "";
   newsEl.innerHTML = `
     <div class="news-tabs">${FEED_TABS.map(([k, label]) => `<button type="button" data-tab="${k}" class="${feedTab === k ? "active" : ""}">${label}</button>`).join("")}</div>
+    ${feedTab === "briefing" ? `<p class="sub">Today's market-wide stories, ranked by a simple attention heuristic (macro topic + breadth of coverage) — a reading order, not a prediction. Single-stock churn is filtered out.</p>` : ""}
     ${trending.length ? `<div class="news-trending"><span class="mkt-label">Trending</span>${trending.map(tagChip).join("")}</div>` : ""}
     ${empty}
     <ul class="news-list${feedLoading ? " loading" : ""}">${list.map(item).join("")}</ul>
@@ -2145,7 +2155,9 @@ async function loadMarket() {
   // THEIR stocks' news — the market firehose is one tab away.
   if (!feedInitialized) {
     feedInitialized = true;
-    if (readWatch().length) loadFeed("you", 10);
+    // Following-first when you follow stocks; otherwise open on the
+    // Briefing — the skim of what actually matters today.
+    loadFeed(readWatch().length ? "you" : "briefing", 10);
   }
   const grab = async (url, render) => {
     try {
