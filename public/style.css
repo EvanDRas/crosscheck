@@ -1388,3 +1388,31 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .today-daily:hover { color: var(--accent); }
+
+/* follow-a-ticker form on the Following card */
+.watch-add { display: flex; gap: 6px; margin-top: 8px; }
+.watch-add input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 3px;
+  color: var(--ink);
+  padding: 5px 9px;
+  font-size: 12.5px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+.watch-add input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+.watch-add button {
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  color: var(--ink-2);
+  border-radius: 3px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.watch-add button:hover { border-color: var(--accent); color: var(--ink); }
+.watch-table .spark-cell { width: 70px; padding-right: 8px; }

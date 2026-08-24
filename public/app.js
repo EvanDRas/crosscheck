@@ -1519,6 +1519,7 @@ let feedTab = "top";
 let feedItems = [];
 let feedLimit = 10;
 let feedLoading = false;
+let feedInitialized = false;
 const FEED_TABS = [["top", "Top"], ["markets", "Markets"], ["world", "World"], ["you", "For you"]];
 const hasImg = (n) => /^https:\/\//i.test(n?.image ?? "");
 const youTickers = () => [...new Set([...readWatch(), ...readRecent()])].slice(0, 6);
@@ -1764,27 +1765,35 @@ async function loadWatchQuotes() {
 function renderWatch() {
   const card = $("watchCard");
   const w = readWatch();
+  const addForm = `
+    <form class="watch-add" autocomplete="off">
+      <input type="text" maxlength="10" spellcheck="false" placeholder="Follow a ticker — e.g. AMD" aria-label="Follow a ticker" />
+      <button type="submit">Follow</button>
+    </form>`;
   if (!w.length) {
     const byMove = [...(moversData?.rows ?? [])].sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).map((r) => r.ticker);
     // Keyless installs have no movers — fall back to the universe list so
-    // the empty state still offers something to star (For you news is
-    // keyless, so starring pays off immediately either way).
+    // the empty state still offers something to follow (For you news is
+    // keyless, so following pays off immediately either way).
     const pool = byMove.length ? byMove : (moversData?.universe ?? []);
     const sugg = [...new Set([...readRecent(), ...pool])].slice(0, 6);
     card.innerHTML = `
-      <h2>Your stocks</h2>
-      <p class="watch-empty">Star any stock and it lives here — price, verdict, and its own news under <b>For you</b>.</p>
+      <h2>Following</h2>
+      <p class="watch-empty">Follow the stocks you care about — they live here with price and verdict, and the
+      news feed opens on <b>their</b> stories instead of the market firehose.</p>
+      ${addForm}
       ${sugg.length ? `<div class="watch-sugg">${sugg.map((t) => `<button type="button" class="chip" data-star="${esc(t)}">☆ ${esc(t)}</button>`).join("")}</div>` : ""}`;
     return;
   }
   card.innerHTML = `
-    <h2>Your stocks</h2>
+    <h2>Following</h2>
     <table class="mkt-table watch-table">
       ${w.map((t) => {
         const q = watchQuotes[t];
         const v = screenData.find((r) => r.ticker === t);
         return `<tr class="mkt-row" data-t="${esc(t)}">
           <td class="mkt-sym">${esc(t)}</td>
+          <td class="spark-cell">${q?.spark ? sparkSvg(q.spark, 64, 20) : ""}</td>
           <td class="num">${q ? esc(fmtPrice(q.price)) : "—"}</td>
           <td class="num">${q && isNum(q.changePercent) ? `<span class="badge ${chgCls(q.changePercent)}">${esc(fmtPct(q.changePercent, true))}</span>` : ""}</td>
           <td>${v ? `<span class="pill-sm ${verdictClass(v.verdict)}">${esc(v.verdict)}</span>` : ""}</td>
@@ -1792,9 +1801,24 @@ function renderWatch() {
         </tr>`;
       }).join("")}
     </table>
+    ${addForm}
     ${watchDelta?.deltas?.length ? `<p class="watch-delta">Since your last visit: ${watchDelta.deltas.map((d) =>
       `<button type="button" class="watch-delta-item mkt-row ${d.pct > 0 ? "pos" : "neg"}" data-t="${esc(d.t)}">${esc(d.t)} ${esc(fmtPct(d.pct, true))}</button>`).join(" ")}</p>` : ""}`;
 }
+
+// Follow by typing: validate the shape, add, and let the quote fetch judge
+// whether it's real (a bogus ticker just shows dashes until unfollowed).
+$("watchCard").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = e.target.querySelector("input");
+  const t = String(input?.value ?? "").trim().toUpperCase();
+  if (!/^[A-Z][A-Z.]{0,9}$/.test(t) || t === "DEMO") {
+    input?.select();
+    return;
+  }
+  if (!readWatch().includes(t)) toggleWatch(t);
+  else input.value = "";
+});
 
 // Verdict screen state: the payload survives refreshes; sort and filter are
 // view state that must survive the 2-minute re-poll without snapping back.
@@ -2115,6 +2139,12 @@ async function loadMarket() {
   renderLearn();
   renderWatch();
   loadWatchQuotes();
+  // Following-first: when the reader follows stocks, the feed opens on
+  // THEIR stocks' news — the market firehose is one tab away.
+  if (!feedInitialized) {
+    feedInitialized = true;
+    if (readWatch().length) loadFeed("you", 10);
+  }
   const grab = async (url, render) => {
     try {
       const res = await fetch(url);

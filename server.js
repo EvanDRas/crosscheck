@@ -229,6 +229,18 @@ app.get("/api/compare", async (req, res) => {
 // and market headlines. One shared cache serves every visitor for 2 minutes,
 // so the front page costs ~11 API calls per interval — not per page load.
 // Keyless: quotes are unavailable, headlines still flow (RSS needs no key).
+// 30-session sparkline series. startDate is a calendar day, so the Tiingo
+// cache serves every refresh until tomorrow.
+async function sparkSeries(sym) {
+  try {
+    const from = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+    const rows = await getTiingoDaily(sym, from);
+    return rows ? rows.slice(-30).map((r) => r.adj) : null;
+  } catch {
+    return null;
+  }
+}
+
 const INDICES = [
   ["SPY", "S&P 500"],
   ["QQQ", "Nasdaq 100"],
@@ -299,22 +311,11 @@ async function buildMarket() {
         return null;
       }
     };
-    // 30-session sparklines for the strip and board. startDate is a calendar
-    // day, so the Tiingo series cache serves every refresh until tomorrow.
-    const sparkFor = async (sym) => {
-      try {
-        const from = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
-        const rows = await getTiingoDaily(sym, from);
-        return rows ? rows.slice(-30).map((r) => r.adj) : null;
-      } catch {
-        return null;
-      }
-    };
     const sparkSyms = INDICES.map(([s]) => s);
     const [indices, news, sparkPairs] = await Promise.all([
       apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
       marketNews(apiKey).catch(() => []),
-      hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkFor(s)])) : [],
+      hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkSeries(s)])) : [],
     ]);
     const sparks = {};
     for (const [s, v] of sparkPairs) if (v) sparks[s] = v;
@@ -442,7 +443,12 @@ app.get("/api/quotes", async (req, res) => {
   await Promise.all(list.map(async (t) => {
     try {
       const q = await getQuoteCached(t, apiKey);
-      if (q?.c) quotes[t] = { price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
+      if (!q?.c) return;
+      quotes[t] = { price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
+      if (hasTiingoKey()) {
+        const s = await sparkSeries(t);
+        if (s) quotes[t].spark = s;
+      }
     } catch {
       /* left out — the row shows a dash */
     }
