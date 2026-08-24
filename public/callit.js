@@ -130,9 +130,17 @@
     function renderHome(msg) {
       const d = dailyState();
       if (d.rounds.length >= 5) return renderSummary(msg);
+      const how = compact
+        ? `<p class="callit-note">Not pure guessing: most single stocks trail the index over long stretches, and extreme numbers (a triple-digit P/E, a price at 2% of its range) usually mean something. The date matters as much as the numbers.</p>`
+        : `<div class="callit-how">
+            <div class="mkt-label">How do you beat a coin flip?</div>
+            <p class="callit-note">Base rates and extremes. Over long stretches most individual stocks <b>trail</b> the index — a few giant winners drag the average up — so "trails" is the statistically safer default. Extreme numbers carry information: a triple-digit P/E in a frothy year usually ends badly; fat margins and steady growth at a sane price sometimes compound for a decade. And the date matters as much as the numbers — the same figures mean different things in 2013 and mid-2021. If it still feels like half-guessing, that is the lesson: you have the same information the formula has, and you'll both hover near a coin flip.</p>
+          </div>`;
       root.innerHTML = `
         <div class="callit-daily-head"><b>Daily 5</b> · mystery ${d.rounds.length + 1} of 5 · the same five for everyone today</div>
         <p class="callit-lead">A real company on a real past date, ticker hidden. Did it beat the S&amp;P from that day to now? Call it — then see what the formula said with the same numbers.</p>
+        ${how}
+        <p class="callit-note">Mysteries come from the same fixed 50 large caps (all 11 sectors) the daily forward test grades — a list committed before any results existed, so neither the game nor the track record can cherry-pick.</p>
         ${msg ? `<p class="callit-msg">${esc(msg)}</p>` : ""}
         ${scoreLine()}
         <div class="callit-btns">
