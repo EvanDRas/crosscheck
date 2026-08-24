@@ -480,18 +480,28 @@ async function buildHomeStats() {
     const partial = warnings.some((w) => /Graded \d+ of|grading failed/.test(w));
     const era = rows.filter((r) => (r.formulaVersion ?? "v1") === SCORING_VERSION);
     const graded = era.filter((r) => r.excess != null && r.ageDays > 0 && r.basis !== "raw");
-    // The hit rate only counts calls that have had a month to breathe —
-    // week-old "accuracy" is noise, and EVIDENCE.md says judge in months.
-    const seasoned = graded.filter((r) => r.ageDays >= 30);
-    const best = graded.length ? graded.reduce((a, b) => (b.excess > a.excess ? b : a)) : null;
-    const worst = graded.length ? graded.reduce((a, b) => (b.excess < a.excess ? b : a)) : null;
+    // Direction-aware accuracy: a buy-band call is right when the stock
+    // BEAT SPY, a sell-band call is right when it TRAILED — a raw
+    // "stock beat SPY" count would score a wrong STRONG SELL as a win.
+    // HOLDs abstain. Only calls with a month to breathe count toward the
+    // rate — week-old "accuracy" is noise, and EVIDENCE.md says months.
+    const isBuy = (v) => /BUY/.test(v ?? "");
+    const isSell = (v) => /SELL/.test(v ?? "");
+    const seasoned = graded.filter((r) => r.ageDays >= 30 && (isBuy(r.verdict) || isSell(r.verdict)));
+    const right = seasoned.filter((r) => (isBuy(r.verdict) ? r.excess > 0 : r.excess < 0)).length;
+    // Best/worst by call QUALITY (direction-signed excess): a sell that
+    // trailed SPY by 12% is a great call, not a bad one.
+    const qual = (r) => (isBuy(r.verdict) ? r.excess : isSell(r.verdict) ? -r.excess : null);
+    const pool = graded.filter((r) => qual(r) != null);
+    const best = pool.length ? pool.reduce((a, b) => (qual(b) > qual(a) ? b : a)) : null;
+    const worst = pool.length ? pool.reduce((a, b) => (qual(b) < qual(a) ? b : a)) : null;
     const payload = {
       calls: entries.length,
       days: new Set(entries.map((e) => e.date)).size,
       graded: graded.length,
-      beatPct: seasoned.length >= 30 ? (100 * seasoned.filter((r) => r.excess > 0).length) / seasoned.length : null,
-      best: best ? { ticker: best.ticker, excessPct: 100 * best.excess } : null,
-      worst: worst ? { ticker: worst.ticker, excessPct: 100 * worst.excess } : null,
+      rightPct: seasoned.length >= 30 ? (100 * right) / seasoned.length : null,
+      best: best ? { ticker: best.ticker, excessPct: 100 * best.excess, verdict: best.verdict } : null,
+      worst: worst ? { ticker: worst.ticker, excessPct: 100 * worst.excess, verdict: worst.verdict } : null,
       asOf: new Date().toISOString(),
       source,
     };

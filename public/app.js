@@ -2039,19 +2039,21 @@ function renderRecord(s) {
     return;
   }
   const exc = (v) => (isNum(v) ? `${v > 0 ? "+" : ""}${fmtNum(v, 1)}% vs SPY` : "—");
+  const callLabel = (c) => `${esc(c.ticker)} ${exc(c.excessPct)}${/SELL/.test(c.verdict ?? "") ? " · called sell" : ""}`;
   // The server only reports a hit rate once enough calls are 30+ days old —
   // until then the honest label is "too early", not a green number.
   const tiles = [
     ["Calls logged", String(s.calls), ""],
     ["Days running", String(s.days), ""],
     ["Graded so far", String(s.graded), ""],
-    ["Beat the S&P (30d+ calls)", isNum(s.beatPct) ? `${fmtNum(s.beatPct, 0)}%` : "too early", isNum(s.beatPct) && s.beatPct >= 53 ? "pos" : ""],
-    s.best && s.graded >= 5 ? ["Best aged call", `${esc(s.best.ticker)} ${exc(s.best.excessPct)}`, s.best.excessPct > 0 ? "pos" : ""] : null,
-    s.worst && s.graded >= 5 ? ["Worst aged call", `${esc(s.worst.ticker)} ${exc(s.worst.excessPct)}`, ""] : null,
+    ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}%` : "too early", isNum(s.rightPct) && s.rightPct >= 53 ? "pos" : ""],
+    s.best && s.graded >= 5 ? ["Best aged call", callLabel(s.best), "pos"] : null,
+    s.worst && s.graded >= 5 ? ["Worst aged call", callLabel(s.worst), ""] : null,
   ].filter(Boolean);
   card.innerHTML = `
     <h2>The forward test</h2>
-    <p class="sub">Every call frozen and graded vs the S&amp;P, wins and losses alike — <a href="/ledger.html">full ledger</a>.
+    <p class="sub">Every call frozen and graded vs the S&amp;P — <a href="/ledger.html">full ledger</a>.
+      Right = a buy that beat SPY or a sell that trailed it; HOLDs abstain.
       Young calls read like a coin flip; that matches the <a href="/evidence.html">backtests</a>.${s.source === "official" ? " Calls are the project's official published log, graded locally by this app." : ""}</p>
     <div class="mkt-strip record-strip">
       ${tiles.map(([label, val, cls]) => `

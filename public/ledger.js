@@ -31,7 +31,13 @@ function renderSummary(data) {
   const graded = data.entries.filter((e) => (e.formulaVersion ?? "v1") === era && e.excess != null && e.ageDays > 0 && e.basis === "tr");
   const dates = data.entries.map((e) => e.date).sort();
   const avgExcess = graded.length ? graded.reduce((a, e) => a + e.excess, 0) / graded.length : null;
-  const wins = graded.length ? graded.filter((e) => e.excess > 0).length : 0;
+  // Direction-aware: a buy is right when its stock beat SPY, a sell is
+  // right when it trailed. A plain "beat SPY" count scored wrong sells as
+  // wins. HOLDs abstain from the accuracy stat.
+  const isBuy = (v) => /BUY/.test(v ?? "");
+  const isSell = (v) => /SELL/.test(v ?? "");
+  const called = graded.filter((e) => isBuy(e.verdict) || isSell(e.verdict));
+  const right = called.filter((e) => (isBuy(e.verdict) ? e.excess > 0 : e.excess < 0)).length;
   const eraCounts = {};
   for (const e of data.entries) {
     const v = e.formulaVersion ?? "v1";
@@ -42,8 +48,8 @@ function renderSummary(data) {
     ["Calls logged", String(data.entries.length)],
     ["First call", dates[0] ?? "—"],
     ["Graded (current era, aged, TR)", String(graded.length)],
-    ["Avg vs SPY (graded)", graded.length ? pct(avgExcess) : "—"],
-    ["Beat SPY", graded.length ? `${wins} of ${graded.length}` : "—"],
+    ["Avg vs SPY (all graded)", graded.length ? pct(avgExcess) : "—"],
+    ["Right on direction", called.length ? `${right} of ${called.length}` : "—"],
     ["Formula eras", eras || "—"],
   ];
   $("summaryCard").innerHTML = `
@@ -54,6 +60,7 @@ function renderSummary(data) {
     dividend-adjusted closes (call date &rarr; latest), SPY measured the same way over the same window.
     SPY is an S&amp;P 500 index fund — shorthand for "the market." Costs excluded.
     Terms: <b>excess</b> = the call's return minus SPY's over the same window (positive = beat the market) ·
+    <b>right on direction</b> = buys whose stock beat SPY plus sells whose stock trailed it (HOLDs abstain) ·
     <b>aged</b> = at least one trading session old · <b>TR</b> = total return, dividends and splits included ·
     <b>eras</b> = formula versions (calls are only compared within their own era).</p>
     <div class="kn-grid">
