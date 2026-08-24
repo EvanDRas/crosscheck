@@ -1416,3 +1416,21 @@ a:hover { text-decoration: underline; }
 }
 .watch-add button:hover { border-color: var(--accent); color: var(--ink); }
 .watch-table .spark-cell { width: 70px; padding-right: 8px; }
+
+/* time-machine toggle in the header */
+#tmToggle {
+  background: transparent;
+  border: 1px solid var(--baseline);
+  color: var(--muted);
+  border-radius: 3px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#tmToggle:hover { border-color: var(--accent); color: var(--ink); }
+#tmToggle.active { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 560px) { #tmToggle { display: none; } }

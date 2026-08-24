@@ -52,7 +52,10 @@ function renderSummary(data) {
     output only), which this installation grades itself with its own keys. Your personal picks below stay
     local; run <code>npm run batch</code> to build a local formula ledger instead. ` : ""}As of ${new Date(data.asOf).toLocaleString("en-US")}. Total-return grading: split- and
     dividend-adjusted closes (call date &rarr; latest), SPY measured the same way over the same window.
-    SPY is an S&amp;P 500 index fund — shorthand for "the market." Costs excluded.</p>
+    SPY is an S&amp;P 500 index fund — shorthand for "the market." Costs excluded.
+    Terms: <b>excess</b> = the call's return minus SPY's over the same window (positive = beat the market) ·
+    <b>aged</b> = at least one trading session old · <b>TR</b> = total return, dividends and splits included ·
+    <b>eras</b> = formula versions (calls are only compared within their own era).</p>
     <div class="kn-grid">
       ${tiles.map(([l, v]) => `<div class="kn-tile"><div class="kn-label">${esc(l)}</div><div class="kn-value">${esc(v)}</div></div>`).join("")}
     </div>`;

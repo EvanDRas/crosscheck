@@ -282,7 +282,7 @@ function renderVerdict(d) {
   const pickRow = d.demo || !hasKey
     ? ""
     : `<div class="pick-row" id="pickRow">
-         <span class="pick-label">Your call on ${esc(d.ticker)} (logged to <a href="/ledger.html">your track record</a>, graded vs SPY):</span>
+         <span class="pick-label">Your call on ${esc(d.ticker)} (logged to <a href="/ledger.html">your track record</a>, graded against SPY — an S&amp;P 500 fund, i.e. "the market"):</span>
          <button type="button" data-dir="buy">I'd buy</button>
          <button type="button" data-dir="avoid">I'd pass</button>
          <button type="button" data-dir="sell">I'd sell</button>
@@ -501,7 +501,9 @@ function renderKeyNumbers(d) {
   };
   el.keyNumbers.innerHTML = `
     <h2>Key numbers</h2>
-    <p class="sub">Fundamentals from Finnhub, cross-checked against SEC EDGAR filings${d.edgarThrough ? ` (filed data through ${esc(d.edgarThrough)})` : ""}. N/A = no source has a value.</p>
+    <p class="sub">Fundamentals from Finnhub, cross-checked against SEC EDGAR filings${d.edgarThrough ? ` (filed data through ${esc(d.edgarThrough)})` : ""}.
+      Marks: <span class="prov prov-edgar">SEC</span> = value from filings (vendor had none) · <span class="prov prov-ok">✓</span> = both sources agree ·
+      <span class="prov prov-warn">⚠︎</span> = they disagree · N/A = no source has a value · tap <span class="term-q">?</span> on any tile for a plain-English definition.</p>
     <div class="kn-grid">
       ${tiles.map(([label, val, key, term]) => `
         <div class="kn-tile${term && window.TERMS?.[term] ? " has-term" : ""}" ${term ? `data-term="${esc(term)}"` : ""}>
@@ -2360,6 +2362,17 @@ $("setupSaveBtn").addEventListener("click", async () => {
 checkSetup();
 
 $("setupDemoBtn")?.addEventListener("click", () => go("DEMO"));
+
+// The date field lives behind a labeled toggle: an unlabeled mm/dd/yyyy in
+// the header read as noise, and a forgotten date silently turned every
+// search into a time-machine query.
+$("tmToggle")?.addEventListener("click", () => {
+  const open = el.dateInput.hidden;
+  el.dateInput.hidden = !open;
+  $("tmToggle").classList.toggle("active", open);
+  if (open) el.dateInput.focus();
+  else el.dateInput.value = "";
+});
 
 // Deep link: /#AAPL analyzes on load; otherwise land on the market overview.
 if (location.hash.length > 1) analyze(location.hash.slice(1));
