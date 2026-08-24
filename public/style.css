@@ -1450,3 +1450,22 @@ a:hover { text-decoration: underline; }
 }
 .impact.hi { color: var(--warning); border-color: var(--warning); }
 .impact.mid { color: var(--muted); border-color: var(--baseline); }
+
+/* Following: two-line flex rows that cannot overflow the narrow column */
+.watch-item { border-top: 1px solid var(--hairline); }
+.watch-item:first-child { border-top: none; }
+.watch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0 3px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 0;
+}
+.watch-spark { flex: 0 1 auto; min-width: 0; overflow: hidden; display: flex; }
+.watch-price { margin-left: auto; white-space: nowrap; }
+.watch-verdict { display: flex; align-items: center; gap: 8px; padding: 0 0 7px; }
+.watch-score { font-family: var(--mono); font-size: 11px; color: var(--muted); }

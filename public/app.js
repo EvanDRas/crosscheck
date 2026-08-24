@@ -1485,7 +1485,6 @@ function renderMarket(m) {
   lastUpdatedAt = Date.now();
   renderToday();
   renderHero();
-  if (feedTab === "top" && feedLimit === 10) feedItems = newsData.items;
   renderNewsCard();
   renderWatch(); // verdict pills need screenData, which just arrived
   if (moversData) renderHeat(); // so do the heat-tile dots
@@ -1522,18 +1521,17 @@ let feedItems = [];
 let feedLimit = 10;
 let feedLoading = false;
 let feedInitialized = false;
-const FEED_TABS = [["briefing", "Briefing"], ["you", "For you"], ["top", "Top"], ["markets", "Markets"], ["world", "World"]];
+// (No "Top" tab: it was the old mixed feed, and nobody could say how it
+// differed from the Briefing — the Briefing IS the top of the news now.)
+const FEED_TABS = [["briefing", "Briefing"], ["you", "For you"], ["markets", "Markets"], ["world", "World"]];
 const hasImg = (n) => /^https:\/\//i.test(n?.image ?? "");
-const youTickers = () => [...new Set([...readWatch(), ...readRecent()])].slice(0, 6);
+// For-you means FOLLOWED — mixing in recently-viewed tickers put stocks the
+// reader merely glanced at into their personal feed.
+const youTickers = () => readWatch().slice(0, 6);
 
 async function loadFeed(tab, limit = 10) {
   feedTab = tab;
   feedLimit = limit;
-  if (tab === "top" && limit === 10 && newsData) {
-    feedItems = newsData.items;
-    renderNewsCard();
-    return;
-  }
   const t = tab === "you" ? youTickers() : [];
   if (tab === "you" && !t.length) {
     feedItems = [];
@@ -1588,12 +1586,14 @@ function renderHero() {
 function renderNewsCard() {
   const newsEl = $("marketNews");
   const items = feedItems;
-  const leadLink = feedTab === "top" ? pickLead()?.link : null;
+  const leadLink = pickLead()?.link ?? null; // the hero's story never repeats in the list
   const list = items.filter((n) => n.link !== leadLink);
   const tagged = list.map((n) => ({ n, tags: n.tickers ?? tickersIn(n.headline) }));
+  // Trending comes from the broad market pool (not the current tab) and
+  // shows on the Briefing, where a skim-reader wants it.
   const counts = new Map();
-  for (const { tags } of tagged) for (const t of tags) counts.set(t, (counts.get(t) ?? 0) + 1);
-  const trending = feedTab === "top" ? [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t) : [];
+  for (const n of newsData?.items ?? []) for (const t of tickersIn(n.headline)) counts.set(t, (counts.get(t) ?? 0) + 1);
+  const trending = feedTab === "briefing" ? [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t) : [];
   const tagsFor = (n) => tagged.find((x) => x.n === n)?.tags ?? [];
   // Impact badge: an honest attention heuristic (topic + how many outlets
   // ran the story), labeled as a guide to reading order — not a forecast.
@@ -1613,7 +1613,7 @@ function renderNewsCard() {
       </div>
     </li>`;
   const empty = feedTab === "you" && !youTickers().length
-    ? `<p class="feed-empty">Star a few stocks and their news lands here. Try the suggestions under <b>Your stocks</b>.</p>`
+    ? `<p class="feed-empty">Follow stocks in the <b>Following</b> card and only their news lands here.</p>`
     : feedLoading && !list.length ? `<p class="feed-empty">Loading…</p>` : !list.length ? `<p class="feed-empty">Nothing here right now.</p>` : "";
   newsEl.innerHTML = `
     <div class="news-tabs">${FEED_TABS.map(([k, label]) => `<button type="button" data-tab="${k}" class="${feedTab === k ? "active" : ""}">${label}</button>`).join("")}</div>
@@ -1797,22 +1797,27 @@ function renderWatch() {
       ${sugg.length ? `<div class="watch-sugg">${sugg.map((t) => `<button type="button" class="chip" data-star="${esc(t)}">☆ ${esc(t)}</button>`).join("")}</div>` : ""}`;
     return;
   }
+  // Two-line rows: price data on the first line, the verdict pill on its
+  // own line below — six cells in one row overflowed the narrow column and
+  // bled into the neighboring feed.
   card.innerHTML = `
     <h2>Following</h2>
-    <table class="mkt-table watch-table">
+    <div class="watch-list">
       ${w.map((t) => {
         const q = watchQuotes[t];
         const v = screenData.find((r) => r.ticker === t);
-        return `<tr class="mkt-row" data-t="${esc(t)}">
-          <td class="mkt-sym">${esc(t)}</td>
-          <td class="spark-cell">${q?.spark ? sparkSvg(q.spark, 64, 20) : ""}</td>
-          <td class="num">${q ? esc(fmtPrice(q.price)) : "—"}</td>
-          <td class="num">${q && isNum(q.changePercent) ? `<span class="badge ${chgCls(q.changePercent)}">${esc(fmtPct(q.changePercent, true))}</span>` : ""}</td>
-          <td>${v ? `<span class="pill-sm ${verdictClass(v.verdict)}">${esc(v.verdict)}</span>` : ""}</td>
-          <td class="star-cell">${starBtn(t)}</td>
-        </tr>`;
+        return `<div class="watch-item">
+          <div class="watch-row mkt-row" data-t="${esc(t)}">
+            <span class="mkt-sym">${esc(t)}</span>
+            <span class="watch-spark">${q?.spark ? sparkSvg(q.spark, 56, 18) : ""}</span>
+            <span class="watch-price">${q ? esc(fmtPrice(q.price)) : "—"}</span>
+            ${q && isNum(q.changePercent) ? `<span class="badge ${chgCls(q.changePercent)}">${esc(fmtPct(q.changePercent, true))}</span>` : ""}
+            <span class="star-cell">${starBtn(t)}</span>
+          </div>
+          ${v ? `<div class="watch-verdict"><span class="pill-sm ${verdictClass(v.verdict)}">${esc(v.verdict)}</span><span class="watch-score">${esc(fmtNum(v.score, 1))}/100 · formula</span></div>` : ""}
+        </div>`;
       }).join("")}
-    </table>
+    </div>
     ${addForm}
     ${watchDelta?.deltas?.length ? `<p class="watch-delta">Since your last visit: ${watchDelta.deltas.map((d) =>
       `<button type="button" class="watch-delta-item mkt-row ${d.pct > 0 ? "pos" : "neg"}" data-t="${esc(d.t)}">${esc(d.t)} ${esc(fmtPct(d.pct, true))}</button>`).join(" ")}</p>` : ""}`;
