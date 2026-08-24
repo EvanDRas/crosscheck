@@ -145,8 +145,10 @@
       const d = dailyState();
       const you = d.rounds.filter((r) => r.you).length;
       const f = d.rounds.filter((r) => r.formula).length;
+      const called = d.rounds.filter((r) => r.fc !== false).length;
+      const fLine = called < d.rounds.length ? `${f}/${called} (${d.rounds.length - called} no-call)` : `${f}/${d.rounds.length}`;
       root.innerHTML = `
-        <div class="callit-daily-head"><b>Daily 5 — done.</b> You ${you}/5 · Formula ${f}/5</div>
+        <div class="callit-daily-head"><b>Daily 5 — done.</b> You ${you}/5 · Formula ${fLine}</div>
         <div class="callit-daily-rows">
           ${d.rounds.map((r, i) => `<span class="callit-day-row">${i + 1}. ${esc(r.t)} <b class="${r.you ? "pos" : "neg"}">${r.you ? "✓" : "✗"}</b></span>`).join("")}
         </div>
@@ -192,13 +194,12 @@
       if (youRight) score.you += 1;
       if (fRight) score.formula += 1;
       saveScore(score);
-      const today = localDay();
-      const t = readJSON("cc_callit_today", {});
-      writeJSON("cc_callit_today", { date: today, rounds: (t.date === today ? t.rounds : 0) + 1 });
       let nextLabel = "Next round";
       if (mode === "daily") {
         const d = dailyState();
-        d.rounds.push({ t: round.ticker, d: round.date, you: youRight, formula: fRight });
+        // fc = whether the formula actually made a call (HOLD abstains) —
+        // an abstention must not count as a miss in the head-to-head.
+        d.rounds.push({ t: round.ticker, d: round.date, you: youRight, formula: fRight, fc: Boolean(fCall) });
         writeJSON("cc_callit_daily", d);
         bumpPlayStreak();
         nextLabel = d.rounds.length >= 5 ? "See today's result" : "Next mystery";
@@ -238,14 +239,18 @@
           try {
             const res = await fetch(`/api/timemachine?ticker=${encodeURIComponent(pick.t)}&date=${pick.d}`);
             const body = await res.json();
-            if (res.status === 422) {
+            if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+              // Validation rejections (bad date, missing key) are permanent —
+              // no key means stop immediately, anything else means the next
+              // candidate. Retrying these burned ~36s before showing the
+              // "needs a Tiingo key" message.
               lastErr = body?.error ?? lastErr;
               if (/tiingo|key/i.test(lastErr)) { busy = false; return renderHome(lastErr); }
               break; // deterministic rejection — next candidate
             }
             if (!res.ok) {
               lastErr = body?.error ?? lastErr;
-              await sleep(1500); // transient — same candidate again
+              await sleep(1500); // transient (rate limit / server) — same candidate again
               continue;
             }
             if (body.scoring?.insufficientData || !isNum(body.outcome?.excess)) break; // deterministic — next candidate
@@ -284,7 +289,9 @@
         const d = dailyState();
         const you = d.rounds.filter((r) => r.you).length;
         const f = d.rounds.filter((r) => r.formula).length;
-        const text = `Crosscheck Daily 5 (${d.date}) — Me ${you}/5 · Formula ${f}/5. Same five mysteries for everyone: github.com/EvanDRas/crosscheck`;
+        const called = d.rounds.filter((r) => r.fc !== false).length;
+        const fPart = called < d.rounds.length ? `${f}/${called} called` : `${f}/${d.rounds.length}`;
+        const text = `Crosscheck Daily 5 (${d.date}) — Me ${you}/5 · Formula ${fPart}. Same five mysteries for everyone: github.com/EvanDRas/crosscheck`;
         try {
           navigator.clipboard.writeText(text);
           b.textContent = "Copied";

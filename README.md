@@ -53,7 +53,7 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   "NOT ENOUGH DATA" instead of a fake verdict.
 - **Market overview homepage**: the landing page opens on live index levels
   (S&P 500, Nasdaq 100, Dow, Russell 2000 via ETF proxies), today's biggest
-  gainers and losers across the batch universe, a clickable mega-cap board,
+  gainers and losers across the batch universe,
   aggregated market headlines, the forward test's own live record tiles
   (calls logged, hit rate once enough calls age — losses included), and a
   row of curated Time Machine moments to explore. Everything is served from
@@ -61,9 +61,9 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   matter how many people load it. Keyless, the headlines still flow (RSS
   needs no key).
 - **Verdict screen**: a browsable, scrollable ranking of the entire fixed
-  50-stock batch universe by the formula's latest logged score — overall,
-  near-term, and long-term verdicts per row, served straight from the local
-  ledger (zero API calls). Click any row for the full analysis. Populates
+  50-stock batch universe by the formula's latest logged score and verdict,
+  served straight from the local ledger (zero API calls), with filter chips
+  and sortable columns. Click any row for the full analysis. Populates
   after the first `npm run batch`; every call shown is graded on
   the track record page.
 - **Visual, not just tabular**: a sector heat map of the whole batch

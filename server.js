@@ -110,10 +110,18 @@ app.post("/api/setup", async (req, res) => {
     if (!q || (!q.c && !q.pc)) {
       return res.status(400).json({ error: "Finnhub did not accept that key. Double-check it and try again." });
     }
-    const lines = [`FINNHUB_API_KEY=${finnhub}`];
+    // Merge, never clobber: a hand-added line (HOST, PORT, panel paths)
+    // must survive the setup screen writing the keys.
+    const managed = new Set(["FINNHUB_API_KEY", "TIINGO_API_KEY", "SEC_EDGAR_CONTACT"]);
+    let existing = [];
+    try {
+      existing = fs.readFileSync(ENV_FILE, "utf8").split(/\r?\n/)
+        .filter((l) => l.trim() && !managed.has(l.split("=")[0].trim()));
+    } catch { /* no .env yet */ }
+    const lines = [...existing, `FINNHUB_API_KEY=${finnhub}`];
     if (tiingo) lines.push(`TIINGO_API_KEY=${tiingo}`);
     if (contact) lines.push(`SEC_EDGAR_CONTACT=${contact}`);
-    if (String(PORT) !== "3000") lines.push(`PORT=${PORT}`);
+    if (String(PORT) !== "3000" && !existing.some((l) => l.startsWith("PORT="))) lines.push(`PORT=${PORT}`);
     fs.writeFileSync(ENV_FILE, lines.join("\n") + "\n");
     process.env.FINNHUB_API_KEY = finnhub;
     if (tiingo) process.env.TIINGO_API_KEY = tiingo;
@@ -248,7 +256,6 @@ function buildScreen() {
         ticker: e.ticker,
         score: e.score,
         verdict: e.verdict,
-        confidence: e.confidence ?? null,
         date: e.date,
       }));
   } catch {
@@ -736,7 +743,7 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
       warnings.push(`${failed} ticker(s) could not be graded right now — shown ungraded.`);
     }
   } else if (!apiKey && needsQuote.length) {
-    warnings.push(`No FINNHUB_API_KEY — ${needsQuote.length} ticker(s) outside the local panel can't be graded without live quotes.`);
+    warnings.push(`${needsQuote.length} ticker(s) not graded yet — add a free finnhub.io key (and a free tiingo.com key for full total-return grading) to grade them.`);
   }
 
   const rows = [...entries].reverse().map((e) => {
@@ -791,11 +798,25 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
 
 // The ledger page: every logged formula call graded against what actually
 // happened since. History is never rewritten, entries are never edited.
+let ledgerCache = null;
 app.get("/api/ledger", async (_req, res) => {
   try {
+    // The page fires /api/ledger and /api/picks together; a short cache +
+    // single-flight stops the same 585-row regrade running twice per visit.
+    if (ledgerCache && Date.now() - ledgerCache.at < 60_000) return res.json(ledgerCache.payload);
+    const payload = await singleFlight("ledger", buildLedgerPayload);
+    ledgerCache = { at: Date.now(), payload };
+    res.json(payload);
+  } catch (err) {
+    console.error("ledger failed:", err);
+    res.status(500).json({ error: "Could not load the verdict ledger." });
+  }
+});
+async function buildLedgerPayload() {
+  {
     const entries = readLedger();
     if (!entries.length) {
-      return res.json({ entries: [], aggregates: [], asOf: new Date().toISOString(), warning: null });
+      return { entries: [], aggregates: [], asOf: new Date().toISOString(), warning: null };
     }
     const { rows, warnings } = await gradeEntries(entries);
     const eras = [...new Set(entries.map((e) => e.formulaVersion ?? "v1"))];
@@ -805,17 +826,14 @@ app.get("/api/ledger", async (_req, res) => {
     // Aggregates: current-era rows only — v1 "BUY" and v2 "BUY" are
     // different claims and must not share a bucket.
     const currentEra = rows.filter((r) => (r.formulaVersion ?? "v1") === SCORING_VERSION);
-    res.json({
+    return {
       entries: rows,
       aggregates: aggregateLedger(currentEra),
       asOf: new Date().toISOString(),
       warning: warnings.length ? warnings.join(" ") : null,
-    });
-  } catch (err) {
-    console.error("ledger failed:", err);
-    res.status(500).json({ error: "Could not load the verdict ledger." });
+    };
   }
-});
+}
 
 // ---- personal accuracy tracker: the user's own calls, same grading --------
 

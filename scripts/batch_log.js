@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { FinnhubError } from "../lib/finnhub.js";
-import { analyzeTicker, NotFoundError } from "../lib/analyze.js";
+import { analyzeTicker, NotFoundError, marketDate } from "../lib/analyze.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -43,6 +43,13 @@ function logRun(line) {
 }
 
 async function main() {
+  // No session, no calls: a weekend run would freeze Friday's closes as a
+  // Saturday-dated batch — 50 correlated duplicates padding the ledger.
+  const nyDay = new Date(`${marketDate()}T12:00:00Z`).getUTCDay();
+  if (nyDay === 0 || nyDay === 6) {
+    logRun("SKIP batch: weekend in New York — no trading session to log.");
+    return;
+  }
   const apiKey = process.env.FINNHUB_API_KEY;
   if (!apiKey) {
     logRun("ABORT: no FINNHUB_API_KEY in .env — nothing can be logged without live quotes.");

@@ -72,13 +72,26 @@ test("distressed sample lands in SELL territory", () => {
 });
 
 test("missing categories renormalize weights instead of dragging the score", () => {
+  const r = computeVerdict({
+    netMargin: 24, roe: 32,
+    currentRatio: 1.8, debtEquity: 0.5,
+    revenueGrowth: 10, epsGrowth: 12,
+    pricePosition: 0.6,
+  });
+  assert.equal(r.availableCount, 4);
+  assert.equal(r.confidence, "Medium");
+  const score = (key) => r.categories.find((c) => c.key === key).score;
+  const wsum = WEIGHTS.profitability + WEIGHTS.health + WEIGHTS.growth + WEIGHTS.momentum;
+  const expected = (score("profitability") * WEIGHTS.profitability + score("health") * WEIGHTS.health
+    + score("growth") * WEIGHTS.growth + score("momentum") * WEIGHTS.momentum) / wsum;
+  assert.ok(Math.abs(r.score - expected) < 0.06, `renormalized mean ${expected} vs ${r.score}`);
+});
+
+test("fewer than four categories yields no verdict — the display floor matches the ledger's logging floor", () => {
   const r = computeVerdict({ netMargin: 24, roe: 32, currentRatio: 1.8, debtEquity: 0.5 });
   assert.equal(r.availableCount, 2);
-  assert.equal(r.confidence, "Low");
-  const prof = r.categories.find((c) => c.key === "profitability").score;
-  const health = r.categories.find((c) => c.key === "health").score;
-  const expected = (prof * WEIGHTS.profitability + health * WEIGHTS.health) / (WEIGHTS.profitability + WEIGHTS.health);
-  assert.ok(Math.abs(r.score - expected) < 0.06, `renormalized mean ${expected} vs ${r.score}`);
+  assert.equal(r.insufficientData, true);
+  assert.equal(r.score, null);
 });
 
 test("negative P/E and PEG are excluded, not scored as cheap", () => {

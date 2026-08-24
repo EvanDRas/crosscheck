@@ -224,11 +224,11 @@ function renderVerdict(d) {
   const meters = s.categories.map((c) => {
     // Disputed inputs stay disputed where the decision forms: a category
     // score built on a value the SEC cross-check contradicts carries the
-    // same ⚠ here as in Key numbers.
+    // same ⚠︎ here as in Key numbers.
     const detail = c.details
       .map((m) => {
         const p = m.key ? d.metricProvenance?.[m.key] : null;
-        const mark = p?.src === "conflict" ? ` <span class="prov prov-warn" title="Sources disagree on this number — Finnhub ${esc(String(p.finnhub))} vs SEC filings ${esc(String(p.edgar))}">⚠</span>` : "";
+        const mark = p?.src === "conflict" ? ` <span class="prov prov-warn" title="Sources disagree on this number — Finnhub ${esc(String(p.finnhub))} vs SEC filings ${esc(String(p.edgar))}">⚠︎</span>` : "";
         return `${esc(m.label)} ${esc(fmtDetailValue(m) ?? "N/A")}${m.score != null ? ` → ${m.score}` : ""}${mark}`;
       })
       .join(" · ");
@@ -489,14 +489,14 @@ function renderKeyNumbers(d) {
     </div>`;
   };
   // Provenance chips: SEC = value came from EDGAR filings (Finnhub had none),
-  // ✓ = both sources agree, ⚠ = they disagree (hover for both values).
+  // ✓ = both sources agree, ⚠︎ = they disagree (hover for both values).
   const pn = (v) => (typeof v === "number" ? String(Math.round(v * 100) / 100) : String(v));
   const provMark = (key) => {
     const p = key ? d.metricProvenance?.[key] : null;
     if (!p) return "";
     if (p.src === "edgar") return ` <span class="prov prov-edgar" title="From SEC EDGAR filings (Finnhub had no value)">SEC</span>`;
     if (p.src === "both") return ` <span class="prov prov-ok" title="Finnhub ${esc(pn(p.finnhub))} — SEC filings agree (${esc(pn(p.edgar))})">✓</span>`;
-    if (p.src === "conflict") return ` <span class="prov prov-warn" title="Sources disagree: Finnhub ${esc(pn(p.finnhub))} vs SEC filings ${esc(pn(p.edgar))} — Finnhub shown">⚠</span>`;
+    if (p.src === "conflict") return ` <span class="prov prov-warn" title="Sources disagree: Finnhub ${esc(pn(p.finnhub))} vs SEC filings ${esc(pn(p.edgar))} — Finnhub shown">⚠︎</span>`;
     return "";
   };
   el.keyNumbers.innerHTML = `
