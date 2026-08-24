@@ -1476,6 +1476,7 @@ function renderMarket(m) {
   // (Big board cut — the heat map and movers already carry those quotes.)
 
   screenData = m.screen ?? [];
+  screenSource = m.screenSource ?? "local";
   renderScreen();
 
   newsData = { items: m.news ?? [], hasKey: Boolean(m.hasKey) };
@@ -1798,6 +1799,7 @@ function renderWatch() {
 // Verdict screen state: the payload survives refreshes; sort and filter are
 // view state that must survive the 2-minute re-poll without snapping back.
 let screenData = [];
+let screenSource = "local";
 let screenSort = { key: "score", dir: -1 };
 let screenFilter = "ALL";
 const SCREEN_GROUPS = { BUY: ["STRONG BUY", "BUY"], HOLD: ["HOLD"], SELL: ["SELL", "STRONG SELL"] };
@@ -1818,7 +1820,7 @@ function renderScreen() {
   const arrow = (k) => (screenSort.key === k ? (screenSort.dir === -1 ? " ↓" : " ↑") : "");
   scr.innerHTML = `
     <h2>Verdict screen</h2>
-    <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData[0].date)}) ·
+    <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData[0].date)})${screenSource === "official" ? " · the official forward test, published by the project" : ""} ·
       every call graded on the <a href="/ledger.html">track record</a> · not advice — the formula's own
       <a href="/evidence.html">backtests</a> showed no predictive edge.</p>
     <div class="screen-filters">
@@ -2009,7 +2011,7 @@ function renderRecord(s) {
   card.innerHTML = `
     <h2>The forward test</h2>
     <p class="sub">Every call frozen and graded vs the S&amp;P, wins and losses alike — <a href="/ledger.html">full ledger</a>.
-      Young calls read like a coin flip; that matches the <a href="/evidence.html">backtests</a>.</p>
+      Young calls read like a coin flip; that matches the <a href="/evidence.html">backtests</a>.${s.source === "official" ? " Calls are the project's official published log, graded locally by this app." : ""}</p>
     <div class="mkt-strip record-strip">
       ${tiles.map(([label, val, cls]) => `
         <div class="mkt-tile">

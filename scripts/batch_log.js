@@ -15,7 +15,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { FinnhubError } from "../lib/finnhub.js";
+import { execSync } from "node:child_process";
 import { analyzeTicker, NotFoundError, marketDate } from "../lib/analyze.js";
+import { publishForwardTest } from "./publish_forward_test.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -102,6 +104,27 @@ async function main() {
   }
 
   logRun(`DONE batch: ${logged} logged, ${already} already-today, ${noVerdict} no-verdict, ${failures.length} failed${failures.length ? ` [${failures.join("; ")}]` : ""}`);
+
+  // Publish the official forward test: refresh docs/forward-test.json and
+  // push it, so every installation's screens show today's calls without
+  // running an experiment of their own. Every step is best-effort — a
+  // failed push never breaks the batch.
+  try {
+    const pub = publishForwardTest();
+    if (pub.written) {
+      logRun(`PUBLISH: forward-test.json refreshed (${pub.count} calls)`);
+      try {
+        execSync("git add docs/forward-test.json", { cwd: ROOT, stdio: "pipe" });
+        execSync(`git commit -m "Forward test: ${marketDate()}" -- docs/forward-test.json`, { cwd: ROOT, stdio: "pipe" });
+        execSync("git push origin main", { cwd: ROOT, stdio: "pipe", timeout: 60_000 });
+        logRun("PUBLISH: pushed to GitHub");
+      } catch (err) {
+        logRun(`PUBLISH: commit/push skipped (${String(err.message ?? err).split("\n")[0]})`);
+      }
+    }
+  } catch (err) {
+    logRun(`PUBLISH: failed (${err.message})`);
+  }
   process.exit(failures.length === tickers.length ? 1 : 0);
 }
 

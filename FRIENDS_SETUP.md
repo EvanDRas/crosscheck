@@ -38,8 +38,10 @@ run `npm install` and `npm start` in a terminal in that folder.
 
 You can ignore anything in the README about a "local research panel" —
 that's an optional data source on the maintainer's PC. Your charts come from
-your Tiingo key, and your Verdict Ledger starts fresh from your own first
-lookup.
+your Tiingo key. The track record page shows the project's official forward
+test (updated each trading day and verified by your own app with your own
+keys); your personal picks live on the same page and never leave your
+computer.
 
 ## Read this before you trade off it — seriously
 

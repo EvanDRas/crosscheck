@@ -241,14 +241,16 @@ const INDICES = [
 // Browsable verdict screen: the daily batch already logs the whole fixed
 // 50-stock universe, so the landing page can rank it from disk — zero API
 // calls. Current-formula (v2) entries only; the newest entry per ticker wins.
-function buildScreen() {
+async function buildScreen() {
   try {
     const uni = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
     const universe = new Set(uni.tickers ?? []);
+    const { entries, source } = await effectiveLedger();
     const latest = new Map();
-    for (const e of readLedger()) {
+    for (const e of entries) {
       if (universe.has(e.ticker) && e.formulaVersion === SCORING_VERSION) latest.set(e.ticker, e);
     }
+    buildScreen.source = source;
     return [...latest.values()]
       .filter((e) => Number.isFinite(e.score))
       .sort((a, b) => b.score - a.score)
@@ -321,7 +323,8 @@ async function buildMarket() {
       hasKey: Boolean(apiKey),
       indices: indices.filter(Boolean),
       news,
-      screen: buildScreen(),
+      screen: await buildScreen(),
+      screenSource: buildScreen.source ?? "local",
       sparks,
     };
     marketCache = { at: Date.now(), payload };
@@ -462,7 +465,7 @@ app.get("/api/homestats", async (_req, res) => {
 });
 async function buildHomeStats() {
   {
-    const entries = readLedger();
+    const { entries, source } = await effectiveLedger();
     if (!entries.length) return { empty: true };
     const { rows, warnings } = await gradeEntries(entries, { rawQuotes: false });
     // A capped or partly-failed grading pass is a cold-start artifact —
@@ -483,6 +486,7 @@ async function buildHomeStats() {
       best: best ? { ticker: best.ticker, excessPct: 100 * best.excess } : null,
       worst: worst ? { ticker: worst.ticker, excessPct: 100 * worst.excess } : null,
       asOf: new Date().toISOString(),
+      source,
     };
     homeStatsCache = { at: Date.now(), ttl: partial ? 60_000 : 600_000, payload };
     return payload;
@@ -634,6 +638,51 @@ app.get("/api/stream", (req, res) => {
 //  2. "tr" via Tiingo's adjusted closes for tickers the panel doesn't cover.
 //  3. "raw" — live quote vs the logged price/SPY level. Breaks across splits,
 //     excludes dividends — rows carry basis so the page can say which.
+// The official forward test: the project's published call log (formula
+// output only — no market data). A fresh install has an empty local ledger,
+// so its track record, verdict screen, and record tiles read these instead:
+// the experiment runs on the project machine; installations verify it by
+// grading the published calls themselves, by date, with their own keys.
+// Running your own batch switches everything back to your local ledger.
+const OFFICIAL_URL = "https://raw.githubusercontent.com/EvanDRas/crosscheck/main/docs/forward-test.json";
+const OFFICIAL_FILE = path.join(__dirname, "docs", "forward-test.json");
+let officialCache = null;
+async function officialEntries() {
+  if (officialCache && Date.now() - officialCache.at < 6 * 3_600_000) return officialCache.entries;
+  let doc = null;
+  try {
+    const r = await fetch(OFFICIAL_URL, { signal: AbortSignal.timeout(6000) });
+    if (r.ok) doc = await r.json();
+  } catch {
+    /* offline — the bundled copy below still works */
+  }
+  if (!doc) {
+    try {
+      doc = JSON.parse(fs.readFileSync(OFFICIAL_FILE, "utf8"));
+    } catch {
+      /* no bundled copy either */
+    }
+  }
+  const entries = (doc?.entries ?? []).map((e) => ({
+    date: e.date,
+    ticker: e.ticker,
+    score: e.score,
+    verdict: e.verdict,
+    confidence: e.confidence ?? null,
+    ntVerdict: e.nt ?? null,
+    ltVerdict: e.lt ?? null,
+    formulaVersion: e.v ?? "v1",
+  }));
+  officialCache = { at: Date.now(), entries };
+  return entries;
+}
+
+async function effectiveLedger() {
+  const own = readLedger();
+  if (own.length) return { entries: own, source: "local" };
+  return { entries: await officialEntries(), source: "official" };
+}
+
 const GRADE_STORE = path.join(__dirname, "data", "grade_store.json");
 function readGradeStore() {
   try {
@@ -814,9 +863,9 @@ app.get("/api/ledger", async (_req, res) => {
 });
 async function buildLedgerPayload() {
   {
-    const entries = readLedger();
+    const { entries, source } = await effectiveLedger();
     if (!entries.length) {
-      return { entries: [], aggregates: [], asOf: new Date().toISOString(), warning: null };
+      return { entries: [], aggregates: [], asOf: new Date().toISOString(), warning: null, source };
     }
     const { rows, warnings } = await gradeEntries(entries);
     const eras = [...new Set(entries.map((e) => e.formulaVersion ?? "v1"))];
@@ -831,6 +880,7 @@ async function buildLedgerPayload() {
       aggregates: aggregateLedger(currentEra),
       asOf: new Date().toISOString(),
       warning: warnings.length ? warnings.join(" ") : null,
+      source,
     };
   }
 }

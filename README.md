@@ -62,10 +62,16 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   needs no key).
 - **Verdict screen**: a browsable, scrollable ranking of the entire fixed
   50-stock batch universe by the formula's latest logged score and verdict,
-  served straight from the local ledger (zero API calls), with filter chips
-  and sortable columns. Click any row for the full analysis. Populates
-  after the first `npm run batch`; every call shown is graded on
-  the track record page.
+  with filter chips and sortable columns. Click any row for the full
+  analysis. Every call shown is graded on the track record page.
+- **The official forward test travels with the app.** The daily 50-stock
+  experiment runs on the project's machine; its call log — the formula's
+  own output only (ticker, date, score, verdict — no market data) — is
+  published to `docs/forward-test.json` and updated each trading day. A
+  fresh install's verdict screen and track record show the official calls
+  immediately and grade them locally with your own keys, so you can verify
+  every number yourself. Your personal picks are always yours and stay
+  local; run `npm run batch` if you'd rather build your own ledger instead.
 - **Visual, not just tabular**: a sector heat map of the whole batch
   universe colored by today's move, an advancing/declining breadth bar, and
   30-session sparklines on every index tile and big-board row. Background

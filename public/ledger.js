@@ -48,7 +48,9 @@ function renderSummary(data) {
   ];
   $("summaryCard").innerHTML = `
     <h2>Summary</h2>
-    <p class="sub">As of ${new Date(data.asOf).toLocaleString("en-US")}. Total-return grading: split- and
+    <p class="sub">${data.source === "official" ? `<b>Official forward test</b> — the project's published call log (formula
+    output only), which this installation grades itself with its own keys. Your personal picks below stay
+    local; run <code>npm run batch</code> to build a local formula ledger instead. ` : ""}As of ${new Date(data.asOf).toLocaleString("en-US")}. Total-return grading: split- and
     dividend-adjusted closes (call date &rarr; latest), SPY measured the same way over the same window.
     SPY is an S&amp;P 500 index fund — shorthand for "the market." Costs excluded.</p>
     <div class="kn-grid">
