@@ -247,7 +247,19 @@ async function load() {
     renderSummary(data);
     renderCallsMap(data);
     renderAggregates(data);
-    renderCalls(data);
+    // Official-source viewers get the statistics, not 585 rows of scroll:
+    // the row-level log is still fully public in the repo for anyone who
+    // wants to audit it, and this app grades it locally either way.
+    if (data.source === "official") {
+      $("callsCard").innerHTML = `
+        <h2>All calls</h2>
+        <p class="sub" style="margin-bottom:0">Individual rows are omitted here — the aggregates above cover every
+        call ever made, with nothing excluded. The complete row-level log is public in the repo
+        (<code>docs/forward-test.json</code>), and this app graded it locally to produce the numbers above.
+        Run <code>npm run batch</code> to build your own local ledger with full rows.</p>`;
+    } else {
+      renderCalls(data);
+    }
     $("content").hidden = false;
   } catch {
     $("status").hidden = true;
