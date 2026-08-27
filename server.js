@@ -521,6 +521,93 @@ async function buildHomeStats() {
   }
 }
 
+// The Daily 5: today's five game rounds, built ONCE server-side and cached
+// for the whole day. The page fetches the pack in a single request and
+// plays instantly — no mid-game API calls left to fail. Seeding is
+// deterministic (date + universe order), so every install still gets the
+// same five; a ticker never repeats within the day.
+const D5_START = Date.parse("2013-01-02");
+const D5_END = Date.parse("2024-06-28");
+const d5hash = (s) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+const d5rand = (a) => () => {
+  a |= 0;
+  a = (a + 0x6D2B79F5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) | 0;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+const d5day = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+function d5pick(tickers, day, round, attempt) {
+  const rnd = d5rand(d5hash(`${day}|${round}|${attempt}`));
+  const t = tickers[Math.floor(rnd() * tickers.length)];
+  const d = new Date(D5_START + rnd() * (D5_END - D5_START));
+  const dow = d.getUTCDay();
+  if (dow === 0) d.setUTCDate(d.getUTCDate() + 1);
+  if (dow === 6) d.setUTCDate(d.getUTCDate() + 2);
+  return { t, d: d.toISOString().slice(0, 10) };
+}
+
+let daily5Cache = null;
+async function buildDaily5() {
+  const day = d5day();
+  const tickers = moversMeta().universe;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Fail FAST when the data source is limited: a bounded build that returns
+  // an honest "busy, try in a few minutes" beats a spinner that never ends.
+  const deadline = Date.now() + 25_000;
+  const busyErr = () => new Error("The price-data source is busy right now (free-tier limit) — try the Daily 5 again in a few minutes.");
+  const rounds = [];
+  for (let round = 0; round < 5; round++) {
+    let placed = false;
+    for (let attempt = 0; attempt < 12 && !placed; attempt++) {
+      if (Date.now() > deadline) throw busyErr();
+      const pick = d5pick(tickers, day, round, attempt);
+      if (rounds.some((r) => r.ticker === pick.t)) continue; // no repeats in a day
+      for (let tries = 0; tries < 2; tries++) {
+        if (Date.now() > deadline) throw busyErr();
+        try {
+          const p = await pointInTimeCall(pick.t, pick.d);
+          if (p.scoring?.insufficientData || typeof p.outcome?.excess !== "number") break; // deterministic reject
+          rounds.push({
+            ticker: p.ticker,
+            date: p.date,
+            inputs: p.inputs ?? {},
+            scoring: { score: p.scoring?.score ?? null, verdict: p.scoring?.verdict ?? null },
+            outcome: p.outcome,
+          });
+          placed = true;
+          break;
+        } catch {
+          await sleep(800); // transient (rate limit) — same candidate again
+        }
+      }
+    }
+  }
+  if (rounds.length < 5) throw busyErr();
+  const payload = { day, rounds, builtAt: new Date().toISOString() };
+  daily5Cache = payload;
+  return payload;
+}
+app.get("/api/daily5", async (_req, res) => {
+  try {
+    if (!hasTiingoKey()) return res.status(400).json({ error: "The Daily 5 needs a free Tiingo key (tiingo.com) — add it and today's five unlock." });
+    if (daily5Cache && daily5Cache.day === d5day()) return res.json(daily5Cache);
+    res.json(await singleFlight("daily5", buildDaily5));
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
+
 // The Time Machine: what the formula would have said on a past date, using
 // only information filed and priced by that day, graded against everything
 // since. The feature that makes the honesty claim interactive.

@@ -39,25 +39,9 @@
   };
   const saveScore = (s) => writeJSON("cc_callit", s);
 
-  // Deterministic PRNG: the daily seed must produce the identical (ticker,
-  // date) sequence for every player, including the retry sequence when a
-  // candidate round has insufficient data (data failures are the same for
-  // everyone, so everyone lands on the same playable five).
-  const hashStr = (s) => {
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  };
-  const mulberry32 = (a) => () => {
-    a |= 0;
-    a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) | 0;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  // Daily rounds come pre-built from the server (/api/daily5): one fetch,
+  // cached all day, identical for every install — no mid-game API calls
+  // left to fail. The client only rolls its own dice for practice mode.
   const DATE_START = Date.parse("2013-01-02");
   const DATE_END = Date.parse("2024-06-28");
   const clampWeekday = (d) => {
@@ -66,13 +50,22 @@
     if (dow === 6) d.setUTCDate(d.getUTCDate() + 2);
     return d.toISOString().slice(0, 10);
   };
-  const seededPick = (tickers, day, round, attempt) => {
-    const rnd = mulberry32(hashStr(`${day}|${round}|${attempt}`));
-    return {
-      t: tickers[Math.floor(rnd() * tickers.length)],
-      d: clampWeekday(new Date(DATE_START + rnd() * (DATE_END - DATE_START))),
-    };
-  };
+  let dailyPack = null;
+  async function getDailyPack() {
+    const day = localDay();
+    if (dailyPack?.day === day) return dailyPack;
+    const cached = readJSON("cc_daily5_pack", null);
+    if (cached?.day === day && Array.isArray(cached.rounds) && cached.rounds.length === 5) {
+      dailyPack = cached;
+      return cached;
+    }
+    const res = await fetch("/api/daily5");
+    const body = await res.json();
+    if (!res.ok) throw new Error(body?.error ?? "Could not load today's five.");
+    dailyPack = body;
+    writeJSON("cc_daily5_pack", body);
+    return body;
+  }
   const randomPick = (tickers) => {
     // Practice mode: random, with a variety guard so nobody sees the same
     // ticker twice in a short stretch.
@@ -231,15 +224,26 @@
       if (busy) return;
       mode = m;
       busy = true;
+      const d = dailyState();
+      if (m === "daily") {
+        root.innerHTML = `<p class="callit-msg">Loading today's five…</p>`;
+        try {
+          const pack = await getDailyPack();
+          round = pack.rounds[d.rounds.length];
+          busy = false;
+          if (!round) return renderSummary();
+          renderRound();
+        } catch (err) {
+          busy = false;
+          renderHome(err.message);
+        }
+        return;
+      }
       root.innerHTML = `<p class="callit-msg">Reconstructing a past day…</p>`;
       let lastErr = "Could not build a round right now.";
-      const d = dailyState();
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       for (let attempt = 0; attempt < 12; attempt++) {
-        const pick = m === "daily" ? seededPick(tickers, d.date, d.rounds.length, attempt) : randomPick(tickers);
-        // No repeats within a day's five. Deterministic: earlier rounds are
-        // identical for every player, so this skip is identical too.
-        if (m === "daily" && d.rounds.some((r) => r.t === pick.t)) continue;
+        const pick = randomPick(tickers);
         // Determinism rule for the daily: only DATA verdicts (this candidate
         // has no usable point-in-time round — same for every player) advance
         // the seeded attempt counter. Transient failures (rate limits,
