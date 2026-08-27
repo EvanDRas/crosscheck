@@ -12,6 +12,13 @@ that came back null).
 Free and MIT-licensed; runs on your machine with your own free API keys.
 Non-programmer setup guide: [FRIENDS_SETUP.md](FRIENDS_SETUP.md).
 
+**Run it like an app (Windows):** double-click `Start Crosscheck app.vbs` once,
+then run `scripts\install_shortcut.ps1` to get a Crosscheck icon on your desktop
+and Start Menu — it launches the server silently and opens its own app window
+(no terminal, no browser tabs). `Stop Crosscheck.bat` shuts the server down.
+On any OS, Chrome's own Install button (in the address bar) installs it as an
+app too, as long as the server is running.
+
 ![The front page: market overview, sector heat map, news feed, and the Daily 5 game](docs/screenshots/front-page.png)
 
 ![A full analysis — the DEMO ticker, so every number here is fictional sample data](docs/screenshots/demo-verdict.png)
