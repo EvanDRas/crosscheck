@@ -235,8 +235,11 @@
       let lastErr = "Could not build a round right now.";
       const d = dailyState();
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < 12; attempt++) {
         const pick = m === "daily" ? seededPick(tickers, d.date, d.rounds.length, attempt) : randomPick(tickers);
+        // No repeats within a day's five. Deterministic: earlier rounds are
+        // identical for every player, so this skip is identical too.
+        if (m === "daily" && d.rounds.some((r) => r.t === pick.t)) continue;
         // Determinism rule for the daily: only DATA verdicts (this candidate
         // has no usable point-in-time round — same for every player) advance
         // the seeded attempt counter. Transient failures (rate limits,
