@@ -45,11 +45,18 @@ function logRun(line) {
 }
 
 async function main() {
-  // No session, no calls: a weekend run would freeze Friday's closes as a
-  // Saturday-dated batch — 50 correlated duplicates padding the ledger.
-  const nyDay = new Date(`${marketDate()}T12:00:00Z`).getUTCDay();
-  if (nyDay === 0 || nyDay === 6) {
-    logRun("SKIP batch: weekend in New York — no trading session to log.");
+  // No session, no calls: a weekend or holiday run would freeze the prior
+  // close as a new dated batch — 50 correlated duplicates padding the ledger.
+  const HOLIDAYS = new Set([
+    "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19",
+    "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+    "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18",
+    "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
+  ]);
+  const today = marketDate();
+  const nyDay = new Date(`${today}T12:00:00Z`).getUTCDay();
+  if (nyDay === 0 || nyDay === 6 || HOLIDAYS.has(today)) {
+    logRun("SKIP batch: no trading session in New York today (weekend or market holiday).");
     return;
   }
   const apiKey = process.env.FINNHUB_API_KEY;

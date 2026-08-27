@@ -286,6 +286,8 @@ function renderVerdict(d) {
          <button type="button" data-dir="buy">I'd buy</button>
          <button type="button" data-dir="avoid">I'd pass</button>
          <button type="button" data-dir="sell">I'd sell</button>
+         <input type="text" class="pick-note" id="pickNote" maxlength="120" spellcheck="false"
+                placeholder="why? (optional — future you will want to know)" />
          <span class="pick-msg" id="pickMsg"></span>
        </div>`;
 
@@ -307,7 +309,7 @@ function renderVerdict(d) {
         const res = await fetch("/api/picks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticker: d.ticker, direction: b.dataset.dir }),
+          body: JSON.stringify({ ticker: d.ticker, direction: b.dataset.dir, note: $("pickNote")?.value ?? "" }),
         });
         const body = await res.json();
         msg.textContent = res.ok ? body.message : body.error ?? "Failed.";
@@ -1294,9 +1296,7 @@ let inFlight = null;
 // "did you mean:" with nothing after the colon.
 async function suggestFor(query, { foundMsg, fallbackMsg } = {}) {
   const deadEnd = fallbackMsg
-    ?? (hasKey
-      ? `Nothing found for "${query}". Double-check the spelling, or try the ticker symbol directly.`
-      : `Search needs an API key — use the setup card above to add your free Finnhub key, or try the DEMO ticker.`);
+    ?? `Nothing found for "${query}". Double-check the spelling, or try the ticker symbol directly.`;
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
     const { results } = await res.json();
@@ -1650,8 +1650,18 @@ const writeJSON = (key, v) => {
 };
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+// NYSE full-day holidays (observed dates), so July 4th doesn't read "open".
+const MARKET_HOLIDAYS = new Set([
+  "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19",
+  "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+  "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18",
+  "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
+]);
+
 function marketStatus() {
   const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const iso = `${ny.getFullYear()}-${String(ny.getMonth() + 1).padStart(2, "0")}-${String(ny.getDate()).padStart(2, "0")}`;
+  if (MARKET_HOLIDAYS.has(iso)) return "closed";
   const mins = ny.getHours() * 60 + ny.getMinutes();
   return ny.getDay() >= 1 && ny.getDay() <= 5 && mins >= 570 && mins < 960 ? "open" : "closed";
 }
@@ -2273,7 +2283,7 @@ function taRender() {
 el.input.addEventListener("input", () => {
   const q = el.input.value.trim();
   clearTimeout(taTimer);
-  if (!hasKey || q.length < 2) {
+  if (q.length < 2) { // keyless search works too now (SEC ticker map)
     taClose();
     return;
   }

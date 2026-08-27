@@ -17,6 +17,7 @@ import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
 import { marketNews, feedNews } from "./lib/news.js";
+import { searchCompanies } from "./lib/edgar.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
@@ -140,9 +141,19 @@ app.get("/api/search", async (req, res) => {
   try {
     const apiKey = process.env.FINNHUB_API_KEY;
     const q = String(req.query.q ?? "").trim().slice(0, 60);
-    if (!apiKey || q.length < 2) return res.json({ results: [] });
+    if (q.length < 2) return res.json({ results: [] });
     const hit = searchCache.get(q.toLowerCase());
     if (hit && Date.now() - hit.at < 3_600_000) return res.json({ results: hit.results });
+    if (!apiKey) {
+      // Keyless: the SEC's own ticker map covers name-to-ticker just fine.
+      try {
+        const results = await searchCompanies(q);
+        if (results.length) searchCache.set(q.toLowerCase(), { at: Date.now(), results });
+        return res.json({ results });
+      } catch {
+        return res.json({ results: [] });
+      }
+    }
     // US-listed shapes only (AAPL, BRK.A) — foreign suffixes like .SN/.T and
     // exchange-prefixed symbols are beyond the free tier's useful coverage.
     // Dotted suffixes are class shares only (BRK.A) — .L/.T/.SN etc. are

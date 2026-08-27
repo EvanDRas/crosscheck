@@ -166,6 +166,20 @@ window.TERMS = {
     caveat: "Companies report the fourth quarter only inside the annual report, so TTM has to be synthesized: annual minus the three quarterlies. Crosscheck does this from SEC data directly.",
     live: "AAPL",
   },
+  tstat: {
+    name: "t-statistic",
+    what: "How many standard errors an average is away from zero — a measure of whether a result is signal or luck. Rule of thumb: |t| above ~2 is hard to explain by chance; below 1 is indistinguishable from noise.",
+    use: "The evidence page reports every spread with its t-stat. The momentum test's t = −0.24 means the result is statistically nothing — which is the finding.",
+    caveat: "A big t on a tiny effect can still be economically worthless, and 20 tests at t=2 will produce one false positive on average. Read the effect size and the t together.",
+    live: "DEMO",
+  },
+  quintile: {
+    name: "Quintile spread",
+    what: "Rank every stock by a score, split into five equal buckets, and compare the top bucket's return to the bottom's. If the score means anything, Q5 should beat Q1.",
+    use: "The backtests' headline test: the formula's top-vs-bottom quintile spread came out at roughly zero (slightly negative) — scores did not sort future returns.",
+    caveat: "A spread can be positive gross and worthless net: trading costs live in exactly the stocks the extreme buckets ask you to trade.",
+    live: "DEMO",
+  },
   insiders: {
     name: "Insider transactions",
     what: "Open-market buys and sells by executives and directors, reported to the SEC on Form 4 within two business days.",

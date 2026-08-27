@@ -76,22 +76,29 @@ function renderAggregates(data) {
   $("aggCard").innerHTML = `
     <h2>By verdict</h2>
     <p class="sub">The test the formula has to pass over time: buys above SPY, sells below.
+    "Right" is direction-aware — for sell bands it means the stock <i>trailed</i> SPY.
     Current formula era only; aged, total-return-graded rows only.</p>
     <div class="ledger-table-wrap">
       <table class="ledger-table">
         <thead><tr>
           <th>Verdict</th><th class="num">Calls</th><th class="num">Avg return</th>
-          <th class="num">Avg vs SPY</th><th class="num">Beat SPY</th>
+          <th class="num">Avg vs SPY</th><th class="num">Beat SPY</th><th class="num">Right</th>
         </tr></thead>
         <tbody>
-          ${data.aggregates.map((a) => `
+          ${data.aggregates.map((a) => {
+            const buy = /BUY/.test(a.verdict);
+            const sell = /SELL/.test(a.verdict);
+            const rightPct = buy ? a.winRateVsSpy : sell ? 1 - a.winRateVsSpy : null;
+            return `
             <tr>
               <td><span class="pill-sm ${pillClass(a.verdict)}">${esc(a.verdict)}</span></td>
               <td class="num">${a.n}</td>
               <td class="num">${deltaCell(a.avgReturn)}</td>
               <td class="num">${deltaCell(a.avgExcess)}</td>
               <td class="num">${Math.round(a.winRateVsSpy * 100)}%</td>
-            </tr>`).join("")}
+              <td class="num">${rightPct == null ? "—" : `${Math.round(rightPct * 100)}%`}</td>
+            </tr>`;
+          }).join("")}
         </tbody>
       </table>
     </div>`;
