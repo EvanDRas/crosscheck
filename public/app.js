@@ -1485,6 +1485,9 @@ function renderMarket(m) {
   lastUpdatedAt = Date.now();
   renderToday();
   renderHero();
+  renderMacro(m.macro ?? []);
+  renderCalendar(m.events ?? []);
+  renderEarningsWeek(m.earningsWeek ?? []);
   renderNewsCard();
   renderWatch(); // verdict pills need screenData, which just arrived
   if (moversData) renderHeat(); // so do the heat-tile dots
@@ -1513,6 +1516,80 @@ function tagChip(t) {
   const dp = q?.changePercent;
   return `<button type="button" class="news-tag mkt-row" data-t="${esc(t)}">${esc(t)}${isNum(dp) ? ` <span class="${chgCls(dp)}">${esc(fmtPct(dp, true))}</span>` : ""}</button>`;
 }
+
+// ---------- beyond stocks: macro strip, calendar, earnings week ----------
+
+function renderMacro(rows) {
+  const card = $("macroStrip");
+  if (!rows.length) {
+    card.hidden = true;
+    return;
+  }
+  const val = (r) => {
+    if (r.kind === "yield") return `${fmtNum(r.value, 2)}%`;
+    if (r.kind === "fx") return fmtNum(r.value, 4);
+    if (r.value >= 1000) return fmtNum(r.value, 0);
+    return fmtNum(r.value, 2);
+  };
+  card.innerHTML = `
+    <div class="macro-row">
+      ${rows.map((r) => `
+        <div class="macro-tile" title="${esc(r.hint)}">
+          <span class="mkt-label">${esc(r.label)}</span>
+          <span class="macro-val">${esc(val(r))}</span>
+          ${isNum(r.chgPct) ? `<span class="badge ${chgCls(r.chgPct)}">${esc(fmtPct(r.chgPct, true))}</span>` : ""}
+        </div>`).join("")}
+    </div>`;
+  card.hidden = false;
+}
+
+function renderCalendar(events) {
+  const card = $("calendarCard");
+  if (!events.length) {
+    card.hidden = true;
+    return;
+  }
+  const daysUntil = (d) => Math.max(0, Math.round((Date.parse(d) - Date.now()) / 86_400_000));
+  card.innerHTML = `
+    <h2>Economic calendar</h2>
+    <p class="sub">The scheduled events that move everything at once. Only dependable dates — nothing guessed.</p>
+    ${events.map((e) => {
+      const n = daysUntil(e.date);
+      return `<div class="cal-row">
+        <span class="cal-date">${esc(new Date(e.date + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric" }))}</span>
+        <span class="cal-name">${esc(e.name)}</span>
+        <span class="cal-in">${n === 0 ? "today" : `in ${n}d`}</span>
+      </div>`;
+    }).join("")}`;
+  card.hidden = false;
+}
+
+function renderEarningsWeek(rows) {
+  const card = $("earningsWeekCard");
+  if (!rows.length) {
+    card.hidden = true;
+    return;
+  }
+  const dayName = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short" });
+  card.innerHTML = `
+    <h2>Earnings this week</h2>
+    <p class="sub">From the 50-stock universe — earnings days are the year's biggest single-day swings.</p>
+    ${rows.slice(0, 10).map((r) => `
+      <div class="cal-row mkt-row" data-t="${esc(r.symbol)}">
+        <span class="cal-date">${esc(dayName(r.date))}</span>
+        <span class="cal-name mkt-sym">${esc(r.symbol)}</span>
+        <span class="cal-in">${r.epsEstimate != null ? `est ${esc(fmtNum(r.epsEstimate, 2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
+      </div>`).join("")}`;
+  card.hidden = false;
+}
+
+$("earningsWeekCard").addEventListener("click", (e) => {
+  const t = e.target.closest?.(".mkt-row")?.dataset?.t;
+  if (t) {
+    el.dateInput.value = "";
+    go(t);
+  }
+});
 
 // ---------- feed tabs: Top / Markets / World / For you ----------
 

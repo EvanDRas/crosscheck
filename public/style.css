@@ -1495,3 +1495,16 @@ a:hover { text-decoration: underline; }
 .front .card h2 { border-bottom: 1px solid var(--hairline); }
 .front { padding-top: 8px; }
 .intro { padding: 18px 0 22px; }
+
+/* macro strip + calendar rows */
+.macro-row { display: flex; flex-wrap: wrap; gap: 8px 26px; align-items: baseline; }
+.macro-tile { display: flex; align-items: baseline; gap: 8px; }
+.macro-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; color: var(--ink); }
+#macroStrip { padding: 12px 18px; }
+.cal-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid var(--hairline); font-size: 13px; }
+.cal-row:first-of-type { border-top: none; }
+.cal-date { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); min-width: 46px; }
+.cal-name { color: var(--ink); }
+.cal-in { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.cal-row.mkt-row { cursor: pointer; }
+.cal-row.mkt-row:hover { background: rgba(255, 255, 255, 0.035); }

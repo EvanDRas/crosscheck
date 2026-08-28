@@ -18,6 +18,8 @@ import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
 import { marketNews, feedNews } from "./lib/news.js";
 import { searchCompanies } from "./lib/edgar.js";
+import { getMacro, nextEvents } from "./lib/macro.js";
+import { getEarningsCalendarRange } from "./lib/finnhub.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
@@ -300,6 +302,23 @@ function singleFlight(key, fn) {
   return p;
 }
 
+// This week's earnings for the 50-stock universe: one bulk calendar call,
+// cached six hours, filtered server-side so the payload stays tiny.
+let earnWeekCache = null;
+async function getEarningsWeek(apiKey) {
+  if (earnWeekCache && Date.now() - earnWeekCache.at < 6 * 3_600_000) return earnWeekCache.rows;
+  const universe = new Set(moversMeta().universe);
+  const from = new Date().toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const doc = await getEarningsCalendarRange(from, to, apiKey);
+  const rows = (doc?.earningsCalendar ?? [])
+    .filter((e) => universe.has(String(e.symbol ?? "").toUpperCase()))
+    .map((e) => ({ symbol: e.symbol, date: e.date, epsEstimate: typeof e.epsEstimate === "number" ? e.epsEstimate : null, hour: e.hour ?? "" }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  earnWeekCache = { at: Date.now(), rows };
+  return rows;
+}
+
 let marketCache = null;
 app.get("/api/market", async (_req, res) => {
   try {
@@ -323,10 +342,12 @@ async function buildMarket() {
       }
     };
     const sparkSyms = INDICES.map(([s]) => s);
-    const [indices, news, sparkPairs] = await Promise.all([
+    const [indices, news, sparkPairs, macro, earningsWeek] = await Promise.all([
       apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
       marketNews(apiKey).catch(() => []),
       hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkSeries(s)])) : [],
+      getMacro().catch(() => []),
+      apiKey ? getEarningsWeek(apiKey).catch(() => []) : [],
     ]);
     const sparks = {};
     for (const [s, v] of sparkPairs) if (v) sparks[s] = v;
@@ -338,6 +359,9 @@ async function buildMarket() {
       screen: await buildScreen(),
       screenSource: buildScreen.source ?? "local",
       sparks,
+      macro,
+      events: nextEvents(4),
+      earningsWeek,
     };
     marketCache = { at: Date.now(), payload };
     return payload;

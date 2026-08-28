@@ -102,6 +102,11 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   reconstruction — no hindsight on either side — which makes it the most
   honest demonstration on the site of how hard prediction is. On the
   homepage and the Learn page; needs the free Tiingo key.
+- **Beyond stocks**: a macro strip with the six numbers that explain most
+  red days — VIX, the 10-year Treasury yield, oil, gold, Bitcoin, and
+  EUR/USD — plus an economic calendar (Fed decisions, jobs reports, options
+  expiries; only dependable dates, nothing guessed) and this week's
+  earnings from the universe, each row one click from the full analysis.
 - **A real front page**: newspaper hierarchy — a hero lead story, a today
   bar (market open/closed, live "updated Xs ago", your visit streak), and
   three columns: your watchlist, the news feed, and the game/record rail.
