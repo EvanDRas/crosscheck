@@ -9,9 +9,11 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 root = fso.GetParentFolderName(WScript.ScriptFullName)
 url = "http://localhost:3000"
 
-' Server, hidden. A second instance dies quietly on the port check.
+' Always restart the server so the app runs the code currently on disk —
+' a long-lived hidden server otherwise serves stale endpoints after updates.
+sh.Run "powershell -NoProfile -WindowStyle Hidden -Command ""$c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if ($c) { $p = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $c[0].OwningProcess); if ($p.CommandLine -match 'server') { Stop-Process -Id $c[0].OwningProcess -Force } }""", 0, True
 sh.Run """" & root & "\scripts\serve_hidden.bat""", 0, False
-WScript.Sleep 1800
+WScript.Sleep 2200
 
 ' Prefer Chrome, fall back to Edge — both support --app windows.
 On Error Resume Next

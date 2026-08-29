@@ -48,7 +48,12 @@
       dailyPack = cached;
       return cached;
     }
-    const res = await fetch("/api/daily5");
+    let res;
+    try {
+      res = await fetch("/api/daily5", { signal: AbortSignal.timeout(20_000) });
+    } catch {
+      throw new Error("The server didn't answer — it may be running old code. Close the app window and reopen it from the desktop icon.");
+    }
     const body = await res.json();
     if (!res.ok) throw new Error(body?.error ?? "Could not load today's five.");
     dailyPack = body;
