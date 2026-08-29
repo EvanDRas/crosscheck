@@ -1743,28 +1743,29 @@ function marketStatus() {
   return ny.getDay() >= 1 && ny.getDay() <= 5 && mins >= 570 && mins < 960 ? "open" : "closed";
 }
 
-// The streak belongs to PLAYING the Daily 5 (callit.js owns bumping it on
-// the first daily reveal of the day) — a streak for merely loading a page
-// attaches the "don't break the chain" pressure to the wrong action.
-function readStreak() {
+// Visit streak: consecutive days the front page was opened.
+function bumpStreak() {
   const s = readJSON("cc_streak", { last: null, count: 0, best: 0 });
   const today = localDay();
   const yesterday = localDay(new Date(Date.now() - 86_400_000));
-  const current = s.last === today || s.last === yesterday ? s.count : 0;
-  return { current, best: Math.max(s.best ?? 0, s.count ?? 0), playedToday: s.last === today };
+  if (s.last !== today) {
+    s.count = s.last === yesterday ? (s.count ?? 0) + 1 : 1;
+    s.last = today;
+    s.best = Math.max(s.best ?? 0, s.count);
+    writeJSON("cc_streak", s);
+  }
+  return { current: s.count, best: s.best ?? s.count };
 }
 
 function renderToday() {
-  const s = readStreak();
+  const s = bumpStreak();
   const st = marketStatus();
-  const daily = readJSON("cc_callit_daily", { date: null, rounds: [] });
-  const played = daily.date === localDay() ? daily.rounds.length : 0;
   const ago = lastUpdatedAt ? Math.max(0, Math.round((Date.now() - lastUpdatedAt) / 1000)) : null;
   $("todayBar").innerHTML = `
     <span class="today-date">${esc(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</span>
     <span class="today-mkt ${st}"><i></i>Market ${st}</span>
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
-    <button type="button" class="today-daily" data-scroll="callitCard">Daily 5: ${played >= 5 ? "done" : `${played}/5`}${s.current ? ` · ${s.current}-day streak` : ""}${s.best > s.current ? ` · best ${s.best}` : ""}</button>
+    ${s.current > 1 ? `<span class="today-upd">${s.current}-day streak${s.best > s.current ? ` · best ${s.best}` : ""}</span>` : ""}
     <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
 setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
@@ -2047,7 +2048,6 @@ function renderHeat() {
   card.hidden = false;
 }
 
-let callitMounted = false;
 let moversPoll = null;
 
 // A cold server answers /api/movers progressively (partial: true while its
@@ -2076,11 +2076,6 @@ function renderMovers(m) {
   // The game needs the universe list (for random picks) and a Tiingo key.
   // The game runs off the graded forward test (no key gate here — the pack
   // endpoint explains itself if grading isn't warm yet).
-  if (!callitMounted && window.mountCallIt) {
-    window.mountCallIt($("callitMount"), { compact: true });
-    callitMounted = true;
-  }
-  $("callitCard").hidden = false;
   if (rows.length < 10) {
     card.hidden = true;
     return;
@@ -2443,7 +2438,7 @@ $("setupSaveBtn").addEventListener("click", async () => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? "Setup failed.");
     btn.textContent = "✓ Saved — you're live";
-    // Reload so every key-gated surface (indices, movers, heat map, Daily 5,
+    // Reload so every key-gated surface (indices, movers, heat map,
     // moments) comes alive at once — without this the page looked dead for
     // up to two minutes after a successful setup.
     setTimeout(() => location.reload(), 900);

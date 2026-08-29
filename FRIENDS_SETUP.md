@@ -22,8 +22,8 @@ Nothing is shared with anyone — your lookups, your keys, your machine.
    [finnhub.io](https://finnhub.io), copy the API key from its dashboard,
    paste it in, done. (A second free key from
    [tiingo.com](https://www.tiingo.com) is optional but worth the two
-   minutes — it unlocks the price charts, the Time Machine, and the Daily 5
-   game, which is the best part.)
+   minutes — it unlocks the price charts, the Time Machine, and the live
+   grading of the track record.)
 
 That's it. Keep the black window open while you use the app; close it to
 stop. Your keys and your lookups never leave your computer.
