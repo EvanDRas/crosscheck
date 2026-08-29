@@ -44,8 +44,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
 - **Tiingo** (optional free key): fresh split/dividend-adjusted closes for
   tickers the local panel doesn't cover — live chart + 52-week stats for any
   US name, and total-return ledger grading instead of the raw-quote fallback.
-  It also unlocks the Time Machine, the homepage moments row, and the entire
-  Daily 5 game — it's the key that makes the fun parts work.
+  It also unlocks the Time Machine and the homepage moments row, and powers
+  the grading behind the daily game — the key that makes the fun parts work.
 - **News** is aggregated server-side from Google News RSS (spans hundreds of
   publishers), Yahoo Finance RSS, and Finnhub company-news — parsed, filtered
   for relevance (every item must mention the company's core name, a distinctive
