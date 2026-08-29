@@ -2074,23 +2074,13 @@ function renderMovers(m) {
   }
   if (!readWatch().length) renderWatch(); // suggestions come from the movers
   // The game needs the universe list (for random picks) and a Tiingo key.
-  const gameCard = $("callitCard");
-  if (m.universe?.length && hasTiingo && window.mountCallIt) {
-    if (!callitMounted) {
-      window.mountCallIt($("callitMount"), { tickers: m.universe, compact: true });
-      callitMounted = true;
-    }
-    gameCard.hidden = false;
-  } else if (m.universe?.length && !callitMounted) {
-    // Tease the game instead of vanishing — the Daily 5 is the best reason
-    // to bother adding the free key.
-    $("callitMount").innerHTML = `<p class="callit-msg">The Daily 5 — five mystery stocks a day, same five for everyone,
-      you versus the formula — needs a free <a href="https://www.tiingo.com" target="_blank" rel="noopener noreferrer">Tiingo</a> key.
-      Add it and today's five unlock.</p>`;
-    gameCard.hidden = false;
-  } else if (!callitMounted) {
-    gameCard.hidden = true;
+  // The game runs off the graded forward test (no key gate here — the pack
+  // endpoint explains itself if grading isn't warm yet).
+  if (!callitMounted && window.mountCallIt) {
+    window.mountCallIt($("callitMount"), { compact: true });
+    callitMounted = true;
   }
+  $("callitCard").hidden = false;
   if (rows.length < 10) {
     card.hidden = true;
     return;

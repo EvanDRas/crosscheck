@@ -92,16 +92,15 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   calculator. Every key number on a result page has a `?` that opens its
   definition in place: what it is, and what it can't tell you. The homepage
   rotates one concept a day with a live example.
-- **The Daily 5**: five mystery stocks a day — real companies' real numbers
-  on real past dates, tickers hidden, the SAME five for every player
-  (seeded by the date). Call whether each beat the S&P from that day to
-  now; the reveal shows the truth and what the formula said with the same
-  information. Finish the five, copy your result line ("Me 3/5 · Formula
-  2/5") and compare with friends. Playing it daily is what keeps your
-  streak alive. Practice mode is unlimited. Every round is a point-in-time
-  reconstruction — no hindsight on either side — which makes it the most
-  honest demonstration on the site of how hard prediction is. On the
-  homepage and the Learn page; needs the free Tiingo key.
+- **Right or wrong? — the daily game**: five REAL calls the formula already
+  made (ticker, date, verdict, score), the same five for everyone, served
+  instantly from the graded forward test — no API calls during play. You
+  judge whether each call turned out right or wrong against the S&P; the
+  reveal shows the actual outcome and teaches direction-aware grading (a
+  sell is right when the stock trails). Strategy hint built in: the formula
+  runs near a coin flip, so "wrong" is the smart default — the thesis as a
+  game. Copy your result and compare with friends; playing daily keeps your
+  streak alive; practice mode draws from the rest of the graded pool.
 - **Beyond stocks**: a macro strip with the six numbers that explain most
   red days — VIX, the 10-year Treasury yield, oil, gold, Bitcoin, and
   EUR/USD — plus an economic calendar (Fed decisions, jobs reports, options

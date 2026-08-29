@@ -583,48 +583,51 @@ function d5pick(tickers, day, round, attempt) {
 
 let daily5Cache = null;
 async function buildDaily5() {
+  // "Right or Wrong?" — built entirely from the forward test's own graded
+  // calls (already on disk once grading is warm), so play time has ZERO
+  // external dependencies left to fail. Deterministic daily shuffle of the
+  // shared official call log → the same five for every install.
   const day = d5day();
-  const tickers = moversMeta().universe;
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  // Fail FAST when the data source is limited: a bounded build that returns
-  // an honest "busy, try in a few minutes" beats a spinner that never ends.
-  const deadline = Date.now() + 25_000;
-  const busyErr = () => new Error("The price-data source is busy right now (free-tier limit) — try the Daily 5 again in a few minutes.");
-  const rounds = [];
-  for (let round = 0; round < 5; round++) {
-    let placed = false;
-    for (let attempt = 0; attempt < 12 && !placed; attempt++) {
-      if (Date.now() > deadline) throw busyErr();
-      const pick = d5pick(tickers, day, round, attempt);
-      if (rounds.some((r) => r.ticker === pick.t)) continue; // no repeats in a day
-      for (let tries = 0; tries < 2; tries++) {
-        if (Date.now() > deadline) throw busyErr();
-        try {
-          const p = await pointInTimeCall(pick.t, pick.d);
-          if (p.scoring?.insufficientData || typeof p.outcome?.excess !== "number") break; // deterministic reject
-          rounds.push({
-            ticker: p.ticker,
-            date: p.date,
-            inputs: p.inputs ?? {},
-            scoring: { score: p.scoring?.score ?? null, verdict: p.scoring?.verdict ?? null },
-            outcome: p.outcome,
-          });
-          placed = true;
-          break;
-        } catch {
-          await sleep(800); // transient (rate limit) — same candidate again
-        }
-      }
-    }
+  const ledger = await singleFlight("ledger", buildLedgerPayload);
+  const isBuy = (v) => /BUY/.test(v ?? "");
+  const isSell = (v) => /SELL/.test(v ?? "");
+  const pool = (ledger.entries ?? []).filter((r) =>
+    (r.formulaVersion ?? "v1") === SCORING_VERSION
+    && r.basis === "tr" && r.excess != null && r.ageDays >= 7
+    && (isBuy(r.verdict) || isSell(r.verdict))
+    && Math.abs(r.excess) >= 0.015); // a decisive outcome, not a rounding error
+  if (pool.length < 10) {
+    throw new Error("Not enough graded calls to play yet — grading needs a free Tiingo key (tiingo.com) and a few aged calls. Check back soon.");
   }
-  if (rounds.length < 5) throw busyErr();
-  const payload = { day, rounds, builtAt: new Date().toISOString() };
+  pool.sort((a, b) => (a.date + a.ticker).localeCompare(b.date + b.ticker));
+  const rnd = d5rand(d5hash(day));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const seen = new Set();
+  const take = [];
+  for (const r of pool) {
+    if (seen.has(r.ticker)) continue;
+    seen.add(r.ticker);
+    take.push(r);
+    if (take.length >= 45) break;
+  }
+  const mk = (r) => ({
+    ticker: r.ticker,
+    date: r.date,
+    verdict: r.verdict,
+    score: r.score,
+    ageDays: r.ageDays,
+    excessPct: Math.round(1000 * r.excess) / 10,
+    right: isBuy(r.verdict) ? r.excess > 0 : r.excess < 0,
+  });
+  const payload = { day, rounds: take.slice(0, 5).map(mk), practice: take.slice(5).map(mk), builtAt: new Date().toISOString() };
   daily5Cache = payload;
   return payload;
 }
 app.get("/api/daily5", async (_req, res) => {
   try {
-    if (!hasTiingoKey()) return res.status(400).json({ error: "The Daily 5 needs a free Tiingo key (tiingo.com) — add it and today's five unlock." });
     if (daily5Cache && daily5Cache.day === d5day()) return res.json(daily5Cache);
     res.json(await singleFlight("daily5", buildDaily5));
   } catch (err) {
