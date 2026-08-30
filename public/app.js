@@ -2070,7 +2070,7 @@ function renderNewsCard() {
 $("marketNews").addEventListener("click", (e) => {
   const tab = e.target.closest?.("[data-tab]")?.dataset?.tab;
   if (tab) {
-    loadFeed(tab, 10);
+    loadFeed(tab, 18);
     return;
   }
   if (e.target.closest?.("[data-more]")) loadFeed(feedTab, Math.min(40, feedLimit + 15));
@@ -2151,7 +2151,7 @@ function toggleWatch(t) {
   writeJSON(WATCH_KEY, w.includes(t) ? w.filter((x) => x !== t) : [t, ...w].slice(0, 12));
   refreshStars();
   loadWatchQuotes();
-  if (feedTab === "you") loadFeed("you", 10);
+  if (feedTab === "you") loadFeed("you", 18);
 }
 
 const starBtn = (t) => {
@@ -2604,7 +2604,7 @@ async function loadMarket() {
     feedInitialized = true;
     // Following-first when you follow stocks; otherwise open on the
     // Briefing — the skim of what actually matters today.
-    loadFeed(readWatch().length ? "you" : "briefing", 10);
+    loadFeed(readWatch().length ? "you" : "briefing", 18);
   }
   const grab = async (url, render) => {
     try {

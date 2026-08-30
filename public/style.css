@@ -1266,6 +1266,7 @@ a:hover { text-decoration: underline; }
   margin-bottom: 16px;
 }
 .col-left, .col-main, .col-right { display: flex; flex-direction: column; gap: 16px; }
+.col-main > .card { flex: 1; }
 .front-cols .card { margin-bottom: 0; }
 .col-left, .col-main, .col-right { min-width: 0; }
 
