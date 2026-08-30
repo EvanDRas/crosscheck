@@ -1612,7 +1612,7 @@ function renderEarningsWeek(rows) {
       <div class="cal-row mkt-row" tabindex="0" role="link" data-t="${esc(r.symbol)}">
         <span class="cal-date">${esc(dayName(r.date))}</span>
         <span class="cal-name mkt-sym">${esc(r.symbol)}</span>
-        <span class="cal-in">${r.epsEstimate != null ? `est EPS $${esc(fmtNum(r.epsEstimate, 2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
+        <span class="cal-in">${r.epsEstimate != null ? `est EPS $${esc(r.epsEstimate.toFixed(2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
       </div>`).join("")}`;
   card.hidden = false;
 }
@@ -1769,7 +1769,7 @@ function renderPortfolio() {
     <form class="pf-add" autocomplete="off">
       <input name="t" type="text" maxlength="10" spellcheck="false" placeholder="Ticker" aria-label="Ticker" />
       <input name="sh" type="number" min="0" step="any" placeholder="Shares" aria-label="Shares" />
-      <input name="cost" type="number" min="0" step="any" placeholder="$ paid/share" aria-label="Cost per share" />
+      <input name="cost" type="number" min="0" step="any" placeholder="$/share" aria-label="Cost per share" />
       <input name="date" type="date" max="${localDay()}" aria-label="Buy date (optional)" title="Buy date — optional, but it unlocks the honest question: would the S&amp;P have done better?" />
       <button type="submit">Add</button>
     </form>`;
@@ -2565,7 +2565,7 @@ function renderRecord(s) {
     if (!isNum(c.excessPct)) return `${esc(c.ticker)} —`;
     const sell = /SELL/.test(c.verdict ?? "");
     const edge = sell ? -c.excessPct : c.excessPct;
-    return `${esc(c.ticker)} ${edge > 0 ? "+" : ""}${fmtNum(edge, 1)}% ${sell ? "(sell — stock trailed SPY)" : "vs SPY"}`;
+    return `${esc(c.ticker)} ${edge > 0 ? "+" : ""}${fmtNum(edge, 1)}% ${sell ? (edge > 0 ? "(sell — stock trailed SPY)" : "(sell — stock beat SPY)") : "vs SPY"}`;
   };
   const callEdge = (c) => (isNum(c.excessPct) ? (/SELL/.test(c.verdict ?? "") ? -c.excessPct : c.excessPct) : null);
   // The server only reports a hit rate once enough calls are 30+ days old —
