@@ -1772,7 +1772,10 @@ function renderPortfolio() {
       <input name="cost" type="number" min="0" step="any" placeholder="$/share" aria-label="Cost per share" />
       <input name="date" type="date" max="${localDay()}" aria-label="Buy date (optional)" title="Buy date — optional, but it unlocks the honest question: would the S&amp;P have done better?" />
       <button type="submit">Add</button>
-    </form>`;
+    </form>
+    <label class="pf-import">Import your broker's positions CSV (Fidelity: Positions &#8594; the Download icon) — read in this browser only, never uploaded.
+      <input id="pfImportFile" type="file" accept=".csv,text/csv,text/plain" hidden /></label>
+    ${pfImportMsg ? `<p class="pf-total-sub">${esc(pfImportMsg)}</p>` : ""}`;
   if (!lots.length) {
     card.innerHTML = `
       <h2>Your portfolio</h2>
@@ -1838,6 +1841,87 @@ function renderPortfolio() {
     ${form}
     <p class="pf-privacy">Private: positions live in this browser only and are never uploaded.</p>`;
 }
+
+// ---------- broker CSV import (Fidelity-style positions files) ----------
+// Parsed entirely in this browser. Handles quoted fields ("$1,234.56"),
+// finds the header row by its column names, and takes only what a lot
+// needs: symbol, share count, average cost. Fidelity's positions file has
+// no purchase dates, so imported lots start undated (the vs-S&P comparison
+// stays locked until dates are added by hand — stated, not hidden).
+let pfImportMsg = "";
+
+function splitCsvLine(line) {
+  const out = [];
+  let cur = "";
+  let q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') q = false;
+      else cur += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ",") { out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function parseBrokerCsv(text) {
+  const money = (v) => {
+    const n = Number(String(v ?? "").replace(/[$,%\s]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
+  const lines = String(text).split(/\r?\n/);
+  const headIdx = lines.findIndex((l) => /symbol/i.test(l) && /(quantity|shares|qty)/i.test(l));
+  if (headIdx === -1) return { lots: [], error: "No header row with Symbol and Quantity columns found — is this a positions CSV?" };
+  const head = splitCsvLine(lines[headIdx]).map((h) => h.trim().toLowerCase());
+  const col = (...names) => head.findIndex((h) => names.some((n) => h === n || h.includes(n)));
+  const iSym = col("symbol");
+  const iQty = col("quantity", "shares", "qty");
+  const iAvg = col("average cost basis", "average cost", "avg cost", "average price", "cost/share");
+  const iTot = col("cost basis total", "cost basis", "total cost");
+  const lots = [];
+  for (const line of lines.slice(headIdx + 1)) {
+    if (!line.trim()) continue;
+    const f = splitCsvLine(line);
+    const rawSym = String(f[iSym] ?? "").trim();
+    if (/\*\*$/.test(rawSym)) continue; // Fidelity core/money-market position
+    const t = rawSym.replace(/[^A-Za-z.\-]/g, "").toUpperCase();
+    if (!/^[A-Z][A-Z.\-]{0,9}$/.test(t)) continue;
+    const sh = money(f[iQty]);
+    if (!(sh > 0)) continue;
+    let cost = iAvg >= 0 ? money(f[iAvg]) : null;
+    if (!(cost > 0) && iTot >= 0) {
+      const tot = money(f[iTot]);
+      if (tot > 0) cost = tot / sh;
+    }
+    if (!(cost > 0)) continue;
+    lots.push({ t, sh, cost: Math.round(cost * 100) / 100, date: null });
+  }
+  return { lots };
+}
+
+$("portfolioCard").addEventListener("change", async (e) => {
+  const input = e.target.closest?.("#pfImportFile");
+  if (!input || !input.files?.length) return;
+  const text = await input.files[0].text();
+  const { lots: found, error } = parseBrokerCsv(text);
+  if (error || !found.length) {
+    pfImportMsg = error ?? "No usable positions found in that file.";
+    renderPortfolio();
+    return;
+  }
+  const existing = readPf();
+  const have = new Set(existing.map((l) => l.t));
+  const fresh = found.filter((l) => !have.has(l.t));
+  writeJSON(PF_KEY, [...existing, ...fresh].slice(0, 30));
+  pfImportMsg = `Imported ${fresh.length} position${fresh.length === 1 ? "" : "s"}`
+    + (found.length - fresh.length ? ` (${found.length - fresh.length} already tracked — left untouched)` : "")
+    + `. Broker files carry no buy dates, so add dates by hand to unlock the vs-S&P comparison.`;
+  loadPfQuotes();
+});
 
 $("portfolioCard").addEventListener("submit", (e) => {
   e.preventDefault();

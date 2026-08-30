@@ -1653,3 +1653,7 @@ input.pick-note { max-width: none; }
 .news-list { max-width: 1020px; }
 
 .mkt-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* ---- broker CSV import ---- */
+.pf-import { display: block; margin-top: 8px; font-size: 11px; color: var(--muted); cursor: pointer; text-decoration: underline; text-decoration-color: var(--hairline); text-underline-offset: 3px; }
+.pf-import:hover { color: var(--accent); }
