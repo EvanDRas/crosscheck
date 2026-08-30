@@ -97,6 +97,22 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   EUR/USD — plus an economic calendar (Fed decisions, jobs reports, options
   expiries; only dependable dates, nothing guessed) and this week's
   earnings from the universe, each row one click from the full analysis.
+- **Your portfolio, honestly benchmarked**: enter what you actually own
+  (with buy dates) and get live value, profit/loss, and the comparison
+  most brokers never show — would the same money in the S&P, dividends
+  included, have done better? Positions live only in your browser.
+- **The economy right now**: inflation, unemployment, the Fed funds rate,
+  the 30-year mortgage, and the 10yr−3mo yield spread (the classic
+  recession signal, flagged when inverted) — straight from FRED, the
+  St. Louis Fed's public data service, keyless.
+- **World markets and sectors**: S&P and Nasdaq futures (they trade nearly
+  around the clock), Tokyo/Hong Kong/Frankfurt/London, and the 11 sector
+  ETFs ranked by day and month — where the money rotated.
+- **Insider radar**: open-market buys by executives and directors across
+  the universe (SEC Form 4), surfaced when two or more distinct insiders
+  bought — insiders sell for many reasons, but they only buy for one.
+- **IPO calendar** and an **SEC filings feed** for the stocks you follow —
+  8-Ks straight from EDGAR, often before the news story about them.
 - **A real front page**: newspaper hierarchy — a hero lead story, a today
   bar (market open/closed, live "updated Xs ago", your visit streak), and
   three columns: your watchlist, the news feed, and the game/record rail.

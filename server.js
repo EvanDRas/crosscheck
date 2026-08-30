@@ -17,10 +17,10 @@ import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
 import { marketNews, feedNews } from "./lib/news.js";
-import { searchCompanies } from "./lib/edgar.js";
-import { getMacro, getWorld, nextEvents } from "./lib/macro.js";
+import { searchCompanies, getRecentFilings } from "./lib/edgar.js";
+import { getMacro, getWorld, getSectors, nextEvents } from "./lib/macro.js";
 import { getEconomy } from "./lib/fred.js";
-import { getEarningsCalendarRange, getIpoCalendarRange } from "./lib/finnhub.js";
+import { getEarningsCalendarRange, getIpoCalendarRange, getInsiderTransactions } from "./lib/finnhub.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
@@ -345,6 +345,60 @@ async function getIpoWeeks(apiKey) {
   return rows;
 }
 
+// Insider radar: who is buying their own stock, across the universe. One
+// free Finnhub call per ticker (SEC Form 4 data, ~3-month window), swept in
+// the background under the shared rate budget and cached 24 hours. Two or
+// more distinct open-market buyers is the cluster pattern worth surfacing;
+// a lone routine buy is noise.
+let insiderCache = null;
+let insiderSweepRunning = false;
+function startInsiderSweep() {
+  const apiKey = process.env.FINNHUB_API_KEY;
+  if (!apiKey || insiderSweepRunning) return;
+  if (insiderCache && Date.now() - insiderCache.at < 24 * 3_600_000) return;
+  insiderSweepRunning = true;
+  (async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const { universe } = moversMeta();
+    const since = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+    const perTicker = [];
+    let complete = true;
+    for (let i = 0; i < universe.length; i += 5) {
+      let waited = 0;
+      while (callsLastMinute() > 42 && waited < 90_000) {
+        await sleep(3000);
+        waited += 3000;
+      }
+      if (callsLastMinute() > 42) {
+        complete = false;
+        break;
+      }
+      const chunk = await Promise.all(universe.slice(i, i + 5).map(async (t) => {
+        try {
+          const doc = await getInsiderTransactions(t, apiKey);
+          const buys = (doc?.data ?? []).filter((r) =>
+            r.transactionCode === "P" && r.change > 0 && (r.transactionDate ?? "") >= since);
+          const buyers = new Set(buys.map((r) => r.name)).size;
+          const value = buys.reduce((sum, r) => sum + r.change * (r.transactionPrice || 0), 0);
+          return buyers ? { ticker: t, buyers, value: Math.round(value) } : null;
+        } catch {
+          return null;
+        }
+      }));
+      perTicker.push(...chunk.filter(Boolean));
+      await sleep(400);
+    }
+    const rows = perTicker
+      .filter((r) => r.buyers >= 2 || r.value >= 250_000)
+      .sort((a, b) => (b.buyers - a.buyers) || (b.value - a.value))
+      .slice(0, 8);
+    insiderCache = { at: Date.now(), rows, complete };
+    insiderSweepRunning = false;
+  })().catch(() => {
+    insiderSweepRunning = false;
+  });
+}
+
 let marketCache = null;
 app.get("/api/market", async (_req, res) => {
   try {
@@ -368,7 +422,8 @@ async function buildMarket() {
       }
     };
     const sparkSyms = INDICES.map(([s]) => s);
-    const [indices, news, sparkPairs, macro, earningsWeek, world, economy, ipo] = await Promise.all([
+    startInsiderSweep();
+    const [indices, news, sparkPairs, macro, earningsWeek, world, economy, ipo, sectors] = await Promise.all([
       apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
       marketNews(apiKey).catch(() => []),
       hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkSeries(s)])) : [],
@@ -377,6 +432,7 @@ async function buildMarket() {
       getWorld().catch(() => []),
       getEconomy().catch(() => []),
       apiKey ? getIpoWeeks(apiKey).catch(() => []) : [],
+      getSectors().catch(() => []),
     ]);
     const sparks = {};
     for (const [s, v] of sparkPairs) if (v) sparks[s] = v;
@@ -394,6 +450,8 @@ async function buildMarket() {
       world,
       economy,
       ipo,
+      sectors,
+      insiders: insiderCache && insiderCache.complete ? { rows: insiderCache.rows } : null,
     };
     marketCache = { at: Date.now(), payload };
     return payload;
@@ -478,12 +536,38 @@ const feedCache = new Map();
 const parseTickers = (s, max) => [...new Set(String(s ?? "").toUpperCase().split(",").map((x) => x.trim()).filter((x) => TICKER_RE.test(x) && x !== "DEMO"))].slice(0, max);
 app.get("/api/feed", async (req, res) => {
   try {
-    const tab = ["top", "markets", "world", "you", "briefing"].includes(req.query.tab) ? req.query.tab : "top";
+    const tab = ["top", "markets", "world", "you", "briefing", "filings"].includes(req.query.tab) ? req.query.tab : "top";
     const limit = Math.min(40, Math.max(5, Number(req.query.limit) || 10));
     const tickers = parseTickers(req.query.t, 6);
     const key = `${tab}|${limit}|${tickers.join(",")}`;
     const hit = feedCache.get(key);
     if (hit && Date.now() - hit.at < 300_000) return res.json(hit.payload);
+    if (tab === "filings") {
+      // What the followed companies have legally told the market lately —
+      // straight from EDGAR (keyless, public domain). An 8-K often lands
+      // before the news story about it does.
+      const payload = await singleFlight(`feed:${key}`, async () => {
+        const settled = await Promise.allSettled(tickers.map(async (t) => {
+          const filings = await getRecentFilings(t, 6);
+          return (filings ?? []).map((f) => ({
+            headline: `${t} filed a ${f.form} — ${f.label}`,
+            source: "SEC EDGAR",
+            date: f.filed ? `${f.filed}T12:00:00.000Z` : null,
+            link: f.url,
+            summary: "",
+            tickers: [t],
+            impact: f.form === "8-K" ? 2 : /^10-[KQ]$/.test(f.form) ? 1 : 0,
+            covered: 1,
+          }));
+        }));
+        const items = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+          .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
+          .slice(0, limit);
+        return { tab, items, asOf: new Date().toISOString() };
+      });
+      feedCache.set(key, { at: Date.now(), payload });
+      return res.json(payload);
+    }
     const names = moversMeta().names;
     const items = await singleFlight(`feed:${key}`, () => feedNews({
       tab,
@@ -499,6 +583,27 @@ app.get("/api/feed", async (req, res) => {
   } catch (err) {
     console.error("feed failed:", err);
     res.json({ items: [] });
+  }
+});
+
+// SPY total-return factors for the portfolio card: for each buy date, what
+// the S&P has returned (dividends included) since. Keyless Yahoo series,
+// cached an hour inside lib/spy.js. The portfolio itself never reaches the
+// server — only bare dates do.
+app.get("/api/spybench", async (req, res) => {
+  try {
+    const dates = String(req.query.d ?? "").split(",").map((x) => x.trim())
+      .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)).slice(0, 30);
+    if (!dates.length) return res.json({ factors: {} });
+    const series = await getSpyTrSeries("max");
+    const factors = {};
+    for (const d of dates) {
+      const r = series ? spyTrReturn(series, d) : null;
+      if (r != null) factors[d] = r;
+    }
+    res.json({ factors });
+  } catch {
+    res.json({ factors: {} });
   }
 });
 

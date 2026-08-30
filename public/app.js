@@ -1491,6 +1491,8 @@ function renderMarket(m) {
   renderWorld(m.world ?? []);
   renderEconomy(m.economy ?? []);
   renderIpo(m.ipo ?? []);
+  renderSectors(m.sectors ?? []);
+  renderInsiderRadar(m.insiders ?? null);
   renderNewsCard();
   renderWatch(); // verdict pills need screenData, which just arrived
   if (moversData) renderHeat(); // so do the heat-tile dots
@@ -1643,6 +1645,192 @@ function renderIpo(rows) {
   card.hidden = false;
 }
 
+function renderSectors(rows) {
+  const card = $("sectorCard");
+  if (!rows.length) {
+    card.hidden = true;
+    return;
+  }
+  card.innerHTML = `
+    <h2>Sector scoreboard</h2>
+    <p class="sub">The 11 S&amp;P sectors ranked by the latest session — where the money rotated. The month column is the bigger trend.</p>
+    ${rows.map((r) => `
+      <div class="cal-row" title="${esc(r.sym)} sector ETF">
+        <span class="cal-name">${esc(r.label)}</span>
+        <span class="cal-in"><span class="badge ${chgCls(r.dayPct)}">${esc(fmtPct(r.dayPct, true))}</span>
+          <span class="sect-mo ${r.monthPct >= 0 ? "pos" : "neg"}">1mo ${esc(fmtPct(r.monthPct, true))}</span></span>
+      </div>`).join("")}`;
+  card.hidden = false;
+}
+
+function renderInsiderRadar(ins) {
+  const card = $("insiderCard");
+  if (!ins || !Array.isArray(ins.rows)) {
+    card.hidden = true; // sweep not finished yet, or keyless — no data, no card
+    return;
+  }
+  const kM = (v) => (v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${Math.round(v / 1e3)}k`);
+  card.innerHTML = `
+    <h2>Insider radar</h2>
+    <p class="sub">Open-market buys by executives and directors in the last six weeks (SEC Form 4), across the 50-stock universe. Two or more distinct buyers is the pattern worth noticing — insiders sell for many reasons, but they only buy for one.</p>
+    ${ins.rows.length ? ins.rows.map((r) => `
+      <div class="cal-row mkt-row" data-t="${esc(r.ticker)}">
+        <span class="cal-name mkt-sym">${esc(r.ticker)}</span>
+        <span class="cal-in">${r.buyers} buyer${r.buyers === 1 ? "" : "s"}${r.value > 0 ? ` · ${esc(kM(r.value))}` : ""}</span>
+      </div>`).join("") : `<p class="watch-empty">No notable insider buying in the universe right now — which is the honest answer, not a broken card.</p>`}`;
+  card.hidden = false;
+}
+
+$("insiderCard").addEventListener("click", (e) => {
+  const t = e.target.closest?.(".mkt-row")?.dataset?.t;
+  if (t) {
+    el.dateInput.value = "";
+    go(t);
+  }
+});
+
+// ---------- your portfolio: stored ONLY in this browser ----------
+// Lots live in localStorage and never reach the server; the only things
+// that do are bare tickers (for quotes) and bare dates (for the SPY
+// benchmark) — never quantities or costs together with either.
+
+const PF_KEY = "cc_portfolio";
+const readPf = () => readJSON(PF_KEY, []).filter((l) =>
+  l && typeof l.t === "string" && isNum(l.sh) && l.sh > 0 && isNum(l.cost) && l.cost > 0).slice(0, 30);
+let pfQuotes = {};
+let pfBench = {};
+
+async function loadPfQuotes() {
+  const lots = readPf();
+  const ts = [...new Set(lots.map((l) => l.t))].slice(0, 12);
+  if (!ts.length || !hasKey) {
+    pfQuotes = {};
+    renderPortfolio();
+    return;
+  }
+  try {
+    const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.join(","))}`);
+    if (res.ok) pfQuotes = (await res.json()).quotes ?? {};
+  } catch {
+    /* rows show dashes */
+  }
+  const dates = [...new Set(lots.map((l) => l.date).filter(Boolean))];
+  if (dates.length) {
+    try {
+      const res = await fetch(`/api/spybench?d=${encodeURIComponent(dates.join(","))}`);
+      if (res.ok) pfBench = (await res.json()).factors ?? {};
+    } catch {
+      /* comparison hides */
+    }
+  }
+  renderPortfolio();
+}
+
+const fmtUsd = (v) => `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+
+function renderPortfolio() {
+  const card = $("portfolioCard");
+  const lots = readPf();
+  const form = `
+    <form class="pf-add" autocomplete="off">
+      <input name="t" type="text" maxlength="10" spellcheck="false" placeholder="Ticker" aria-label="Ticker" />
+      <input name="sh" type="number" min="0" step="any" placeholder="Shares" aria-label="Shares" />
+      <input name="cost" type="number" min="0" step="any" placeholder="$ paid/share" aria-label="Cost per share" />
+      <input name="date" type="date" max="${localDay()}" aria-label="Buy date (optional)" title="Buy date — optional, but it unlocks the honest question: would the S&amp;P have done better?" />
+      <button type="submit">Add</button>
+    </form>`;
+  if (!lots.length) {
+    card.innerHTML = `
+      <h2>Your portfolio</h2>
+      <p class="watch-empty">Track what you actually own — live value, profit and loss, and the comparison
+      most brokers never show: <b>would the same money in the S&amp;P have done better?</b>
+      Everything stays in this browser; nothing is uploaded anywhere.</p>
+      ${form}`;
+    return;
+  }
+  let value = 0, costTot = 0, dayChg = 0, quoted = 0;
+  let spyVal = 0, spyCost = 0, datedVal = 0;
+  const rows = lots.map((l, i) => {
+    const q = pfQuotes[l.t];
+    const cost = l.sh * l.cost;
+    let plPct = null, spyDiff = null;
+    if (q) {
+      quoted++;
+      value += l.sh * q.price;
+      costTot += cost;
+      if (isNum(q.change)) dayChg += l.sh * q.change;
+      plPct = ((q.price - l.cost) / l.cost) * 100;
+      const f = l.date != null ? pfBench[l.date] : null;
+      if (f != null) {
+        spyVal += cost * (1 + f);
+        spyCost += cost;
+        datedVal += l.sh * q.price;
+        spyDiff = plPct - f * 100;
+      }
+    }
+    return `<div class="pf-item">
+      <div class="watch-row mkt-row" data-t="${esc(l.t)}">
+        <span class="mkt-sym">${esc(l.t)}</span>
+        <span class="pf-shares">${esc(fmtNum(l.sh, l.sh % 1 ? 2 : 0))} @ ${esc(fmtPrice(l.cost))}</span>
+        <span class="watch-price">${q ? esc(fmtPrice(q.price)) : "—"}</span>
+        ${plPct != null ? `<span class="badge ${chgCls(plPct)}">${esc(fmtPct(plPct, true))}</span>` : ""}
+        <span class="star-cell"><button type="button" class="pf-rm" data-rm="${i}" title="Remove this lot">×</button></span>
+      </div>
+      ${spyDiff != null ? `<div class="watch-verdict"><span class="sect-mo ${spyDiff >= 0 ? "pos" : "neg"}">${spyDiff >= 0 ? "beating" : "trailing"} the S&amp;P by ${esc(fmtPct(Math.abs(spyDiff), false))}</span><span class="watch-score">since ${esc(l.date)} · dividends counted</span></div>` : ""}
+    </div>`;
+  }).join("");
+  const pl = value - costTot;
+  const plPctTot = costTot > 0 ? (pl / costTot) * 100 : null;
+  const spyLine = spyCost > 0
+    ? (() => {
+        const spyPct = ((spyVal - spyCost) / spyCost) * 100;
+        const diff = datedVal - spyVal;
+        return `<div class="pf-total-sub">Same money in the S&amp;P instead (dividends counted): ${esc(fmtPct(spyPct, true))} —
+          you're ${diff >= 0 ? "ahead" : "behind"} by ${esc(fmtUsd(Math.abs(diff)))} on the dated lots.</div>`;
+      })()
+    : `<div class="pf-total-sub">Add buy dates to unlock the vs-S&amp;P comparison.</div>`;
+  card.innerHTML = `
+    <h2>Your portfolio</h2>
+    <div class="pf-list">${rows}</div>
+    ${quoted ? `<div class="pf-total">
+      <span>${esc(fmtUsd(value))}</span>
+      ${plPctTot != null ? `<span class="badge ${chgCls(plPctTot)}">${esc(fmtUsd(pl))} (${esc(fmtPct(plPctTot, true))})</span>` : ""}
+      ${isNum(dayChg) && dayChg !== 0 ? `<span class="pf-day ${dayChg >= 0 ? "pos" : "neg"}">${esc(fmtUsd(dayChg))} today</span>` : ""}
+    </div>${spyLine}` : hasKey ? `<div class="pf-total-sub">Loading prices…</div>` : `<div class="pf-total-sub">Add a free Finnhub key (top of the page on first run) for live prices.</div>`}
+    ${form}
+    <p class="pf-privacy">Private: positions live in this browser only and are never uploaded.</p>`;
+}
+
+$("portfolioCard").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const t = String(f.elements.t?.value ?? "").trim().toUpperCase();
+  const sh = Number(f.elements.sh?.value);
+  const cost = Number(f.elements.cost?.value);
+  const date = String(f.elements.date?.value ?? "") || null;
+  if (!/^[A-Z][A-Z.]{0,9}$/.test(t) || t === "DEMO" || !(sh > 0) || !(cost > 0)) return;
+  if (date && date > localDay()) return;
+  writeJSON(PF_KEY, [...readPf(), { t, sh, cost, date }]);
+  f.reset();
+  loadPfQuotes();
+});
+
+$("portfolioCard").addEventListener("click", (e) => {
+  const rm = e.target.closest?.("[data-rm]")?.dataset?.rm;
+  if (rm != null) {
+    const lots = readPf();
+    lots.splice(Number(rm), 1);
+    writeJSON(PF_KEY, lots);
+    renderPortfolio();
+    return;
+  }
+  const t = e.target.closest?.(".mkt-row")?.dataset?.t;
+  if (t) {
+    el.dateInput.value = "";
+    go(t);
+  }
+});
+
 $("earningsWeekCard").addEventListener("click", (e) => {
   const t = e.target.closest?.(".mkt-row")?.dataset?.t;
   if (t) {
@@ -1660,7 +1848,7 @@ let feedLoading = false;
 let feedInitialized = false;
 // (No "Top" tab: it was the old mixed feed, and nobody could say how it
 // differed from the Briefing — the Briefing IS the top of the news now.)
-const FEED_TABS = [["briefing", "Briefing"], ["you", "For you"], ["markets", "Markets"], ["world", "World"]];
+const FEED_TABS = [["briefing", "Briefing"], ["you", "For you"], ["markets", "Markets"], ["world", "World"], ["filings", "Filings"]];
 const hasImg = (n) => /^https:\/\//i.test(n?.image ?? "");
 // For-you means FOLLOWED — mixing in recently-viewed tickers put stocks the
 // reader merely glanced at into their personal feed.
@@ -1669,8 +1857,8 @@ const youTickers = () => readWatch().slice(0, 6);
 async function loadFeed(tab, limit = 10) {
   feedTab = tab;
   feedLimit = limit;
-  const t = tab === "you" ? youTickers() : [];
-  if (tab === "you" && !t.length) {
+  const t = tab === "you" || tab === "filings" ? youTickers() : [];
+  if ((tab === "you" || tab === "filings") && !t.length) {
     feedItems = [];
     renderNewsCard();
     return;
@@ -1749,16 +1937,19 @@ function renderNewsCard() {
         <div class="news-meta">${impactBadge(n)}${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}${(n.covered ?? 1) >= 2 ? ` · ${n.covered} outlets` : ""}${tagsFor(n).length ? ` <span class="news-tags">${tagsFor(n).map(tagChip).join("")}</span>` : ""}</div>
       </div>
     </li>`;
-  const empty = feedTab === "you" && !youTickers().length
-    ? `<p class="feed-empty">Follow stocks in the <b>Following</b> card and only their news lands here.</p>`
+  const empty = (feedTab === "you" || feedTab === "filings") && !youTickers().length
+    ? (feedTab === "filings"
+      ? `<p class="feed-empty">Follow stocks in the <b>Following</b> card to see their SEC filings here — an 8-K often lands before the news story about it.</p>`
+      : `<p class="feed-empty">Follow stocks in the <b>Following</b> card and only their news lands here.</p>`)
     : feedLoading && !list.length ? `<p class="feed-empty">Loading…</p>` : !list.length ? `<p class="feed-empty">Nothing here right now.</p>` : "";
   newsEl.innerHTML = `
     <div class="news-tabs">${FEED_TABS.map(([k, label]) => `<button type="button" data-tab="${k}" class="${feedTab === k ? "active" : ""}">${label}</button>`).join("")}</div>
     ${feedTab === "briefing" ? `<p class="sub">Today's market-wide stories, ranked by a simple attention heuristic (macro topic + breadth of coverage) — a reading order, not a prediction. Single-stock churn is filtered out.</p>` : ""}
+    ${feedTab === "filings" ? `<p class="sub">What your followed companies legally told the market, straight from SEC EDGAR — filings are the primary source the news is written from.</p>` : ""}
     ${trending.length ? `<div class="news-trending"><span class="mkt-label">Trending</span>${trending.map(tagChip).join("")}</div>` : ""}
     ${empty}
     <ul class="news-list${feedLoading ? " loading" : ""}">${list.map(item).join("")}</ul>
-    ${list.length && !(feedTab === "you" && !youTickers().length) ? `<button type="button" class="load-more" data-more="1">${feedLoading ? "Loading…" : "More stories"}</button>` : ""}`;
+    ${list.length && !((feedTab === "you" || feedTab === "filings") && !youTickers().length) ? `<button type="button" class="load-more" data-more="1">${feedLoading ? "Loading…" : "More stories"}</button>` : ""}`;
   newsEl.hidden = false;
 }
 
@@ -2290,6 +2481,8 @@ async function loadMarket() {
   renderLearn();
   renderWatch();
   loadWatchQuotes();
+  renderPortfolio();
+  loadPfQuotes();
   // Following-first: when the reader follows stocks, the feed opens on
   // THEIR stocks' news — the market firehose is one tab away.
   if (!feedInitialized) {
