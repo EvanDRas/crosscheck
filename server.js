@@ -82,12 +82,28 @@ app.get("/api/health", (_req, res) => {
 // run once a key exists — after that, .env is edited by hand on purpose.
 app.post("/api/setup", async (req, res) => {
   try {
-    if (process.env.FINNHUB_API_KEY) {
-      return res.status(409).json({ error: "A key is already configured. Edit the .env file directly to change it." });
-    }
     const finnhub = String(req.body?.finnhubKey ?? "").trim();
     const tiingo = String(req.body?.tiingoKey ?? "").trim();
     const contact = String(req.body?.contact ?? "").trim();
+    if (process.env.FINNHUB_API_KEY) {
+      // The one allowed late change: ADDING a Tiingo key that was skipped at
+      // first-run (the most common upgrade). Existing values are never
+      // overwritten through this endpoint.
+      if (!finnhub && tiingo && !process.env.TIINGO_API_KEY) {
+        if (!/^[A-Za-z0-9]{10,80}$/.test(tiingo) || /[\x00-\x1f\x7f]/.test(tiingo)) {
+          return res.status(400).json({ error: "That doesn't look like a Tiingo API key." });
+        }
+        let keepLines = [];
+        try {
+          keepLines = fs.readFileSync(ENV_FILE, "utf8").split(/\r?\n/)
+            .filter((l) => l.trim() && !l.startsWith("TIINGO_API_KEY="));
+        } catch { /* no .env yet */ }
+        fs.writeFileSync(ENV_FILE, [...keepLines, `TIINGO_API_KEY=${tiingo}`].join("\n") + "\n");
+        process.env.TIINGO_API_KEY = tiingo;
+        return res.json({ ok: true, tiingoOnly: true });
+      }
+      return res.status(409).json({ error: "A Finnhub key is already configured — to add a Tiingo key, fill in ONLY the Tiingo field. To change existing keys, edit the .env file directly." });
+    }
     // Every field is validated before it touches .env — values are written
     // verbatim as env lines, so control characters would be line injection.
     if (!/^[A-Za-z0-9]{20,60}$/.test(finnhub)) {
@@ -229,8 +245,12 @@ app.get("/api/compare", async (req, res) => {
 
       };
     }).filter((r) => Object.values(r).some((v) => v != null && v !== r.symbol));
-    compareCache.set(ticker, { at: Date.now(), rows });
-    if (compareCache.size > 50) compareCache.delete(compareCache.keys().next().value);
+    if (settled.every((r) => r.status === "fulfilled")) {
+      // Partial (rate-limited) tables still get served, but never pinned for
+      // 10 minutes — the budget usually recovers in seconds.
+      compareCache.set(ticker, { at: Date.now(), rows });
+      if (compareCache.size > 50) compareCache.delete(compareCache.keys().next().value);
+    }
     res.json({ rows });
   } catch (err) {
     if (err instanceof FinnhubError) return res.status(err.status === 429 ? 429 : 502).json({ error: err.message });
@@ -309,7 +329,7 @@ let earnWeekCache = null;
 async function getEarningsWeek(apiKey) {
   if (earnWeekCache && Date.now() - earnWeekCache.at < 6 * 3_600_000) return earnWeekCache.rows;
   const universe = new Set(moversMeta().universe);
-  const from = new Date().toISOString().slice(0, 10);
+  const from = marketDate(); // ET day — after 8 PM the UTC date is already tomorrow
   const to = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
   const doc = await getEarningsCalendarRange(from, to, apiKey);
   const rows = (doc?.earningsCalendar ?? [])
@@ -326,7 +346,7 @@ async function getEarningsWeek(apiKey) {
 let ipoCache = null;
 async function getIpoWeeks(apiKey) {
   if (ipoCache && Date.now() - ipoCache.at < 12 * 3_600_000) return ipoCache.rows;
-  const from = new Date().toISOString().slice(0, 10);
+  const from = marketDate();
   const to = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
   const doc = await getIpoCalendarRange(from, to, apiKey);
   const rows = (doc?.ipoCalendar ?? [])
@@ -355,7 +375,7 @@ let insiderSweepRunning = false;
 function startInsiderSweep() {
   const apiKey = process.env.FINNHUB_API_KEY;
   if (!apiKey || insiderSweepRunning) return;
-  if (insiderCache && Date.now() - insiderCache.at < 24 * 3_600_000) return;
+  if (insiderCache && Date.now() - insiderCache.at < (insiderCache.complete ? 24 * 3_600_000 : 30 * 60_000)) return;
   insiderSweepRunning = true;
   (async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -365,11 +385,11 @@ function startInsiderSweep() {
     let complete = true;
     for (let i = 0; i < universe.length; i += 5) {
       let waited = 0;
-      while (callsLastMinute() > 42 && waited < 90_000) {
+      while (callsLastMinute() > 37 && waited < 90_000) {
         await sleep(3000);
         waited += 3000;
       }
-      if (callsLastMinute() > 42) {
+      if (callsLastMinute() > 37) {
         complete = false;
         break;
       }
@@ -377,7 +397,7 @@ function startInsiderSweep() {
         try {
           const doc = await getInsiderTransactions(t, apiKey);
           const buys = (doc?.data ?? []).filter((r) =>
-            r.transactionCode === "P" && r.change > 0 && (r.transactionDate ?? "") >= since);
+            !r.isDerivative && r.transactionCode === "P" && r.change > 0 && (r.transactionDate ?? "") >= since);
           const buyers = new Set(buys.map((r) => r.name)).size;
           const value = buys.reduce((sum, r) => sum + r.change * (r.transactionPrice || 0), 0);
           return buyers ? { ticker: t, buyers, value: Math.round(value) } : null;
@@ -497,11 +517,11 @@ function startMoversSweep(meta) {
     let complete = true;
     for (let i = 0; i < tickers.length; i += 10) {
       let waited = 0;
-      while (callsLastMinute() > 42 && waited < 60_000) {
+      while (callsLastMinute() > 32 && waited < 60_000) {
         await sleep(3000);
         waited += 3000;
       }
-      if (callsLastMinute() > 42) {
+      if (callsLastMinute() > 32) {
         complete = false;
         break;
       }
@@ -573,7 +593,10 @@ app.get("/api/feed", async (req, res) => {
           .slice(0, limit);
         return { tab, items, asOf: new Date().toISOString() };
       });
-      feedCache.set(key, { at: Date.now(), payload });
+      if (payload.items.length || !tickers.length) {
+        feedCache.set(key, { at: Date.now(), payload });
+        if (feedCache.size > 60) feedCache.delete(feedCache.keys().next().value);
+      }
       return res.json(payload);
     }
     const names = moversMeta().names;
@@ -601,7 +624,7 @@ app.get("/api/feed", async (req, res) => {
 app.get("/api/spybench", async (req, res) => {
   try {
     const dates = String(req.query.d ?? "").split(",").map((x) => x.trim())
-      .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)).slice(0, 30);
+      .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(Date.parse(x)) && x <= marketDate()).slice(0, 30);
     if (!dates.length) return res.json({ factors: {} });
     const series = await getSpyTrSeries("max");
     const factors = {};
@@ -726,7 +749,7 @@ app.get("/api/timemachine", async (req, res) => {
       return res.status(400).json({ error: "Pick a date between 2010-01-01 (when SEC XBRL data starts) and about a week ago." });
     }
     if (!hasTiingoKey()) {
-      return res.status(400).json({ error: "The Time Machine needs a (free) Tiingo API key for historical prices — add one via the setup screen or .env." });
+      return res.status(400).json({ error: "The Time Machine needs a free Tiingo API key for historical prices — get one at tiingo.com, then open the setup card at /?setup=1 and paste it in the Tiingo field." });
     }
     const ck = `${ticker}|${date}`;
     const hit = tmCache.get(ck);
@@ -1056,7 +1079,7 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
       basis,
       frozen,
       gradedThrough: g?.latestDate ?? null,
-      ageDays: Math.max(0, Math.floor((Date.now() - Date.parse(e.date)) / 86_400_000)),
+      ageDays: Math.max(0, Math.round((Date.parse(marketDate()) - Date.parse(e.date)) / 86_400_000)),
     };
   });
 
@@ -1076,7 +1099,7 @@ app.get("/api/ledger", async (_req, res) => {
     res.json(payload);
   } catch (err) {
     console.error("ledger failed:", err);
-    res.status(500).json({ error: "Could not load the verdict ledger." });
+    res.status(500).json({ error: "Could not load the track record." });
   }
 });
 async function buildLedgerPayload() {

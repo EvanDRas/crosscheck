@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Crosscheck — the honest stock analyzer</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%234f86c6%22/><path d=%22M24 55 L42 72 L77 31%22 fill=%22none%22 stroke=%22%23ffffff%22 stroke-width=%2213%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
-  <link rel="stylesheet" href="style.css?v=56" />
+  <link rel="stylesheet" href="style.css?v=57" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0c0d0f" />
 </head>
@@ -86,6 +86,9 @@
         </div>
       </div>
 
+      <section class="card" id="heatCard" hidden></section>
+      <section class="card" id="screenCard" hidden></section>
+
       <div class="data-band">
         <section class="card" id="worldCard" hidden></section>
         <section class="card" id="sectorCard" hidden></section>
@@ -96,14 +99,7 @@
         <section class="card" id="learnCard" hidden></section>
       </div>
 
-      <section class="card" id="heatCard" hidden></section>
-      <section class="card" id="screenCard" hidden></section>
       <section class="card" id="momentsCard" hidden></section>
-
-      <div class="intro-chips front-chips" id="introChips">
-        <button data-t="DEMO">DEMO (no key needed)</button>
-        <button data-t="NVDA" data-d="2023-01-03" class="tm-chip">Time machine: NVDA on the eve of the AI boom</button>
-      </div>
     </section>
 
     <div id="status" class="status" hidden>
@@ -115,7 +111,8 @@
     <div id="suggest" class="suggest-row" hidden></div>
     <div id="demoNote" class="demo-banner" hidden>
       Demo mode — every number and headline on this page is fictional sample data.
-      Add a Finnhub key to analyze real tickers.
+      Real tickers work without a key too (SEC-filings data only) — add a free Finnhub
+      key for live quotes, analysts, and earnings.
     </div>
     <div id="warnings" class="warn-banner" hidden></div>
 
@@ -130,13 +127,15 @@
       <section class="card" id="verdictCard"></section>
       <section class="card" id="keyNumbersCard"></section>
       <section class="card" id="trajectoryCard"></section>
+      <section class="card" id="earningsCard"></section>
       <div class="two-col">
         <section class="card" id="rangeCard"></section>
         <section class="card" id="analystCard"></section>
       </div>
-      <section class="card" id="earningsCard"></section>
-      <section class="card" id="insidersCard"></section>
-      <section class="card" id="filingsCard"></section>
+      <div class="two-col">
+        <section class="card" id="insidersCard"></section>
+        <section class="card" id="filingsCard"></section>
+      </div>
       <section class="card" id="peersCard"></section>
       <section class="card" id="newsCard"></section>
     </div>
@@ -152,7 +151,7 @@
     Always do your own research.
   </footer>
 
-  <script src="glossary.js?v=56"></script>
-  <script src="app.js?v=56"></script>
+  <script src="glossary.js?v=57"></script>
+  <script src="app.js?v=57"></script>
 </body>
 </html>

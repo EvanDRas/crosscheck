@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Evidence — Crosscheck</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%234f86c6%22/><path d=%22M24 55 L42 72 L77 31%22 fill=%22none%22 stroke=%22%23ffffff%22 stroke-width=%2213%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
-  <link rel="stylesheet" href="style.css?v=56" />
+  <link rel="stylesheet" href="style.css?v=57" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0c0d0f" />
 </head>
@@ -61,6 +61,8 @@
       const lines = md.split(/\r?\n/);
       let list = false;
       let table = null;
+      let para = [];
+      const closePara = () => { if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
       const closeList = () => { if (list) { out.push("</ul>"); list = false; } };
       const closeTable = () => {
         if (table) {
@@ -80,12 +82,13 @@
           continue;
         }
         closeTable();
-        if (/^# /.test(line)) { closeList(); out.push(`<h2>${inline(line.slice(2))}</h2>`); }
-        else if (/^## /.test(line)) { closeList(); out.push(`<h3>${inline(line.slice(3))}</h3>`); }
-        else if (/^- /.test(line)) { if (!list) { out.push("<ul>"); list = true; } out.push(`<li>${inline(line.slice(2))}</li>`); }
-        else if (line.trim() === "") { closeList(); out.push(""); }
-        else { closeList(); out.push(`<p>${inline(line)}</p>`); }
+        if (/^# /.test(line)) { closePara(); closeList(); out.push(`<h2>${inline(line.slice(2))}</h2>`); }
+        else if (/^## /.test(line)) { closePara(); closeList(); out.push(`<h3>${inline(line.slice(3))}</h3>`); }
+        else if (/^- /.test(line)) { closePara(); if (!list) { out.push("<ul>"); list = true; } out.push(`<li>${inline(line.slice(2))}</li>`); }
+        else if (line.trim() === "") { closePara(); closeList(); out.push(""); }
+        else { closeList(); para.push(line); }
       }
+      closePara();
       closeList();
       closeTable();
       document.getElementById("evidence").innerHTML = out.join("\n");

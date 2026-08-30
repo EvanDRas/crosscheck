@@ -81,14 +81,14 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   local; run `npm run batch` if you'd rather build your own ledger instead.
 - **Visual, not just tabular**: a sector heat map of the whole batch
   universe colored by today's move, an advancing/declining breadth bar, and
-  30-session sparklines on every index tile and big-board row. Background
+  30-session sparklines on every index tile and watchlist row. Background
   sweeps are budget-aware — they yield whenever the rolling minute of
   Finnhub calls gets full, so an interactive analysis never 429s because the
   heat map was refreshing.
 - **Learn as you look** (`/learn.html`): eleven short lessons built on live
   data — reading a verdict, valuation vs quality vs health, look-ahead bias,
   total return, and what this site found when it tested itself — plus a
-  24-term plain-English glossary and an interactive P/E → years → PEG
+  26-term plain-English glossary and an interactive P/E → years → PEG
   calculator. Every key number on a result page has a `?` that opens its
   definition in place: what it is, and what it can't tell you. The homepage
   rotates one concept a day with a live example.
@@ -119,11 +119,11 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   reports what was actually paid over the last 12 months, never a forecast.
 - **A real front page**: newspaper hierarchy — a hero lead story, a today
   bar (market open/closed, live "updated Xs ago", your visit streak), and
-  three columns: your watchlist, the news feed, and the game/record rail.
-- **Feed tabs — Top / Markets / World / For you**: world and business news
+  three columns: your portfolio and watchlist, the news feed, and the forward-test/record rail.
+- **Feed tabs — Briefing / For you / Markets / World / Filings**: world and business news
   from Google's topic feeds (keyless) merged with the wire items; **For
   you** builds a feed from the stocks you've starred — company news per
-  ticker, keyless, relevance-filtered. "More stories" extends any tab.
+  ticker, keyless, relevance-filtered. A Newer / Older pager pages through each tab.
 - **Watchlist**: star any stock anywhere (screen rows, suggestions) and it
   lives in "Your stocks" — live price, today's move, and the formula's
   latest verdict side by side — and powers the For you feed.
@@ -150,7 +150,7 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   next to search) and see exactly what the formula would have said with only
   that day's filings and prices — filing lags included, no hindsight — then
   how the frozen call aged against SPY. Try the landing-page chip: NVDA on
-  2023-01-03 reads SELL… followed by +1,400%+. The honesty claim, interactive.
+  2023-01-03 reads SELL… the stock then beat the S&P by about +1,370% (Study 2 in EVIDENCE.md). The honesty claim, interactive.
 - **Since you last looked**: revisit a ticker on a later day and the page
   opens with what moved — score, filings, insider activity, earnings date.
 - **Share card**: one click renders the verdict as a PNG with the

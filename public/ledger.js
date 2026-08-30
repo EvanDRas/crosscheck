@@ -48,7 +48,7 @@ function renderSummary(data) {
     ["Calls logged", String(data.entries.length)],
     ["First call", dates[0] ?? "—"],
     ["Graded (current era, aged, TR)", String(graded.length)],
-    ["Avg vs SPY (all graded)", graded.length ? pct(avgExcess) : "—"],
+    ["Avg vs SPY (same graded set)", graded.length ? pct(avgExcess) : "—"],
     ["Right on direction", called.length ? `${right} of ${called.length}` : "—"],
     ["Formula eras", eras || "—"],
   ];

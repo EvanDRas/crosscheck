@@ -157,16 +157,16 @@ function renderCompany(d) {
   if (q && isNum(q.price)) {
     const dir = !isNum(q.change) || q.change === 0 ? "flat" : q.change > 0 ? "up" : "down";
     const arrow = dir === "up" ? "▲" : dir === "down" ? "▼" : "•";
-    const delta = isNum(q.change)
+    const delta = isNum(q.change) && isNum(q.changePercent)
       ? `${arrow} ${q.change > 0 ? "+" : ""}${fmtNum(q.change)} (${q.changePercent > 0 ? "+" : ""}${fmtNum(q.changePercent)}%)`
-      : "";
+      : isNum(q.change) ? `${arrow} ${q.change > 0 ? "+" : ""}${fmtNum(q.change)}` : "";
     // On weekends the quote is Friday's — calling it "today" is wrong.
     const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
     const dayLabel = ny.getDay() === 0 || ny.getDay() === 6 ? "last session" : "today";
     priceHtml = `
       <div class="price-now">${fmtMoney(q.price, currency)}</div>
       <div class="price-delta ${dir}">${esc(delta)} ${dayLabel}</div>
-      <div class="price-sub">Prev close ${fmtMoney(q.previousClose, currency) ?? "N/A"} · as of ${new Date(d.asOf).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+      <div class="price-sub"><span class="price-asof">Prev close ${fmtMoney(q.previousClose, currency) ?? "N/A"} · as of ${new Date(d.asOf).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
         <button type="button" id="qRefresh" class="q-refresh" title="Refresh — re-pull this stock, price and all">&#8635;</button></div>`;
   }
 
@@ -190,7 +190,7 @@ function fmtDetailValue(detail) {
     case "%": return fmtPct(detail.value, true);
     case "x": return fmtX(detail.value);
     case "pos": return `${Math.round(detail.value * 100)}% of range`;
-    case "tilt": return `${detail.value > 0 ? "+" : ""}${detail.value.toFixed(2)} of ±2`;
+    case "tilt": return `${detail.value > 0 ? "+" : ""}${detail.value.toFixed(2)} on −2…+2 (sells→buys)`;
     case "pct01": return `${Math.round(detail.value * 100)}%`;
     default: return String(detail.value);
   }
@@ -294,7 +294,7 @@ function renderVerdict(d) {
 
   el.verdict.innerHTML = `
     <h2>Verdict</h2>
-    <p class="sub">A mechanical score from the numbers below — transparent, not advice.${d.logged ? ` Call logged to the <a href="/ledger.html">verdict ledger</a>.` : ""}</p>
+    <p class="sub">A mechanical score from the numbers below — transparent, not advice.${d.logged ? ` Call logged to the <a href="/ledger.html">track record</a>.` : ""}</p>
     <div class="verdict-wrap">
       <div class="verdict-hero">${hero}</div>
       <div>${meters}<div class="scoring-note">${note}</div>${evidence}</div>
@@ -506,7 +506,7 @@ function renderKeyNumbers(d) {
     <h2>Key numbers</h2>
     <p class="sub">Fundamentals from Finnhub, cross-checked against SEC EDGAR filings${d.edgarThrough ? ` (filed data through ${esc(d.edgarThrough)})` : ""}.
       Marks: <span class="prov prov-edgar">SEC</span> = value from filings (vendor had none) · <span class="prov prov-ok">✓</span> = both sources agree ·
-      <span class="prov prov-warn">⚠︎</span> = they disagree · N/A = no source has a value · tap <span class="term-q">?</span> on any tile for a plain-English definition.</p>
+      <span class="prov prov-warn">⚠︎</span> = they disagree · N/A = no source has a value · click <span class="term-q">?</span> on any tile for a plain-English definition.</p>
     <div class="kn-grid">
       ${tiles.map(([label, val, key, term]) => `
         <div class="kn-tile${term && window.TERMS?.[term] ? " has-term" : ""}" ${term ? `data-term="${esc(term)}"` : ""}>
@@ -594,7 +594,7 @@ function renderFilings(d) {
       ${f.map((x) => `
         <li class="filing-item">
           <span class="filing-form">${esc(x.form)}</span>
-          <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.label)}</a>
+          ${/^https:/.test(x.url ?? "") ? `<a href="${esc(safeHref(x.url))}" target="_blank" rel="noopener noreferrer">${esc(x.label)}</a>` : `<span>${esc(x.label)}</span>`}
           <span class="filing-date">${esc(x.filed)}</span>
         </li>`).join("")}
     </ul>`;
@@ -745,7 +745,7 @@ function renderEarnings(d) {
             : `<span class="earn-chip miss">▼ Miss${isNum(e.surprisePercent) ? ` ${fmtNum(e.surprisePercent, 1)}%` : ""}</span>`;
         return `
           <div class="earn-card">
-            <div class="earn-q">${e.quarter && e.year ? `Q${e.quarter} ${e.year}` : "Quarter"}</div>
+            <div class="earn-q">${e.quarter && e.year ? `Q${esc(e.quarter)} ${esc(e.year)}` : "Quarter"}</div>
             <div class="earn-date">${esc(e.period ?? "")}</div>
             <div class="earn-eps">EPS <b>${fmtNum(e.actual) ?? "N/A"}</b> vs ${fmtNum(e.estimate) ?? "N/A"} est.</div>
             ${chip}
@@ -854,7 +854,7 @@ function renderNews(d) {
     <ul class="news-list">
       ${items.map((n) => `
         <li class="news-item">
-          <a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>
+          ${safeHref(n.link) === "#" ? `<span class="news-headline">${esc(n.headline)}</span>` : `<a class="news-headline" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.headline)}</a>`}
           <div class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}</div>
           ${n.summary ? `<p class="news-summary">${esc(n.summary)}</p>` : ""}
         </li>`).join("")}
@@ -903,7 +903,7 @@ function buildBrief(d) {
   if (s.insufficientData) {
     L.push(`- NOT ENOUGH DATA — only ${s.availableCount}/${s.totalCategories} scoring categories had data.`);
   } else {
-    L.push(`- Overall ${Math.round(s.score)}/100 → ${s.verdict} (confidence ${s.confidence}, ${s.availableCount}/${s.totalCategories} categories)`);
+    L.push(`- Overall ${Math.round(s.score)}/100 → ${s.verdict} (data coverage ${s.confidence}, ${s.availableCount}/${s.totalCategories} categories)`);
     L.push(`- Bands (percentile-calibrated vs 16,497 historical S&P scores; a verdict states rank among large caps): >=74 STRONG BUY (top ~10%), >=66 BUY (top ~30%), >=55 HOLD, >=47 SELL, <47 STRONG SELL. Weights renormalize over categories with data.`);
   }
   for (const c of s.categories) {
@@ -934,6 +934,28 @@ function buildBrief(d) {
   L.push(line("Debt/equity", fmtNum(m.debtEquity)));
   L.push(line("Dividend yield", fmtPct(m.dividendYield)));
   L.push(line("Beta", fmtNum(m.beta)));
+
+  if (d.trajectory?.quarters?.length) {
+    L.push("", "## Trajectory — SEC quarterly filings");
+    for (const t of d.trajectory.quarters) {
+      L.push(`- ${t.end}: revenue ${fmtBillions(t.revenue) ?? "N/A"}${isNum(t.revYoY) ? `, YoY ${t.revYoY > 0 ? "+" : ""}${fmtNum(t.revYoY, 1)}%` : ""}${isNum(t.margin) ? `, net margin ${fmtNum(t.margin, 1)}%` : ""}`);
+    }
+    const dil = d.trajectory.dilution;
+    if (dil && isNum(dil.annualPct)) L.push(`- Share count ${dil.annualPct > 0 ? "grew" : "shrank"} ${fmtNum(Math.abs(dil.annualPct), 1)}%/yr (${dil.from} → ${dil.to})`);
+  }
+
+  if (d.insiders?.buys || d.insiders?.sells) {
+    L.push("", `## Insider activity (open market, last ${d.insiders.windowDays ?? 90} days)`);
+    L.push(`- Buys: ${d.insiders.buys?.count ?? 0} (${fmtBillions(d.insiders.buys?.value) ?? "$0"}) · Sells: ${d.insiders.sells?.count ?? 0} (${fmtBillions(d.insiders.sells?.value) ?? "$0"})`);
+    for (const r of (d.insiders.recent ?? []).slice(0, 5)) {
+      L.push(`- ${r.date} ${r.action} ${r.name}: ${Number(r.shares ?? 0).toLocaleString("en-US")} sh @ ${fmtNum(r.price) ?? "?"}`);
+    }
+  }
+
+  if (d.filings?.length) {
+    L.push("", "## Recent SEC filings");
+    for (const x of d.filings.slice(0, 6)) L.push(`- ${x.filed} ${x.form} — ${x.label}`);
+  }
 
   L.push("", "## Analyst ratings");
   if (d.analystTrends?.total) {
@@ -1030,8 +1052,10 @@ function startLive(d) {
     }
     if (sub) {
       // Upstream trade timestamps aren't reliable wall-clock; the arrival
-      // time is (ticks reach us within ~a second of the trade).
-      sub.innerHTML = `<span class="live-dot" aria-hidden="true"></span>Live · updated ${esc(new Date().toLocaleTimeString("en-US"))} · prev close ${esc(fmtMoney(prevClose, currency) ?? "N/A")}`;
+      // time is (ticks reach us within ~a second of the trade). Update only
+      // the text span so the inline refresh glyph survives the tick.
+      const asof = sub.querySelector(".price-asof") ?? sub;
+      asof.innerHTML = `<span class="live-dot" aria-hidden="true"></span>Live · updated ${esc(new Date().toLocaleTimeString("en-US"))} · prev close ${esc(fmtMoney(prevClose, currency) ?? "N/A")}`;
     }
   };
 }
@@ -1194,7 +1218,7 @@ function render(d) {
   renderNews(d);
   startLive(d);
   if (!d.demo && d.ticker) pushRecent(d.ticker);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!analyze.soft) window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // ---------- time machine ----------
@@ -1296,11 +1320,13 @@ let inFlight = null;
 // always real messages — never a stuck "Searching…" and never an empty
 // "did you mean:" with nothing after the colon.
 async function suggestFor(query, { foundMsg, fallbackMsg } = {}) {
+  const seq = viewSeq;
   const deadEnd = fallbackMsg
     ?? `Nothing found for "${query}". Double-check the spelling, or try the ticker symbol directly.`;
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
     const { results } = await res.json();
+    if (seq !== viewSeq) return; // a newer view took over while we searched
     el.status.hidden = true;
     el.btn.disabled = false;
     if (!results?.length) {
@@ -1314,17 +1340,26 @@ async function suggestFor(query, { foundMsg, fallbackMsg } = {}) {
     el.suggest.hidden = false;
     el.suggest.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => go(b.dataset.t)));
   } catch {
+    if (seq !== viewSeq) return;
     el.status.hidden = true;
     el.btn.disabled = false;
     setError(deadEnd);
   }
 }
 
-async function analyze(ticker) {
+async function analyze(ticker, { soft = false } = {}) {
   ticker = String(ticker ?? "").trim().toUpperCase();
   if (!ticker) return;
   el.input.value = ticker;
-  setLoading(ticker);
+  if (soft) {
+    // In-place refresh: keep the current cards on screen while re-fetching.
+    viewSeq++;
+    stopLive();
+    analyze.soft = true;
+  } else {
+    analyze.soft = false;
+    setLoading(ticker);
+  }
   inFlight?.abort();
   const ctrl = new AbortController();
   inFlight = ctrl;
@@ -1395,18 +1430,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-$("introChips").addEventListener("click", (e) => {
-  const t = e.target?.dataset?.t;
-  const d = e.target?.dataset?.d;
-  if (t && d) {
-    el.input.value = t;
-    el.dateInput.value = d;
-    timeMachine(t, d);
-  } else if (t) {
-    el.dateInput.value = "";
-    go(t);
-  }
-});
 
 // One canonical way back to the landing view — used by the brand link and
 // by the browser back button (hash cleared). Bumping viewSeq and aborting
@@ -1546,7 +1569,9 @@ function renderMacro(rows) {
         <div class="macro-tile" title="${esc(r.hint)}">
           <span class="mkt-label">${esc(r.label)}</span>
           <span class="macro-val">${esc(val(r))}</span>
-          ${isNum(r.chgPct) ? `<span class="badge ${chgCls(r.chgPct)}">${esc(fmtPct(r.chgPct, true))}</span>` : ""}
+          ${isNum(r.chgPct) ? (r.kind === "yield"
+            ? `<span class="badge ${chgCls(r.chgPct)}">${(() => { const pt = r.value - r.value / (1 + r.chgPct / 100); return `${pt > 0 ? "+" : ""}${pt.toFixed(2)}pt`; })()}</span>`
+            : `<span class="badge ${chgCls(r.chgPct)}">${esc(fmtPct(r.chgPct, true))}</span>`) : ""}
         </div>`).join("")}
     </div>`;
   card.hidden = false;
@@ -1587,7 +1612,7 @@ function renderEarningsWeek(rows) {
       <div class="cal-row mkt-row" data-t="${esc(r.symbol)}">
         <span class="cal-date">${esc(dayName(r.date))}</span>
         <span class="cal-name mkt-sym">${esc(r.symbol)}</span>
-        <span class="cal-in">${r.epsEstimate != null ? `est ${esc(fmtNum(r.epsEstimate, 2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
+        <span class="cal-in">${r.epsEstimate != null ? `est EPS $${esc(fmtNum(r.epsEstimate, 2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
       </div>`).join("")}`;
   card.hidden = false;
 }
@@ -1706,15 +1731,19 @@ let pfBench = {};
 
 async function loadPfQuotes(fresh = false) {
   const lots = readPf();
-  const ts = [...new Set(lots.map((l) => l.t))].slice(0, 12);
+  const ts = [...new Set(lots.map((l) => l.t))];
   if (!ts.length || !hasKey) {
     pfQuotes = {};
     renderPortfolio();
     return;
   }
   try {
-    const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.join(","))}&div=1${fresh ? "&fresh=1" : ""}`);
-    if (res.ok) pfQuotes = (await res.json()).quotes ?? {};
+    // The server caps 12 tickers per request — chunk so no lot is silently
+    // left out of the totals.
+    for (let i = 0; i < ts.length; i += 12) {
+      const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.slice(i, i + 12).join(","))}&div=1${fresh ? "&fresh=1" : ""}`);
+      if (res.ok) Object.assign(pfQuotes, (await res.json()).quotes ?? {});
+    }
   } catch {
     /* rows show dashes */
   }
@@ -1734,6 +1763,7 @@ const fmtUsd = (v) => `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US
 
 function renderPortfolio() {
   const card = $("portfolioCard");
+  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName)) return; // mid-entry — repaint next cycle
   const lots = readPf();
   const form = `
     <form class="pf-add" autocomplete="off">
@@ -1870,14 +1900,16 @@ const alertNotified = new Set();
 
 async function checkAlerts() {
   const alerts = readAlerts();
-  const ts = [...new Set(alerts.map((a) => a.t))].slice(0, 12);
+  const ts = [...new Set(alerts.map((a) => a.t))];
   if (!ts.length || !hasKey) {
     renderAlerts();
     return;
   }
   try {
-    const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.join(","))}`);
-    if (res.ok) alertQuotes = (await res.json()).quotes ?? {};
+    for (let i = 0; i < ts.length; i += 12) {
+      const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.slice(i, i + 12).join(","))}`);
+      if (res.ok) Object.assign(alertQuotes, (await res.json()).quotes ?? {});
+    }
   } catch {
     /* keep last quotes */
   }
@@ -1900,6 +1932,7 @@ async function checkAlerts() {
 
 function renderAlerts() {
   const card = $("alertCard");
+  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName)) return; // mid-entry — repaint next cycle
   const alerts = readAlerts();
   const form = `
     <form class="pf-add alert-add" autocomplete="off">
@@ -1910,7 +1943,8 @@ function renderAlerts() {
     </form>`;
   card.innerHTML = `
     <h2>Price alerts</h2>
-    <p class="sub">Checked every two minutes <b>while Crosscheck is open</b> — this app runs on your PC, so nothing can fire when it's closed. That's the honest limit of a private, local tool.</p>
+    ${hasKey ? `<p class="sub">Checked every two minutes <b>while Crosscheck is open</b> — this app runs on your PC, so nothing can fire when it's closed. That's the honest limit of a private, local tool.</p>`
+      : `<p class="sub">Alerts need live quotes — add a free Finnhub key in the setup card at the top of the page and they check every two minutes while Crosscheck is open.</p>`}
     ${alerts.length ? alerts.map((a, i) => {
       const q = alertQuotes[a.t];
       const hit = q ? (a.dir === "above" ? q.price >= a.price : q.price <= a.price) : false;
@@ -1960,7 +1994,6 @@ $("earningsWeekCard").addEventListener("click", (e) => {
 
 let feedTab = "top";
 let feedItems = [];
-let feedLimit = 10;
 let feedPage = 0;
 const FEED_PAGE_SIZE = 12;
 let feedLoading = false;
@@ -1975,8 +2008,8 @@ const youTickers = () => readWatch().slice(0, 6);
 
 async function loadFeed(tab, limit = 10) {
   feedTab = tab;
-  feedLimit = limit;
   feedPage = 0;
+  feedItems = []; // a switched tab shows Loading, never the old tab's stories
   const t = tab === "you" || tab === "filings" ? youTickers() : [];
   if ((tab === "you" || tab === "filings") && !t.length) {
     feedItems = [];
@@ -1991,6 +2024,7 @@ async function loadFeed(tab, limit = 10) {
   } catch {
     /* keep whatever was showing */
   }
+  if (feedTab !== tab) return; // superseded by a newer tab click
   feedLoading = false;
   renderNewsCard();
 }
@@ -2073,9 +2107,9 @@ function renderNewsCard() {
     ${empty}
     <ul class="news-list${feedLoading ? " loading" : ""}">${pageList.map(item).join("")}</ul>
     ${pages > 1 ? `<div class="news-pager">
-      <button type="button" data-pg="prev" ${feedPage === 0 ? "disabled" : ""}>&#8249; Newer</button>
+      <button type="button" data-pg="prev" ${feedPage === 0 ? "disabled" : ""}>&#8249; ${feedTab === "briefing" ? "Back" : "Newer"}</button>
       <span>Page ${feedPage + 1} of ${pages}</span>
-      <button type="button" data-pg="next" ${feedPage >= pages - 1 ? "disabled" : ""}>Older &#8250;</button>
+      <button type="button" data-pg="next" ${feedPage >= pages - 1 ? "disabled" : ""}>${feedTab === "briefing" ? "More" : "Older"} &#8250;</button>
     </div>` : ""}`;
   newsEl.hidden = false;
 }
@@ -2098,9 +2132,14 @@ $("marketNews").addEventListener("click", (e) => {
 
 let lastUpdatedAt = null;
 const readJSON = (key, fallback) => {
+  // Type-checked against the fallback: a stale or hand-edited value of the
+  // wrong SHAPE must degrade to the default, never crash every render.
   try {
     const v = JSON.parse(localStorage.getItem(key));
-    return v ?? fallback;
+    if (v == null) return fallback;
+    if (Array.isArray(fallback)) return Array.isArray(v) ? v : fallback;
+    if (fallback && typeof fallback === "object") return v && typeof v === "object" && !Array.isArray(v) ? v : fallback;
+    return typeof v === typeof fallback ? v : fallback;
   } catch {
     return fallback;
   }
@@ -2130,7 +2169,8 @@ function marketStatus() {
 function bumpStreak() {
   const s = readJSON("cc_streak", { last: null, count: 0, best: 0 });
   const today = localDay();
-  const yesterday = localDay(new Date(Date.now() - 86_400_000));
+  const n = new Date();
+  const yesterday = localDay(new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1)); // calendar math survives DST
   if (s.last !== today) {
     s.count = s.last === yesterday ? (s.count ?? 0) + 1 : 1;
     s.last = today;
@@ -2162,7 +2202,7 @@ async function refreshNow() {
   refreshing = true;
   document.getElementById("qRefresh")?.classList.add("spinning");
   try {
-    await analyze(t); // re-renders the card; the button comes back at rest
+    await analyze(t, { soft: true }); // repaint in place; the button comes back at rest
   } finally {
     refreshing = false;
     document.getElementById("qRefresh")?.classList.remove("spinning");
@@ -2270,6 +2310,7 @@ async function loadWatchQuotes(fresh = false) {
 
 function renderWatch() {
   const card = $("watchCard");
+  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName)) return; // mid-entry — repaint next cycle
   const w = readWatch();
   const addForm = `
     <form class="watch-add" autocomplete="off">
@@ -2312,6 +2353,7 @@ function renderWatch() {
         </div>`;
       }).join("")}
     </div>
+    ${!hasKey && w.length ? `<p class="pf-total-sub">Add a free Finnhub key (setup card at the top of the page) for live prices.</p>` : ""}
     ${addForm}
     ${watchDelta?.deltas?.length ? `<p class="watch-delta">Since your last visit: ${watchDelta.deltas.map((d) =>
       `<button type="button" class="watch-delta-item mkt-row ${d.pct > 0 ? "pos" : "neg"}" data-t="${esc(d.t)}">${esc(d.t)} ${esc(fmtPct(d.pct, true))}</button>`).join(" ")}</p>` : ""}`;
@@ -2371,13 +2413,13 @@ function renderScreen() {
           <tr><th>#</th><th class="sortable" data-sort="ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score">Score${arrow("score")}</th><th>Verdict</th></tr>
         </thead>
         <tbody>
-          ${rows.map((r, i) => `
+          ${(() => { const rank = new Map([...screenData].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).map((r, i) => [r.ticker, i + 1])); return rows.map((r) => `
             <tr class="mkt-row" data-t="${esc(r.ticker)}">
-              <td class="rank">${i + 1}</td>
+              <td class="rank">${rank.get(r.ticker) ?? "—"}</td>
               <td class="mkt-sym">${esc(r.ticker)} ${starBtn(r.ticker)}</td>
               <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
               <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
-            </tr>`).join("")}
+            </tr>`).join(""); })()}
         </tbody>
       </table>
     </div>`;
@@ -2431,7 +2473,7 @@ function renderHeat() {
   const flat = rows.length - adv - dec;
   const avg = (list) => list.reduce((s, r) => s + r.changePercent, 0) / list.length;
   card.innerHTML = `
-    <h2>Sector heat map</h2>
+    <h2>The frozen 50 — sector heat map</h2>
     <p class="sub">The same fixed 50-stock universe as the verdict screen, colored by today's move.</p>
     <div class="breadth" title="Advancing vs declining across the universe">
       <div class="breadth-bar">
@@ -2483,9 +2525,6 @@ function renderMovers(m) {
     renderNewsCard(); // ticker tags need the quotes that just arrived
   }
   if (!readWatch().length) renderWatch(); // suggestions come from the movers
-  // The game needs the universe list (for random picks) and a Tiingo key.
-  // The game runs off the graded forward test (no key gate here — the pack
-  // endpoint explains itself if grading isn't warm yet).
   if (rows.length < 10) {
     card.hidden = true;
     return;
@@ -2520,17 +2559,24 @@ function renderRecord(s) {
     card.hidden = true;
     return;
   }
-  const exc = (v) => (isNum(v) ? `${v > 0 ? "+" : ""}${fmtNum(v, 1)}% vs SPY` : "—");
-  const callLabel = (c) => `${esc(c.ticker)} ${exc(c.excessPct)}${/SELL/.test(c.verdict ?? "") ? " · called sell" : ""}`;
+  // Framed as call-edge: positive always means the CALL was right, so a
+  // sell that trailed SPY reads as a green positive, not a puzzling red.
+  const callLabel = (c) => {
+    if (!isNum(c.excessPct)) return `${esc(c.ticker)} —`;
+    const sell = /SELL/.test(c.verdict ?? "");
+    const edge = sell ? -c.excessPct : c.excessPct;
+    return `${esc(c.ticker)} ${edge > 0 ? "+" : ""}${fmtNum(edge, 1)}% ${sell ? "(sell — stock trailed SPY)" : "vs SPY"}`;
+  };
+  const callEdge = (c) => (isNum(c.excessPct) ? (/SELL/.test(c.verdict ?? "") ? -c.excessPct : c.excessPct) : null);
   // The server only reports a hit rate once enough calls are 30+ days old —
   // until then the honest label is "too early", not a green number.
   const tiles = [
     ["Calls logged", String(s.calls), ""],
     ["Days running", String(s.days), ""],
     ["Graded so far", String(s.graded), ""],
-    ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}%` : "too early", isNum(s.rightPct) && s.rightPct >= 53 ? "pos" : ""],
-    s.best && s.graded >= 5 ? ["Best aged call", callLabel(s.best), "pos"] : null,
-    s.worst && s.graded >= 5 ? ["Worst aged call", callLabel(s.worst), ""] : null,
+    ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}%` : "no calls 30d old yet", isNum(s.rightPct) && s.rightPct >= 53 ? "pos" : ""],
+    s.best && s.graded >= 5 ? ["Best aged call", callLabel(s.best), (callEdge(s.best) ?? 0) > 0 ? "pos" : ""] : null,
+    s.worst && s.graded >= 5 ? ["Worst aged call", callLabel(s.worst), (callEdge(s.worst) ?? 0) < 0 ? "neg" : ""] : null,
   ].filter(Boolean);
   card.innerHTML = `
     <h2>The forward test</h2>
@@ -2683,9 +2729,14 @@ setInterval(() => {
 }, 120_000);
 
 window.addEventListener("hashchange", () => {
-  const t = location.hash.slice(1);
-  if (t) analyze(t);
-  else showHome(); // browser back from #TICKER lands on the market overview
+  let t = location.hash.slice(1);
+  try { t = decodeURIComponent(t); } catch { /* malformed % — use raw */ }
+  if (!t) showHome();
+  else if (/^[A-Za-z0-9.\-^]{1,10}$/.test(t)) analyze(t);
+  else {
+    setLoading(t);
+    suggestFor(t, { foundMsg: `Matches for "${t}":` });
+  } // browser back from #TICKER lands on the market overview
 });
 
 // ---------- recently viewed ----------
@@ -2822,11 +2873,17 @@ async function checkSetup() {
     const h = await res.json();
     hasKey = Boolean(h.hasKey);
     hasTiingo = Boolean(h.hasTiingo);
-    el.setup.hidden = hasKey;
+    // ?setup=1 reopens the card after first-run — the supported way to add
+    // the optional Tiingo key later without touching .env.
+    el.setup.hidden = hasKey && !new URLSearchParams(location.search).has("setup");
     renderMoments(); // flags arrived after the first landing render
-    // The intro time-machine chip needs Tiingo — a keyless friend clicking
-    // it got a bare error page. Hide it until the key exists.
-    document.querySelectorAll("#introChips .tm-chip").forEach((b) => { b.hidden = !hasTiingo; });
+    if (!hasKey) {
+      // The first render ran down the optimistic has-key path; redo the
+      // quote-gated cards now so their honest keyless messages show.
+      loadPfQuotes();
+      loadWatchQuotes();
+      checkAlerts();
+    }
   } catch {
     /* server unreachable — the analyze path will surface it */
   }
@@ -2879,7 +2936,15 @@ $("tmToggle")?.addEventListener("click", () => {
 });
 
 // Deep link: /#AAPL analyzes on load; otherwise land on the market overview.
-if (location.hash.length > 1) analyze(location.hash.slice(1));
+if (location.hash.length > 1) {
+  let t = location.hash.slice(1);
+  try { t = decodeURIComponent(t); } catch { /* malformed % — use raw */ }
+  if (/^[A-Za-z0-9.\-^]{1,10}$/.test(t)) analyze(t);
+  else {
+    setLoading(t);
+    suggestFor(t, { foundMsg: `Matches for "${t}":` });
+  }
+}
 else {
   el.input.focus();
   loadMarket();
@@ -2892,7 +2957,7 @@ else {
 
 const TOUR_STEPS = [
   { el: "#searchForm", title: "Start anywhere", text: `Type any ticker or company name and hit <b>Analyze</b> — score, evidence, filings, peers, and news on one page. No API key yet? Type <b>DEMO</b>.` },
-  { el: "#tmToggle", title: "The no-hindsight time machine", text: `Pick a past date and see exactly what the formula would have said <i>then</i>, using only what was filed and priced by that day.` },
+  { el: "#tmToggle", when: () => hasTiingo, title: "The no-hindsight time machine", text: `Pick a past date and see exactly what the formula would have said <i>then</i>, using only what was filed and priced by that day.` },
   { el: "#portfolioCard", title: "Your money, honestly measured", text: `Add what you own (buy dates included) and get the comparison most brokers skip: <b>would the same money in the S&amp;P have done better?</b> It never leaves this browser.` },
   { el: "#watchCard", title: "Follow what you care about", text: `Followed stocks live here with price and verdict — and the news desk's <b>For you</b> tab shows only their stories.` },
   { el: "#marketNews", title: "The news desk", text: `<b>Briefing</b> ranks today's market-wide stories by likely impact. <b>Filings</b> shows what your companies legally told the SEC — often before the news writes it up. Flip pages with Newer / Older.` },
@@ -2917,7 +2982,21 @@ function tourEnd() {
   if (!el.intro.hidden) renderToday();
 }
 
+function tourVisibleSteps() {
+  return TOUR_STEPS.filter((st) => {
+    if (st.when && !st.when()) return false;
+    if (!st.el) return true;
+    const n = document.querySelector(st.el);
+    return n && !n.hidden;
+  });
+}
+
 function tourShow() {
+  // Recompute visibility every step — cards appear as data loads and can
+  // hide again, and the tour must never point at nothing.
+  tourList = tourVisibleSteps();
+  if (!tourList.length) { tourEnd(); return; }
+  if (tourAt > tourList.length - 1) tourAt = tourList.length - 1;
   const step = tourList[tourAt];
   document.querySelectorAll(".tour-hi").forEach((n) => n.classList.remove("tour-hi"));
   document.querySelector(".topbar")?.classList.remove("tour-hi-root");
@@ -2943,7 +3022,7 @@ function tourShow() {
 }
 
 function tourStart() {
-  tourList = TOUR_STEPS.filter((st) => !st.el || (document.querySelector(st.el) && !document.querySelector(st.el).hidden));
+  tourList = tourVisibleSteps();
   if (!tourList.length) return;
   tourAt = 0;
   if (!tourEls) {

@@ -16,7 +16,7 @@ window.TERMS = {
     name: "Price-to-sales",
     what: "Market cap divided by the last twelve months of revenue. Useful when a company has no profit yet, because revenue is harder to massage than earnings.",
     use: "Valuation category, alongside P/E and PEG.",
-    caveat: "A software company at 10× sales with 80% gross margins is not the same as a grocer at 10× sales. Compare within an industry — the Compare button on any result does exactly that.",
+    caveat: "A software company at 10× sales with 80% gross margins is not the same as a grocer at 10× sales. Compare within an industry — the Compare button on any result (with a Finnhub key) does exactly that.",
     live: "CRM",
   },
   pb: {
@@ -118,7 +118,7 @@ window.TERMS = {
     live: "DEMO",
   },
   confidence: {
-    name: "Data coverage (shown as Confidence)",
+    name: "Data coverage",
     what: "How many of the six categories had enough data to score. High means five or six of the six; lower means the verdict rests on fewer legs.",
     use: "Fewer than two scorable categories means NOT ENOUGH DATA instead of a fake verdict. Degraded results are never logged to the track record.",
     caveat: "High confidence means the inputs were present, not that the call is right.",
