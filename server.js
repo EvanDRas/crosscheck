@@ -400,21 +400,27 @@ function startInsiderSweep() {
 }
 
 let marketCache = null;
-app.get("/api/market", async (_req, res) => {
+app.get("/api/market", async (req, res) => {
   try {
-    if (marketCache && Date.now() - marketCache.at < 120_000) return res.json(marketCache.payload);
-    res.json(await singleFlight("market", buildMarket));
+    // fresh=1 is the user's Refresh button: honor it by rebuilding, but no
+    // more than once per 15 seconds and only when the rate budget is calm —
+    // hammering the button must never burn the API quota.
+    const wantFresh = req.query.fresh === "1"
+      && marketCache && Date.now() - marketCache.at > 15_000
+      && callsLastMinute() < 30;
+    if (!wantFresh && marketCache && Date.now() - marketCache.at < 120_000) return res.json(marketCache.payload);
+    res.json(await singleFlight("market", () => buildMarket(wantFresh)));
   } catch (err) {
     console.error("market failed:", err);
     res.status(500).json({ error: "Could not load the market overview." });
   }
 });
-async function buildMarket() {
+async function buildMarket(fresh = false) {
   {
     const apiKey = process.env.FINNHUB_API_KEY;
     const quoteRow = async ([symbol, label]) => {
       try {
-        const q = await getQuoteCached(symbol, apiKey);
+        const q = await getQuoteCached(symbol, apiKey, fresh ? 10_000 : undefined);
         if (!q?.c) return null;
         return { symbol, label: label ?? symbol, price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
       } catch {
@@ -631,10 +637,13 @@ app.get("/api/quotes", async (req, res) => {
   const list = parseTickers(req.query.t, 12);
   if (!apiKey || !list.length) return res.json({ quotes: {} });
   const wantDiv = req.query.div === "1";
+  // fresh=1 (the Refresh button) bypasses the 2-minute quote cache when the
+  // rate budget allows; under pressure it quietly falls back to cached.
+  const maxAge = req.query.fresh === "1" && callsLastMinute() < 30 ? 10_000 : undefined;
   const quotes = {};
   await Promise.all(list.map(async (t) => {
     try {
-      const q = await getQuoteCached(t, apiKey);
+      const q = await getQuoteCached(t, apiKey, maxAge);
       if (!q?.c) return;
       quotes[t] = { price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
       if (wantDiv) quotes[t].dps = await getDpsTTM(t, apiKey).catch(() => 0);
