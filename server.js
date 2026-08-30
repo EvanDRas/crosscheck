@@ -18,8 +18,9 @@ import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
 import { marketNews, feedNews } from "./lib/news.js";
 import { searchCompanies } from "./lib/edgar.js";
-import { getMacro, nextEvents } from "./lib/macro.js";
-import { getEarningsCalendarRange } from "./lib/finnhub.js";
+import { getMacro, getWorld, nextEvents } from "./lib/macro.js";
+import { getEconomy } from "./lib/fred.js";
+import { getEarningsCalendarRange, getIpoCalendarRange } from "./lib/finnhub.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
@@ -319,6 +320,31 @@ async function getEarningsWeek(apiKey) {
   return rows;
 }
 
+// Upcoming IPOs: one calendar call for the next month, cached 12 hours.
+// New listings have no filings history, so the formula can't score them —
+// but knowing what's coming to market is core hub material.
+let ipoCache = null;
+async function getIpoWeeks(apiKey) {
+  if (ipoCache && Date.now() - ipoCache.at < 12 * 3_600_000) return ipoCache.rows;
+  const from = new Date().toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  const doc = await getIpoCalendarRange(from, to, apiKey);
+  const rows = (doc?.ipoCalendar ?? [])
+    .filter((e) => e.date && (e.name || e.symbol) && e.status !== "withdrawn")
+    .map((e) => ({
+      symbol: e.symbol || "",
+      name: e.name || e.symbol,
+      date: e.date,
+      exchange: e.exchange || "",
+      price: e.price || "",
+      status: e.status || "",
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 8);
+  ipoCache = { at: Date.now(), rows };
+  return rows;
+}
+
 let marketCache = null;
 app.get("/api/market", async (_req, res) => {
   try {
@@ -342,12 +368,15 @@ async function buildMarket() {
       }
     };
     const sparkSyms = INDICES.map(([s]) => s);
-    const [indices, news, sparkPairs, macro, earningsWeek] = await Promise.all([
+    const [indices, news, sparkPairs, macro, earningsWeek, world, economy, ipo] = await Promise.all([
       apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
       marketNews(apiKey).catch(() => []),
       hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkSeries(s)])) : [],
       getMacro().catch(() => []),
       apiKey ? getEarningsWeek(apiKey).catch(() => []) : [],
+      getWorld().catch(() => []),
+      getEconomy().catch(() => []),
+      apiKey ? getIpoWeeks(apiKey).catch(() => []) : [],
     ]);
     const sparks = {};
     for (const [s, v] of sparkPairs) if (v) sparks[s] = v;
@@ -362,6 +391,9 @@ async function buildMarket() {
       macro,
       events: nextEvents(4),
       earningsWeek,
+      world,
+      economy,
+      ipo,
     };
     marketCache = { at: Date.now(), payload };
     return payload;

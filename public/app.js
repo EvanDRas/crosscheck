@@ -1488,6 +1488,9 @@ function renderMarket(m) {
   renderMacro(m.macro ?? []);
   renderCalendar(m.events ?? []);
   renderEarningsWeek(m.earningsWeek ?? []);
+  renderWorld(m.world ?? []);
+  renderEconomy(m.economy ?? []);
+  renderIpo(m.ipo ?? []);
   renderNewsCard();
   renderWatch(); // verdict pills need screenData, which just arrived
   if (moversData) renderHeat(); // so do the heat-tile dots
@@ -1579,6 +1582,63 @@ function renderEarningsWeek(rows) {
         <span class="cal-date">${esc(dayName(r.date))}</span>
         <span class="cal-name mkt-sym">${esc(r.symbol)}</span>
         <span class="cal-in">${r.epsEstimate != null ? `est ${esc(fmtNum(r.epsEstimate, 2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
+      </div>`).join("")}`;
+  card.hidden = false;
+}
+
+function renderWorld(rows) {
+  const card = $("worldCard");
+  if (!rows.length) {
+    card.hidden = true;
+    return;
+  }
+  card.innerHTML = `
+    <h2>World markets</h2>
+    <p class="sub">Futures trade nearly around the clock, and overseas sessions set the tone before New York opens.</p>
+    ${rows.map((r) => `
+      <div class="cal-row" title="${esc(r.hint ?? "")}">
+        <span class="cal-name">${esc(r.label)}</span>
+        <span class="cal-in">${esc(fmtNum(r.value, r.value >= 1000 ? 0 : 2))}
+          ${isNum(r.chgPct) ? `<span class="badge ${chgCls(r.chgPct)}">${esc(fmtPct(r.chgPct, true))}</span>` : ""}</span>
+      </div>`).join("")}`;
+  card.hidden = false;
+}
+
+function renderEconomy(rows) {
+  const card = $("economyCard");
+  if (!rows.length) {
+    card.hidden = true;
+    return;
+  }
+  card.innerHTML = `
+    <h2>The economy right now</h2>
+    <p class="sub">The backdrop every stock trades against. Straight from FRED, the St. Louis Fed's public data service — hover any row for what it means.</p>
+    ${rows.map((r) => `
+      <div class="econ-row" title="${esc(r.hint ?? "")}">
+        <div class="econ-main">
+          <span class="cal-name">${esc(r.label)}</span>
+          <span class="econ-sub">${esc(r.sub)}</span>
+        </div>
+        <span class="econ-val${r.tone === "bad" ? " neg" : ""}">${esc(r.value)}</span>
+      </div>`).join("")}`;
+  card.hidden = false;
+}
+
+function renderIpo(rows) {
+  const card = $("ipoCard");
+  if (!rows.length) {
+    card.hidden = true;
+    return;
+  }
+  const short = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  card.innerHTML = `
+    <h2>IPO calendar</h2>
+    <p class="sub">Going public in the next month. New listings have no filing history — the formula can't score what hasn't reported.</p>
+    ${rows.map((r) => `
+      <div class="cal-row" title="${esc([r.exchange, r.status].filter(Boolean).join(" · "))}">
+        <span class="cal-date">${esc(short(r.date))}</span>
+        <span class="cal-name">${esc(r.name)}</span>
+        <span class="cal-in">${esc(r.price ? `$${r.price}` : r.status)}</span>
       </div>`).join("")}`;
   card.hidden = false;
 }
