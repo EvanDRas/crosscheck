@@ -1609,7 +1609,7 @@ function renderEarningsWeek(rows) {
     <h2>Earnings this week</h2>
     <p class="sub">From the 50-stock universe — earnings days are the year's biggest single-day swings.</p>
     ${rows.slice(0, 10).map((r) => `
-      <div class="cal-row mkt-row" data-t="${esc(r.symbol)}">
+      <div class="cal-row mkt-row" tabindex="0" role="link" data-t="${esc(r.symbol)}">
         <span class="cal-date">${esc(dayName(r.date))}</span>
         <span class="cal-name mkt-sym">${esc(r.symbol)}</span>
         <span class="cal-in">${r.epsEstimate != null ? `est EPS $${esc(fmtNum(r.epsEstimate, 2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
@@ -1703,7 +1703,7 @@ function renderInsiderRadar(ins) {
     <h2>Insider radar</h2>
     <p class="sub">Open-market buys by executives and directors in the last six weeks (SEC Form 4), across the 50-stock universe. Two or more distinct buyers is the pattern worth noticing — insiders sell for many reasons, but they only buy for one.</p>
     ${ins.rows.length ? ins.rows.map((r) => `
-      <div class="cal-row mkt-row" data-t="${esc(r.ticker)}">
+      <div class="cal-row mkt-row" tabindex="0" role="link" data-t="${esc(r.ticker)}">
         <span class="cal-name mkt-sym">${esc(r.ticker)}</span>
         <span class="cal-in">${r.buyers} buyer${r.buyers === 1 ? "" : "s"}${r.value > 0 ? ` · ${esc(kM(r.value))}` : ""}</span>
       </div>`).join("") : `<p class="watch-empty">No notable insider buying in the universe right now — which is the honest answer, not a broken card.</p>`}`;
@@ -1763,7 +1763,7 @@ const fmtUsd = (v) => `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US
 
 function renderPortfolio() {
   const card = $("portfolioCard");
-  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName)) return; // mid-entry — repaint next cycle
+  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value) return; // mid-entry (input holds text) — repaint next cycle
   const lots = readPf();
   const form = `
     <form class="pf-add" autocomplete="off">
@@ -1804,7 +1804,7 @@ function renderPortfolio() {
       }
     }
     return `<div class="pf-item">
-      <div class="watch-row mkt-row" data-t="${esc(l.t)}">
+      <div class="watch-row mkt-row" tabindex="0" role="link" data-t="${esc(l.t)}">
         <span class="mkt-sym">${esc(l.t)}</span>
         <span class="pf-shares">${esc(fmtNum(l.sh, l.sh % 1 ? 2 : 0))} @ ${esc(fmtPrice(l.cost))}</span>
         <span class="watch-price">${q ? esc(fmtPrice(q.price)) : "—"}</span>
@@ -1932,7 +1932,7 @@ async function checkAlerts() {
 
 function renderAlerts() {
   const card = $("alertCard");
-  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName)) return; // mid-entry — repaint next cycle
+  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value) return; // mid-entry (input holds text) — repaint next cycle
   const alerts = readAlerts();
   const form = `
     <form class="pf-add alert-add" autocomplete="off">
@@ -2310,7 +2310,7 @@ async function loadWatchQuotes(fresh = false) {
 
 function renderWatch() {
   const card = $("watchCard");
-  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName)) return; // mid-entry — repaint next cycle
+  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value) return; // mid-entry (input holds text) — repaint next cycle
   const w = readWatch();
   const addForm = `
     <form class="watch-add" autocomplete="off">
@@ -2342,7 +2342,7 @@ function renderWatch() {
         const q = watchQuotes[t];
         const v = screenData.find((r) => r.ticker === t);
         return `<div class="watch-item">
-          <div class="watch-row mkt-row" data-t="${esc(t)}">
+          <div class="watch-row mkt-row" tabindex="0" role="link" data-t="${esc(t)}">
             <span class="mkt-sym">${esc(t)}</span>
             <span class="watch-spark">${q?.spark ? sparkSvg(q.spark, 56, 18) : ""}</span>
             <span class="watch-price">${q ? esc(fmtPrice(q.price)) : "—"}</span>
@@ -2414,7 +2414,7 @@ function renderScreen() {
         </thead>
         <tbody>
           ${(() => { const rank = new Map([...screenData].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).map((r, i) => [r.ticker, i + 1])); return rows.map((r) => `
-            <tr class="mkt-row" data-t="${esc(r.ticker)}">
+            <tr class="mkt-row" tabindex="0" role="link" data-t="${esc(r.ticker)}">
               <td class="rank">${rank.get(r.ticker) ?? "—"}</td>
               <td class="mkt-sym">${esc(r.ticker)} ${starBtn(r.ticker)}</td>
               <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
@@ -2542,7 +2542,7 @@ function renderMovers(m) {
           <div class="movers-label">${label}</div>
           <table class="mkt-table">
             ${list.map((r) => `
-              <tr class="mkt-row" data-t="${esc(r.ticker)}">
+              <tr class="mkt-row" tabindex="0" role="link" data-t="${esc(r.ticker)}">
                 <td class="mkt-sym">${esc(r.ticker)}</td>
                 <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
                 <td class="num"><span class="badge ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</span></td>
@@ -3051,4 +3051,15 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") tourEnd();
   else if (e.key === "ArrowRight" && tourAt < tourList.length - 1) { tourAt++; tourShow(); }
   else if (e.key === "ArrowLeft" && tourAt > 0) { tourAt--; tourShow(); }
+});
+
+// Keyboard access: Enter or Space on any focused stock row opens it, same
+// as a click — the delegated handlers below only listen for clicks.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const row = e.target.closest?.(".mkt-row[data-t]");
+  if (!row || tourEls) return;
+  e.preventDefault();
+  el.dateInput.value = "";
+  go(row.dataset.t);
 });

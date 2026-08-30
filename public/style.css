@@ -321,7 +321,7 @@ a:hover { text-decoration: underline; }
 }
 
 /* Record strip — the forward test's own numbers on the homepage. */
-.record-strip { margin-top: 4px; grid-template-columns: repeat(6, auto); justify-content: start; }
+.record-strip { margin-top: 4px; grid-template-columns: 1fr 1fr; justify-content: stretch; }
 .record-strip .mkt-tile { padding-right: 24px; }
 .record-val { font-size: 17px; }
 .record-val.pos { color: var(--good); }
@@ -507,11 +507,11 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--baseline);
   color: var(--ink);
 }
-.verdict-pill.v-strongbuy { border-color: var(--good); background: rgba(12, 163, 12, 0.15); }
-.verdict-pill.v-buy       { border-color: var(--good); background: rgba(12, 163, 12, 0.07); }
-.verdict-pill.v-hold      { border-color: var(--warning); background: rgba(250, 178, 25, 0.08); }
-.verdict-pill.v-sell      { border-color: var(--serious); background: rgba(236, 131, 90, 0.1); }
-.verdict-pill.v-strongsell{ border-color: var(--critical); background: rgba(208, 59, 59, 0.14); }
+.verdict-pill.v-strongbuy, .pill-sm.v-strongbuy { border-color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); }
+.verdict-pill.v-buy, .pill-sm.v-buy { border-color: var(--good); background: color-mix(in srgb, var(--good) 7%, transparent); }
+.verdict-pill.v-hold, .pill-sm.v-hold { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 8%, transparent); }
+.verdict-pill.v-sell, .pill-sm.v-sell { border-color: var(--serious); background: color-mix(in srgb, var(--serious) 10%, transparent); }
+.verdict-pill.v-strongsell, .pill-sm.v-strongsell { border-color: var(--critical); background: color-mix(in srgb, var(--critical) 14%, transparent); }
 .verdict-pill.v-nodata    { border-color: var(--baseline); background: var(--surface-2); color: var(--ink-2); }
 .verdict-conf { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
 
@@ -685,8 +685,8 @@ a:hover { text-decoration: underline; }
 }
 .setup-steps { margin: 10px 0 14px 20px; line-height: 1.7; font-size: 14px; }
 .setup-form { display: flex; flex-wrap: wrap; gap: 8px; }
-.setup-form input { flex: 1 1 220px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border, #333); background: var(--surface-2); color: inherit; font-size: 14px; }
-.setup-form button { padding: 9px 16px; border-radius: 8px; border: none; background: var(--accent, #4a7dcf); color: #fff; font-weight: 600; cursor: pointer; }
+.setup-form input { flex: 1 1 220px; padding: 9px 12px; border-radius: 3px; border: 1px solid var(--border, #333); background: var(--surface-2); color: inherit; font-size: 14px; }
+.setup-form button { padding: 9px 16px; border-radius: 3px; border: none; background: var(--accent, #4a7dcf); color: #fff; font-weight: 600; cursor: pointer; }
 .setup-form button:disabled { opacity: 0.6; cursor: wait; }
 
 /* personal pick logging */
@@ -896,11 +896,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--baseline);
   color: var(--ink);
 }
-.pill-sm.v-strongbuy { border-color: var(--good); background: rgba(12, 163, 12, 0.15); }
-.pill-sm.v-buy       { border-color: var(--good); background: rgba(12, 163, 12, 0.07); }
-.pill-sm.v-hold      { border-color: var(--warning); background: rgba(250, 178, 25, 0.08); }
-.pill-sm.v-sell      { border-color: var(--serious); background: rgba(236, 131, 90, 0.1); }
-.pill-sm.v-strongsell{ border-color: var(--critical); background: rgba(208, 59, 59, 0.14); }
+
 
 /* ---------- footer ---------- */
 
@@ -1398,7 +1394,6 @@ a:hover { text-decoration: underline; }
 .hero-title-xl { font-size: 26px; padding: 14px 0 4px; }
 
 /* review fixes: rail-sized record strip, mobile time-machine grid, header date on phones */
-.record-strip { grid-template-columns: 1fr 1fr; justify-content: stretch; }
 .record-strip .mkt-tile { padding-right: 12px; }
 @media (max-width: 560px) {
   .tm-outcome { grid-template-columns: 1fr; }
@@ -1514,7 +1509,7 @@ a:hover { text-decoration: underline; }
 
 .mkt-table tr.mkt-row:hover td { background: rgba(255, 255, 255, 0.035); }
 .watch-row:hover, .heat-tile:hover { background: rgba(255, 255, 255, 0.05); }
-.news-item { padding: 8px 10px; margin: 0 -10px; border-radius: 8px; }
+.news-item { padding: 8px 10px; margin: 0 -10px; border-radius: 3px; }
 .news-item:hover { background: rgba(255, 255, 255, 0.03); }
 .front .card h2 { border-bottom: 1px solid var(--hairline); }
 .front { padding-top: 8px; }
@@ -1566,7 +1561,7 @@ a:hover { text-decoration: underline; }
   width: min(500px, calc(100vw - 32px));
   background: var(--surface);
   border: 1px solid var(--baseline);
-  border-radius: 8px;
+  border-radius: 3px;
   padding: 16px 18px 12px;
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
 }
@@ -1656,3 +1651,5 @@ a:hover { text-decoration: underline; }
 .two-col { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
 input.pick-note { max-width: none; }
 .news-list { max-width: 1020px; }
+
+.mkt-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
