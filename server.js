@@ -539,7 +539,7 @@ const parseTickers = (s, max) => [...new Set(String(s ?? "").toUpperCase().split
 app.get("/api/feed", async (req, res) => {
   try {
     const tab = ["top", "markets", "world", "you", "briefing", "filings"].includes(req.query.tab) ? req.query.tab : "top";
-    const limit = Math.min(40, Math.max(5, Number(req.query.limit) || 10));
+    const limit = Math.min(120, Math.max(5, Number(req.query.limit) || 10));
     const tickers = parseTickers(req.query.t, 6);
     const key = `${tab}|${limit}|${tickers.join(",")}`;
     const hit = feedCache.get(key);
