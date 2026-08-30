@@ -2147,18 +2147,20 @@ function renderToday() {
     <span class="today-date">${esc(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</span>
     <span class="today-mkt ${st}"><i></i>Market ${st}</span>
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
-    <button type="button" id="refreshBtn" class="today-daily" title="Re-fetch prices and news right now">${refreshing ? "Refreshing…" : "Refresh"}</button>
     ${s.current > 1 ? `<span class="today-upd">${s.current}-day streak${s.best > s.current ? ` · best ${s.best}` : ""}</span>` : ""}
     <button type="button" id="tourBtn" class="today-daily${readJSON("cc_tour_done", false) ? "" : " pulse"}">New here? Tour the site</button>
     <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
-setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
+setInterval(() => {
+  $("refreshFab").hidden = el.intro.hidden;
+  if (!el.intro.hidden) renderToday();
+}, 5000);
 
 let refreshing = false;
 async function refreshNow() {
   if (refreshing) return;
   refreshing = true;
-  renderToday();
+  $("refreshFab").classList.add("spinning");
   try {
     const res = await fetch("/api/market?fresh=1");
     if (res.ok) renderMarket(await res.json());
@@ -2166,14 +2168,12 @@ async function refreshNow() {
   await Promise.allSettled([loadWatchQuotes(true), loadPfQuotes(true), checkAlerts()]);
   if (feedTab) loadFeed(feedTab, feedLimit || 96);
   refreshing = false;
+  $("refreshFab").classList.remove("spinning");
   renderToday();
 }
+$("refreshFab").addEventListener("click", refreshNow);
 
 $("todayBar").addEventListener("click", (e) => {
-  if (e.target.closest?.("#refreshBtn")) {
-    refreshNow();
-    return;
-  }
   if (e.target.closest?.("#tourBtn")) {
     tourStart();
     return;

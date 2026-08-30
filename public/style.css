@@ -1593,3 +1593,27 @@ a:hover { text-decoration: underline; }
   50% { box-shadow: 0 0 0 7px rgba(79, 134, 198, 0); }
 }
 .today-daily.pulse { border-color: var(--accent); color: var(--accent); animation: tourpulse 2.2s infinite; }
+
+/* ---- floating refresh button ---- */
+.refresh-fab {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 400;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  color: var(--ink-2);
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.refresh-fab:hover { border-color: var(--accent); color: var(--accent); }
+.refresh-fab.spinning { color: var(--accent); animation: fabspin 0.9s linear infinite; }
+@keyframes fabspin { to { transform: rotate(360deg); } }
