@@ -18,7 +18,7 @@ import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
 import { marketNews, feedNews } from "./lib/news.js";
 import { searchCompanies, getRecentFilings } from "./lib/edgar.js";
-import { getMacro, getWorld, getSectors, nextEvents } from "./lib/macro.js";
+import { getMacro, getWorld, getSectors, getCrypto, nextEvents } from "./lib/macro.js";
 import { getEconomy } from "./lib/fred.js";
 import { getEarningsCalendarRange, getIpoCalendarRange, getInsiderTransactions } from "./lib/finnhub.js";
 
@@ -423,7 +423,7 @@ async function buildMarket() {
     };
     const sparkSyms = INDICES.map(([s]) => s);
     startInsiderSweep();
-    const [indices, news, sparkPairs, macro, earningsWeek, world, economy, ipo, sectors] = await Promise.all([
+    const [indices, news, sparkPairs, macro, earningsWeek, world, economy, ipo, sectors, crypto] = await Promise.all([
       apiKey ? Promise.all(INDICES.map(quoteRow)) : [],
       marketNews(apiKey).catch(() => []),
       hasTiingoKey() ? Promise.all(sparkSyms.map(async (s) => [s, await sparkSeries(s)])) : [],
@@ -433,6 +433,7 @@ async function buildMarket() {
       getEconomy().catch(() => []),
       apiKey ? getIpoWeeks(apiKey).catch(() => []) : [],
       getSectors().catch(() => []),
+      getCrypto().catch(() => []),
     ]);
     const sparks = {};
     for (const [s, v] of sparkPairs) if (v) sparks[s] = v;
@@ -451,6 +452,7 @@ async function buildMarket() {
       economy,
       ipo,
       sectors,
+      crypto,
       insiders: insiderCache && insiderCache.complete ? { rows: insiderCache.rows } : null,
     };
     marketCache = { at: Date.now(), payload };
@@ -607,17 +609,35 @@ app.get("/api/spybench", async (req, res) => {
   }
 });
 
+// Trailing-12-month dividends per share, for the portfolio's income line.
+// One metrics call per ticker, cached 24 hours — dividends change quarterly,
+// not intraday. TTM is a fact (what was actually paid), never a forecast.
+const dpsCache = new Map();
+async function getDpsTTM(t, apiKey) {
+  const hit = dpsCache.get(t);
+  if (hit && Date.now() - hit.at < 24 * 3_600_000) return hit.dps;
+  const m = await getMetrics(t, apiKey);
+  const v = m?.metric?.dividendPerShareTTM;
+  const dps = typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+  dpsCache.set(t, { at: Date.now(), dps });
+  if (dpsCache.size > 100) dpsCache.delete(dpsCache.keys().next().value);
+  return dps;
+}
+
 // Watchlist quotes: a handful of tickers through the shared 2-minute cache.
+// div=1 (the portfolio card) additionally returns trailing dividends/share.
 app.get("/api/quotes", async (req, res) => {
   const apiKey = process.env.FINNHUB_API_KEY;
   const list = parseTickers(req.query.t, 12);
   if (!apiKey || !list.length) return res.json({ quotes: {} });
+  const wantDiv = req.query.div === "1";
   const quotes = {};
   await Promise.all(list.map(async (t) => {
     try {
       const q = await getQuoteCached(t, apiKey);
       if (!q?.c) return;
       quotes[t] = { price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
+      if (wantDiv) quotes[t].dps = await getDpsTTM(t, apiKey).catch(() => 0);
       if (hasTiingoKey()) {
         const s = await sparkSeries(t);
         if (s) quotes[t].spark = s;

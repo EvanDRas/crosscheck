@@ -1523,3 +1523,10 @@ a:hover { text-decoration: underline; }
 .econ-sub { font-size: 11.5px; color: var(--muted); }
 .econ-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; white-space: nowrap; }
 .econ-val.neg { color: var(--red, #e05c5c); }
+
+/* ---- price alerts ---- */
+.alert-add select { background: var(--surface); border: 1px solid var(--baseline); border-radius: 3px; color: var(--ink); padding: 5px 6px; font-size: 12.5px; }
+.alert-add input[name="price"] { width: 80px; }
+.cal-row.alert-hit .cal-name { color: var(--ink); font-weight: 600; }
+.badge.pos { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+.badge.neg { background: rgba(248, 113, 113, 0.12); color: var(--critical); }

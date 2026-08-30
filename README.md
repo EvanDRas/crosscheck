@@ -113,6 +113,10 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   bought — insiders sell for many reasons, but they only buy for one.
 - **IPO calendar** and an **SEC filings feed** for the stocks you follow —
   8-Ks straight from EDGAR, often before the news story about them.
+- **Price alerts** (honest about their one limit: checked while the app is
+  open — a local tool can't fire when it's closed), a **crypto strip**
+  (change window stated exactly), and a portfolio **dividend line** that
+  reports what was actually paid over the last 12 months, never a forecast.
 - **A real front page**: newspaper hierarchy — a hero lead story, a today
   bar (market open/closed, live "updated Xs ago", your visit streak), and
   three columns: your watchlist, the news feed, and the game/record rail.

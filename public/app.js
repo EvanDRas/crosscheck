@@ -1493,6 +1493,7 @@ function renderMarket(m) {
   renderIpo(m.ipo ?? []);
   renderSectors(m.sectors ?? []);
   renderInsiderRadar(m.insiders ?? null);
+  renderCrypto(m.crypto ?? []);
   renderNewsCard();
   renderWatch(); // verdict pills need screenData, which just arrived
   if (moversData) renderHeat(); // so do the heat-tile dots
@@ -1709,7 +1710,7 @@ async function loadPfQuotes() {
     return;
   }
   try {
-    const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.join(","))}`);
+    const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.join(","))}&div=1`);
     if (res.ok) pfQuotes = (await res.json()).quotes ?? {};
   } catch {
     /* rows show dashes */
@@ -1748,7 +1749,7 @@ function renderPortfolio() {
       ${form}`;
     return;
   }
-  let value = 0, costTot = 0, dayChg = 0, quoted = 0;
+  let value = 0, costTot = 0, dayChg = 0, quoted = 0, income = 0;
   let spyVal = 0, spyCost = 0, datedVal = 0;
   const rows = lots.map((l, i) => {
     const q = pfQuotes[l.t];
@@ -1758,6 +1759,7 @@ function renderPortfolio() {
       quoted++;
       value += l.sh * q.price;
       costTot += cost;
+      if (isNum(q.dps) && q.dps > 0) income += l.sh * q.dps;
       if (isNum(q.change)) dayChg += l.sh * q.change;
       plPct = ((q.price - l.cost) / l.cost) * 100;
       const f = l.date != null ? pfBench[l.date] : null;
@@ -1789,6 +1791,9 @@ function renderPortfolio() {
           you're ${diff >= 0 ? "ahead" : "behind"} by ${esc(fmtUsd(Math.abs(diff)))} on the dated lots.</div>`;
       })()
     : `<div class="pf-total-sub">Add buy dates to unlock the vs-S&amp;P comparison.</div>`;
+  const incomeLine = income > 0
+    ? `<div class="pf-total-sub">Dividends: these positions paid ${esc(fmtUsd(income))} over the last 12 months — a record of what happened, not a promise of what's next.</div>`
+    : "";
   card.innerHTML = `
     <h2>Your portfolio</h2>
     <div class="pf-list">${rows}</div>
@@ -1796,7 +1801,7 @@ function renderPortfolio() {
       <span>${esc(fmtUsd(value))}</span>
       ${plPctTot != null ? `<span class="badge ${chgCls(plPctTot)}">${esc(fmtUsd(pl))} (${esc(fmtPct(plPctTot, true))})</span>` : ""}
       ${isNum(dayChg) && dayChg !== 0 ? `<span class="pf-day ${dayChg >= 0 ? "pos" : "neg"}">${esc(fmtUsd(dayChg))} today</span>` : ""}
-    </div>${spyLine}` : hasKey ? `<div class="pf-total-sub">Loading prices…</div>` : `<div class="pf-total-sub">Add a free Finnhub key (top of the page on first run) for live prices.</div>`}
+    </div>${spyLine}${incomeLine}` : hasKey ? `<div class="pf-total-sub">Loading prices…</div>` : `<div class="pf-total-sub">Add a free Finnhub key (top of the page on first run) for live prices.</div>`}
     ${form}
     <p class="pf-privacy">Private: positions live in this browser only and are never uploaded.</p>`;
 }
@@ -1828,6 +1833,115 @@ $("portfolioCard").addEventListener("click", (e) => {
   if (t) {
     el.dateInput.value = "";
     go(t);
+  }
+});
+
+function renderCrypto(rows) {
+  const card = $("cryptoCard");
+  if (!rows.length) {
+    card.hidden = true;
+    return;
+  }
+  card.innerHTML = `
+    <h2>Crypto</h2>
+    <p class="sub">Trades around the clock. Change is measured from the prior daily close (midnight UTC) — the way the data source actually rolls its days, not a rolling 24h figure.</p>
+    ${rows.map((r) => `
+      <div class="cal-row" title="${esc(r.hint ?? "")}">
+        <span class="cal-name">${esc(r.label)}</span>
+        <span class="cal-in">$${esc(r.value >= 100 ? fmtNum(r.value, 0) : fmtNum(r.value, 2))}
+          ${isNum(r.chgPct) ? `<span class="badge ${chgCls(r.chgPct)}">${esc(fmtPct(r.chgPct, true))}</span>` : ""}</span>
+      </div>`).join("")}`;
+  card.hidden = false;
+}
+
+// ---------- price alerts: honest about their one limit ----------
+// Alerts live in this browser and are checked against the same 2-minute
+// quote polls the page already makes — which means they only fire while
+// Crosscheck is open. That limit is printed on the card, not hidden.
+
+const ALERT_KEY = "cc_alerts";
+const readAlerts = () => readJSON(ALERT_KEY, []).filter((a) =>
+  a && typeof a.t === "string" && (a.dir === "above" || a.dir === "below") && isNum(a.price) && a.price > 0).slice(0, 20);
+let alertQuotes = {};
+const alertNotified = new Set();
+
+async function checkAlerts() {
+  const alerts = readAlerts();
+  const ts = [...new Set(alerts.map((a) => a.t))].slice(0, 12);
+  if (!ts.length || !hasKey) {
+    renderAlerts();
+    return;
+  }
+  try {
+    const res = await fetch(`/api/quotes?t=${encodeURIComponent(ts.join(","))}`);
+    if (res.ok) alertQuotes = (await res.json()).quotes ?? {};
+  } catch {
+    /* keep last quotes */
+  }
+  for (const a of alerts) {
+    const q = alertQuotes[a.t];
+    if (!q) continue;
+    const hit = a.dir === "above" ? q.price >= a.price : q.price <= a.price;
+    const id = `${a.t}|${a.dir}|${a.price}`;
+    if (hit && !alertNotified.has(id)) {
+      alertNotified.add(id);
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        try {
+          new Notification(`${a.t} is ${a.dir} $${a.price}`, { body: `Now ${fmtPrice(q.price)} — Crosscheck price alert` });
+        } catch { /* notifications unavailable */ }
+      }
+    }
+  }
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const card = $("alertCard");
+  const alerts = readAlerts();
+  const form = `
+    <form class="pf-add alert-add" autocomplete="off">
+      <input name="t" type="text" maxlength="10" spellcheck="false" placeholder="Ticker" aria-label="Ticker" />
+      <select name="dir" aria-label="Direction"><option value="above">goes above</option><option value="below">drops below</option></select>
+      <input name="price" type="number" min="0" step="any" placeholder="$" aria-label="Price" />
+      <button type="submit">Set</button>
+    </form>`;
+  card.innerHTML = `
+    <h2>Price alerts</h2>
+    <p class="sub">Checked every two minutes <b>while Crosscheck is open</b> — this app runs on your PC, so nothing can fire when it's closed. That's the honest limit of a private, local tool.</p>
+    ${alerts.length ? alerts.map((a, i) => {
+      const q = alertQuotes[a.t];
+      const hit = q ? (a.dir === "above" ? q.price >= a.price : q.price <= a.price) : false;
+      return `<div class="cal-row${hit ? " alert-hit" : ""}">
+        <span class="cal-name"><span class="mkt-sym">${esc(a.t)}</span> ${a.dir === "above" ? "above" : "below"} ${esc(fmtPrice(a.price))}</span>
+        <span class="cal-in">${hit ? `<span class="badge ${a.dir === "above" ? "pos" : "neg"}">CROSSED · now ${q ? esc(fmtPrice(q.price)) : ""}</span>` : q ? `now ${esc(fmtPrice(q.price))}` : "…"}
+          <button type="button" class="pf-rm" data-rmalert="${i}" title="Remove alert">×</button></span>
+      </div>`;
+    }).join("") : `<p class="watch-empty">Set a level and the card lights up when it crosses — with a desktop notification if you allow them.</p>`}
+    ${form}`;
+}
+
+$("alertCard").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const t = String(f.elements.t?.value ?? "").trim().toUpperCase();
+  const dir = f.elements.dir?.value === "below" ? "below" : "above";
+  const price = Number(f.elements.price?.value);
+  if (!/^[A-Z][A-Z.]{0,9}$/.test(t) || t === "DEMO" || !(price > 0)) return;
+  writeJSON(ALERT_KEY, [...readAlerts(), { t, dir, price }]);
+  if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
+  f.reset();
+  checkAlerts();
+});
+
+$("alertCard").addEventListener("click", (e) => {
+  const rm = e.target.closest?.("[data-rmalert]")?.dataset?.rmalert;
+  if (rm != null) {
+    const alerts = readAlerts();
+    alerts.splice(Number(rm), 1);
+    writeJSON(ALERT_KEY, alerts);
+    renderAlerts();
   }
 });
 
@@ -2483,6 +2597,7 @@ async function loadMarket() {
   loadWatchQuotes();
   renderPortfolio();
   loadPfQuotes();
+  checkAlerts();
   // Following-first: when the reader follows stocks, the feed opens on
   // THEIR stocks' news — the market firehose is one tab away.
   if (!feedInitialized) {
