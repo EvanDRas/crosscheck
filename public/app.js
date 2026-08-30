@@ -2146,11 +2146,16 @@ function renderToday() {
     <span class="today-mkt ${st}"><i></i>Market ${st}</span>
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
     ${s.current > 1 ? `<span class="today-upd">${s.current}-day streak${s.best > s.current ? ` · best ${s.best}` : ""}</span>` : ""}
+    <button type="button" id="tourBtn" class="today-daily${readJSON("cc_tour_done", false) ? "" : " pulse"}">New here? Tour the site</button>
     <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
 setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
 
 $("todayBar").addEventListener("click", (e) => {
+  if (e.target.closest?.("#tourBtn")) {
+    tourStart();
+    return;
+  }
   const target = e.target.closest?.("[data-scroll]")?.dataset?.scroll;
   if (target) document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
 });
@@ -2858,3 +2863,92 @@ else {
   el.input.focus();
   loadMarket();
 }
+
+// ---------- guided tour: for the confused or overwhelmed ----------
+// Vanilla spotlight walk-through. Each step highlights one card and
+// explains it in plain English; steps whose card is hidden (keyless
+// installs) are skipped automatically. Honest voice throughout.
+
+const TOUR_STEPS = [
+  { el: "#searchForm", title: "Start anywhere", text: `Type any ticker or company name and hit <b>Analyze</b> — score, evidence, filings, peers, and news on one page. No API key yet? Type <b>DEMO</b>.` },
+  { el: "#tmToggle", title: "The no-hindsight time machine", text: `Pick a past date and see exactly what the formula would have said <i>then</i>, using only what was filed and priced by that day.` },
+  { el: "#portfolioCard", title: "Your money, honestly measured", text: `Add what you own (buy dates included) and get the comparison most brokers skip: <b>would the same money in the S&amp;P have done better?</b> It never leaves this browser.` },
+  { el: "#watchCard", title: "Follow what you care about", text: `Followed stocks live here with price and verdict — and the news desk's <b>For you</b> tab shows only their stories.` },
+  { el: "#marketNews", title: "The news desk", text: `<b>Briefing</b> ranks today's market-wide stories by likely impact. <b>Filings</b> shows what your companies legally told the SEC — often before the news writes it up. Flip pages with Newer / Older.` },
+  { el: "#recordCard", title: "The forward test", text: `The formula's live, unfixable track record: every call frozen the day it's made, then graded against the S&amp;P. A sell only counts as right when the stock <i>trails</i> the market.` },
+  { el: "#economyCard", title: "The backdrop", text: `Inflation, jobs, the Fed's rate, and the classic recession gauge — pulled straight from the Fed's own public data, not from anyone's opinion.` },
+  { el: "#alertCard", title: "Price alerts", text: `Set a level and the card lights up when it crosses — while the app is open. A tool that runs on your own PC can't watch while it's closed, and it tells you so.` },
+  { el: "#screenCard", title: "The frozen 50", text: `Fifty household-name stocks across all 11 sectors, locked in before the forward test began so the record can never be cherry-picked. Everyone who downloads Crosscheck sees the same 50.` },
+  { el: null, title: "The honest part", text: `This site backtested its own formula and published the result: <b>no predictive edge</b>. That's the point — Crosscheck teaches you to read the numbers with the mistakes left in. The <a href="/evidence.html">Evidence</a> and <a href="/learn.html">Learn</a> pages go deeper. Nothing here is financial advice.` },
+];
+
+let tourEls = null;
+let tourList = [];
+let tourAt = 0;
+
+function tourEnd() {
+  document.querySelectorAll(".tour-hi").forEach((n) => n.classList.remove("tour-hi"));
+  document.querySelector(".topbar")?.classList.remove("tour-hi-root");
+  tourEls?.backdrop.remove();
+  tourEls?.panel.remove();
+  tourEls = null;
+  writeJSON("cc_tour_done", true);
+  if (!el.intro.hidden) renderToday();
+}
+
+function tourShow() {
+  const step = tourList[tourAt];
+  document.querySelectorAll(".tour-hi").forEach((n) => n.classList.remove("tour-hi"));
+  document.querySelector(".topbar")?.classList.remove("tour-hi-root");
+  const target = step.el ? document.querySelector(step.el) : null;
+  if (target) {
+    target.classList.add("tour-hi");
+    if (target.closest(".topbar")) target.closest(".topbar").classList.add("tour-hi-root");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  tourEls.panel.innerHTML = `
+    <div class="tour-title">${esc(step.title)}</div>
+    <p class="tour-text">${step.text}</p>
+    <div class="tour-nav">
+      <span class="tour-count">${tourAt + 1} of ${tourList.length}</span>
+      <span class="tour-btns">
+        ${tourAt > 0 ? `<button type="button" data-tour="back">Back</button>` : ""}
+        <button type="button" data-tour="next" class="tour-next">${tourAt === tourList.length - 1 ? "Done" : "Next"}</button>
+        <button type="button" data-tour="exit" title="Exit the tour">×</button>
+      </span>
+    </div>`;
+}
+
+function tourStart() {
+  tourList = TOUR_STEPS.filter((st) => !st.el || (document.querySelector(st.el) && !document.querySelector(st.el).hidden));
+  if (!tourList.length) return;
+  tourAt = 0;
+  if (!tourEls) {
+    const backdrop = document.createElement("div");
+    backdrop.className = "tour-backdrop";
+    const panel = document.createElement("div");
+    panel.className = "tour-panel";
+    document.body.append(backdrop, panel);
+    backdrop.addEventListener("click", tourEnd);
+    panel.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-tour]")?.dataset?.tour;
+      if (a === "exit") tourEnd();
+      else if (a === "back" && tourAt > 0) { tourAt--; tourShow(); }
+      else if (a === "next") {
+        if (tourAt >= tourList.length - 1) tourEnd();
+        else { tourAt++; tourShow(); }
+      }
+    });
+    tourEls = { backdrop, panel };
+  }
+  tourShow();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (!tourEls) return;
+  if (e.key === "Escape") tourEnd();
+  else if (e.key === "ArrowRight" && tourAt < tourList.length - 1) { tourAt++; tourShow(); }
+  else if (e.key === "ArrowLeft" && tourAt > 0) { tourAt--; tourShow(); }
+});

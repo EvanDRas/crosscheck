@@ -1554,3 +1554,42 @@ a:hover { text-decoration: underline; }
 .cal-row.alert-hit .cal-name { color: var(--ink); font-weight: 600; }
 .badge.pos { background: rgba(74, 222, 128, 0.12); color: var(--good); }
 .badge.neg { background: rgba(248, 113, 113, 0.12); color: var(--critical); }
+
+/* ---- guided tour ---- */
+.tour-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); z-index: 900; }
+.tour-hi { position: relative; z-index: 901; outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.topbar.tour-hi-root { z-index: 901; }
+.tour-panel {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 24px;
+  z-index: 902;
+  width: min(500px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 8px;
+  padding: 16px 18px 12px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+}
+.tour-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+.tour-text { color: var(--ink-2); font-size: 13px; line-height: 1.55; margin: 0 0 12px; }
+.tour-nav { display: flex; align-items: center; justify-content: space-between; }
+.tour-count { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.tour-btns { display: flex; gap: 8px; }
+.tour-btns button {
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 3px;
+  color: var(--ink-2);
+  padding: 5px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.tour-btns button:hover { border-color: var(--accent); color: var(--ink); }
+.tour-btns .tour-next { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+@keyframes tourpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 134, 198, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(79, 134, 198, 0); }
+}
+.today-daily.pulse { border-color: var(--accent); color: var(--accent); animation: tourpulse 2.2s infinite; }
