@@ -1958,6 +1958,8 @@ $("earningsWeekCard").addEventListener("click", (e) => {
 let feedTab = "top";
 let feedItems = [];
 let feedLimit = 10;
+let feedPage = 0;
+const FEED_PAGE_SIZE = 12;
 let feedLoading = false;
 let feedInitialized = false;
 // (No "Top" tab: it was the old mixed feed, and nobody could say how it
@@ -1971,6 +1973,7 @@ const youTickers = () => readWatch().slice(0, 6);
 async function loadFeed(tab, limit = 10) {
   feedTab = tab;
   feedLimit = limit;
+  feedPage = 0;
   const t = tab === "you" || tab === "filings" ? youTickers() : [];
   if ((tab === "you" || tab === "filings") && !t.length) {
     feedItems = [];
@@ -2051,6 +2054,9 @@ function renderNewsCard() {
         <div class="news-meta">${impactBadge(n)}${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}${(n.covered ?? 1) >= 2 ? ` · ${n.covered} outlets` : ""}${tagsFor(n).length ? ` <span class="news-tags">${tagsFor(n).map(tagChip).join("")}</span>` : ""}</div>
       </div>
     </li>`;
+  const pages = Math.max(1, Math.ceil(list.length / FEED_PAGE_SIZE));
+  if (feedPage > pages - 1) feedPage = pages - 1;
+  const pageList = list.slice(feedPage * FEED_PAGE_SIZE, (feedPage + 1) * FEED_PAGE_SIZE);
   const empty = (feedTab === "you" || feedTab === "filings") && !youTickers().length
     ? (feedTab === "filings"
       ? `<p class="feed-empty">Follow stocks in the <b>Following</b> card to see their SEC filings here — an 8-K often lands before the news story about it.</p>`
@@ -2062,18 +2068,27 @@ function renderNewsCard() {
     ${feedTab === "filings" ? `<p class="sub">What your followed companies legally told the market, straight from SEC EDGAR — filings are the primary source the news is written from.</p>` : ""}
     ${trending.length ? `<div class="news-trending"><span class="mkt-label">Trending</span>${trending.map(tagChip).join("")}</div>` : ""}
     ${empty}
-    <ul class="news-list${feedLoading ? " loading" : ""}">${list.map(item).join("")}</ul>
-    ${list.length && !((feedTab === "you" || feedTab === "filings") && !youTickers().length) ? `<button type="button" class="load-more" data-more="1">${feedLoading ? "Loading…" : "More stories"}</button>` : ""}`;
+    <ul class="news-list${feedLoading ? " loading" : ""}">${pageList.map(item).join("")}</ul>
+    ${pages > 1 ? `<div class="news-pager">
+      <button type="button" data-pg="prev" ${feedPage === 0 ? "disabled" : ""}>&#8249; Newer</button>
+      <span>Page ${feedPage + 1} of ${pages}</span>
+      <button type="button" data-pg="next" ${feedPage >= pages - 1 ? "disabled" : ""}>Older &#8250;</button>
+    </div>` : ""}`;
   newsEl.hidden = false;
 }
 
 $("marketNews").addEventListener("click", (e) => {
   const tab = e.target.closest?.("[data-tab]")?.dataset?.tab;
   if (tab) {
-    loadFeed(tab, 18);
+    loadFeed(tab, 36);
     return;
   }
-  if (e.target.closest?.("[data-more]")) loadFeed(feedTab, Math.min(40, feedLimit + 15));
+  const pg = e.target.closest?.("[data-pg]")?.dataset?.pg;
+  if (pg) {
+    feedPage += pg === "next" ? 1 : -1;
+    renderNewsCard();
+    document.getElementById("marketNews").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 });
 
 // ---------- today bar: the daily ritual ----------
@@ -2151,7 +2166,7 @@ function toggleWatch(t) {
   writeJSON(WATCH_KEY, w.includes(t) ? w.filter((x) => x !== t) : [t, ...w].slice(0, 12));
   refreshStars();
   loadWatchQuotes();
-  if (feedTab === "you") loadFeed("you", 18);
+  if (feedTab === "you") loadFeed("you", 36);
 }
 
 const starBtn = (t) => {
@@ -2604,7 +2619,7 @@ async function loadMarket() {
     feedInitialized = true;
     // Following-first when you follow stocks; otherwise open on the
     // Briefing — the skim of what actually matters today.
-    loadFeed(readWatch().length ? "you" : "briefing", 18);
+    loadFeed(readWatch().length ? "you" : "briefing", 36);
   }
   const grab = async (url, render) => {
     try {
