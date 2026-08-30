@@ -2894,7 +2894,8 @@ $("setupSaveBtn").addEventListener("click", async () => {
   errEl.hidden = true;
   const btn = $("setupSaveBtn");
   btn.disabled = true;
-  btn.textContent = "Validating with Finnhub…";
+  const tiingoOnly = !$("setupFinnhub").value.trim() && $("setupTiingo").value.trim();
+  btn.textContent = tiingoOnly ? "Saving Tiingo key…" : "Validating with Finnhub…";
   try {
     const res = await fetch("/api/setup", {
       method: "POST",
@@ -2907,11 +2908,11 @@ $("setupSaveBtn").addEventListener("click", async () => {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? "Setup failed.");
-    btn.textContent = "✓ Saved — you're live";
+    btn.textContent = body.tiingoOnly ? "✓ Saved — Time Machine unlocked" : "✓ Saved — you're live";
     // Reload so every key-gated surface (indices, movers, heat map,
-    // moments) comes alive at once — without this the page looked dead for
-    // up to two minutes after a successful setup.
-    setTimeout(() => location.reload(), 900);
+    // moments) comes alive at once. Strip any ?setup=1 so the card doesn't
+    // reopen empty over a completed save.
+    setTimeout(() => { location.href = location.pathname; }, 1100);
   } catch (err) {
     errEl.textContent = err.message;
     errEl.hidden = false;
