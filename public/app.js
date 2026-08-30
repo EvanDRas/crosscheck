@@ -1178,6 +1178,7 @@ function render(d) {
 
   // Unhide before rendering: the chart measures its container's width.
   el.results.hidden = false;
+  $("refreshFab").hidden = false;
   renderChanges(d);
   renderCompany(d);
   renderHistory(d);
@@ -2152,24 +2153,23 @@ function renderToday() {
     <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
 setInterval(() => {
-  $("refreshFab").hidden = el.intro.hidden;
+  $("refreshFab").hidden = el.results.hidden;
   if (!el.intro.hidden) renderToday();
 }, 5000);
 
 let refreshing = false;
 async function refreshNow() {
-  if (refreshing) return;
+  // Only meaningful on a ticker view — the front page refreshes itself.
+  const t = decodeURIComponent(location.hash.slice(1));
+  if (refreshing || !t || el.results.hidden) return;
   refreshing = true;
   $("refreshFab").classList.add("spinning");
   try {
-    const res = await fetch("/api/market?fresh=1");
-    if (res.ok) renderMarket(await res.json());
-  } catch { /* keep what's showing */ }
-  await Promise.allSettled([loadWatchQuotes(true), loadPfQuotes(true), checkAlerts()]);
-  if (feedTab) loadFeed(feedTab, feedLimit || 96);
-  refreshing = false;
-  $("refreshFab").classList.remove("spinning");
-  renderToday();
+    await analyze(t);
+  } finally {
+    refreshing = false;
+    $("refreshFab").classList.remove("spinning");
+  }
 }
 $("refreshFab").addEventListener("click", refreshNow);
 
