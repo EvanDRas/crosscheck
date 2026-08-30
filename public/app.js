@@ -2332,6 +2332,9 @@ function renderScreen() {
     <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData[0].date)})${screenSource === "official" ? " · the official forward test, published by the project" : ""} ·
       every call graded on the <a href="/ledger.html">track record</a> · not advice — the formula's own
       <a href="/evidence.html">backtests</a> showed no predictive edge.</p>
+    <p class="sub">Why these 50: household-name US large caps spanning all 11 sectors in rough S&amp;P proportion,
+      <b>frozen before the forward test began</b> — a fixed list can't be quietly rewritten to hide losers,
+      and 50 is what a free data plan can re-score every day.</p>
     <div class="screen-filters">
       ${["ALL", "BUY", "HOLD", "SELL"].map((g) =>
         `<button type="button" data-f="${g}" class="${screenFilter === g ? "active" : ""}">${SCREEN_LABELS[g]} · ${counts[g]}</button>`).join("")}
@@ -2403,6 +2406,7 @@ function renderHeat() {
   const avg = (list) => list.reduce((s, r) => s + r.changePercent, 0) / list.length;
   card.innerHTML = `
     <h2>Sector heat map</h2>
+    <p class="sub">The same fixed 50-stock universe as the verdict screen, colored by today's move.</p>
     <div class="breadth" title="Advancing vs declining across the universe">
       <div class="breadth-bar">
         <span class="breadth-adv" style="width:${((adv / rows.length) * 100).toFixed(1)}%"></span>
