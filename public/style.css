@@ -1594,26 +1594,19 @@ a:hover { text-decoration: underline; }
 }
 .today-daily.pulse { border-color: var(--accent); color: var(--accent); animation: tourpulse 2.2s infinite; }
 
-/* ---- floating refresh button ---- */
-.refresh-fab {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 400;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--baseline);
-  color: var(--ink-2);
-  font-size: 21px;
+
+/* ---- inline quote refresh ---- */
+.q-refresh {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
   line-height: 1;
+  padding: 0 2px;
+  margin-left: 4px;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  vertical-align: -1px;
 }
-.refresh-fab:hover { border-color: var(--accent); color: var(--accent); }
-.refresh-fab.spinning { color: var(--accent); animation: fabspin 0.9s linear infinite; }
-@keyframes fabspin { to { transform: rotate(360deg); } }
+.q-refresh:hover { color: var(--accent); }
+.q-refresh.spinning { display: inline-block; color: var(--accent); animation: qspin 0.9s linear infinite; }
+@keyframes qspin { to { transform: rotate(360deg); } }

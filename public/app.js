@@ -166,7 +166,8 @@ function renderCompany(d) {
     priceHtml = `
       <div class="price-now">${fmtMoney(q.price, currency)}</div>
       <div class="price-delta ${dir}">${esc(delta)} ${dayLabel}</div>
-      <div class="price-sub">Prev close ${fmtMoney(q.previousClose, currency) ?? "N/A"} · as of ${new Date(d.asOf).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>`;
+      <div class="price-sub">Prev close ${fmtMoney(q.previousClose, currency) ?? "N/A"} · as of ${new Date(d.asOf).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+        <button type="button" id="qRefresh" class="q-refresh" title="Refresh — re-pull this stock, price and all">&#8635;</button></div>`;
   }
 
   el.company.innerHTML = `
@@ -1178,7 +1179,6 @@ function render(d) {
 
   // Unhide before rendering: the chart measures its container's width.
   el.results.hidden = false;
-  $("refreshFab").hidden = false;
   renderChanges(d);
   renderCompany(d);
   renderHistory(d);
@@ -2152,10 +2152,7 @@ function renderToday() {
     <button type="button" id="tourBtn" class="today-daily${readJSON("cc_tour_done", false) ? "" : " pulse"}">New here? Tour the site</button>
     <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
-setInterval(() => {
-  $("refreshFab").hidden = el.results.hidden;
-  if (!el.intro.hidden) renderToday();
-}, 5000);
+setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
 
 let refreshing = false;
 async function refreshNow() {
@@ -2163,15 +2160,17 @@ async function refreshNow() {
   const t = decodeURIComponent(location.hash.slice(1));
   if (refreshing || !t || el.results.hidden) return;
   refreshing = true;
-  $("refreshFab").classList.add("spinning");
+  document.getElementById("qRefresh")?.classList.add("spinning");
   try {
-    await analyze(t);
+    await analyze(t); // re-renders the card; the button comes back at rest
   } finally {
     refreshing = false;
-    $("refreshFab").classList.remove("spinning");
+    document.getElementById("qRefresh")?.classList.remove("spinning");
   }
 }
-$("refreshFab").addEventListener("click", refreshNow);
+$("companyCard").addEventListener("click", (e) => {
+  if (e.target.closest?.("#qRefresh")) refreshNow();
+});
 
 $("todayBar").addEventListener("click", (e) => {
   if (e.target.closest?.("#tourBtn")) {
