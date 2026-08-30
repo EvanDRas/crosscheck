@@ -57,7 +57,7 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--hairline);
 }
 .topbar-inner {
-  max-width: 1060px;
+  max-width: 1760px;
   margin: 0 auto;
   padding: 9px 16px;
   display: flex;
@@ -66,23 +66,15 @@ a:hover { text-decoration: underline; }
   flex-wrap: wrap;
 }
 .brand {
-  font-weight: 800;
-  font-size: 14.5px;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: 0.3px;
   color: var(--ink);
   white-space: nowrap;
+  line-height: 1;
 }
-.brand::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
-  background: var(--accent);
-  vertical-align: 1px;
-}
-.brand:hover { text-decoration: none; }
+.brand:hover { text-decoration: none; color: var(--ink); }
 
 .topnav { display: flex; gap: 18px; margin-left: auto; }
 .topnav a { color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
@@ -174,7 +166,7 @@ a:hover { text-decoration: underline; }
 /* ---------- layout ---------- */
 
 #main {
-  max-width: 1060px;
+  max-width: 1760px;
   margin: 0 auto;
   padding: 14px 16px 40px;
 }
@@ -913,7 +905,7 @@ a:hover { text-decoration: underline; }
 /* ---------- footer ---------- */
 
 .disclaimer {
-  max-width: 1060px;
+  max-width: 1760px;
   margin: 0 auto;
   padding: 16px 16px 32px;
   border-top: 1px solid var(--baseline);
@@ -1269,7 +1261,7 @@ a:hover { text-decoration: underline; }
 
 .front-cols {
   display: grid;
-  grid-template-columns: 1fr 1.7fr 1fr;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr) minmax(280px, 380px);
   gap: 16px;
   margin-bottom: 16px;
 }
