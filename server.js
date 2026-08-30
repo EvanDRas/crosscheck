@@ -1017,15 +1017,26 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
   const quotes = {};
   let spyNow = null;
   if (apiKey && (toQuote.length || !spySeries)) {
-    const settled = await Promise.allSettled([
-      getQuoteCached("SPY", apiKey),
-      ...toQuote.map((t) => getQuoteCached(t, apiKey)),
-    ]);
-    if (settled[0].status === "fulfilled" && settled[0].value?.c) spyNow = settled[0].value.c;
-    toQuote.forEach((t, i) => {
-      const r = settled[i + 1];
-      if (r.status === "fulfilled" && r.value?.c) quotes[t] = r.value.c;
-    });
+    // Budget-aware: on a no-Tiingo install this fallback can need dozens of
+    // quotes — chunk them under the shared rolling-minute guard so grading
+    // never starves an interactive analyze (same pattern as the sweeps).
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const spySettled = await Promise.allSettled([getQuoteCached("SPY", apiKey)]);
+    if (spySettled[0].status === "fulfilled" && spySettled[0].value?.c) spyNow = spySettled[0].value.c;
+    for (let i = 0; i < toQuote.length; i += 8) {
+      let waited = 0;
+      while (callsLastMinute() > 40 && waited < 30_000) {
+        await sleep(2000);
+        waited += 2000;
+      }
+      if (callsLastMinute() > 40) break; // ungraded rows just stay ungraded this pass
+      const chunk = toQuote.slice(i, i + 8);
+      const settled = await Promise.allSettled(chunk.map((t) => getQuoteCached(t, apiKey)));
+      chunk.forEach((t, j) => {
+        const r = settled[j];
+        if (r.status === "fulfilled" && r.value?.c) quotes[t] = r.value.c;
+      });
+    }
     const failed = toQuote.filter((t) => quotes[t] == null).length;
     if (needsQuote.length > MAX_QUOTES) {
       warnings.push(`Only the ${MAX_QUOTES} most recent panel-less tickers were re-priced this load (rate-limit protection).`);
