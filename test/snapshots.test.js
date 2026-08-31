@@ -55,6 +55,24 @@ test("diffSnapshots tells the story of a score move, not just the numbers", () =
   assert.ok(!line.includes("Momentum"), line); // unmoved categories stay out
 });
 
+test("diffSnapshots narrates from legacy metrics when the old snapshot has no categories", () => {
+  // A pre-upgrade snapshot: score + the three legacy metrics, no cats/drivers.
+  const prev = { at: "2026-08-24T14:00:00.000Z", score: 75, verdict: "STRONG BUY", pe: 33.0, netMargin: 35.0, revenueGrowth: 14.0 };
+  const curr = takeSnapshot(payload({
+    scoring: { score: 76.2, verdict: "STRONG BUY", categories: [{ label: "Valuation", score: 48 }] },
+    metrics: { pe: 30.5, netMargin: 35.0, revenueGrowth: 14.0 },
+  }));
+  const line = diffSnapshots(prev, curr).find((c) => c.startsWith("Score"));
+  assert.ok(line.includes("likely because earnings caught up to the price"), line);
+});
+
+test("diffSnapshots admits when the older snapshot recorded no cause", () => {
+  const prev = { at: "2026-08-24T14:00:00.000Z", score: 75, verdict: "STRONG BUY" };
+  const curr = takeSnapshot(payload({ scoring: { score: 76.2, verdict: "STRONG BUY", categories: [] } }));
+  const line = diffSnapshots(prev, curr).find((c) => c.startsWith("Score"));
+  assert.ok(line.includes("older snapshot didn't record why"), line);
+});
+
 test("diffSnapshots stays quiet when nothing meaningful moved", () => {
   const prev = takeSnapshot(payload());
   const curr = takeSnapshot(payload({ scoring: { score: 67.8, verdict: "BUY" } })); // +0.5 < threshold

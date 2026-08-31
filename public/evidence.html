@@ -59,8 +59,7 @@
     fetch("/api/evidence").then((r) => r.text()).then((md) => {
       // EVIDENCE.md hard-wraps at ~75 columns with 2-space continuations;
       // join them so list items and bold spans stay whole.
-      md = md.replace(/?
-[ 	]+(?=\S)/g, " ");
+      md = md.replace(/\r?\n[ \t]+(?=\S)/g, " ");
       const out = [];
       const lines = md.split(/\r?\n/);
       let list = false;
