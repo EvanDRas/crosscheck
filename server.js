@@ -93,6 +93,12 @@ app.post("/api/setup", async (req, res) => {
         if (!/^[A-Za-z0-9]{10,80}$/.test(tiingo) || /[\x00-\x1f\x7f]/.test(tiingo)) {
           return res.status(400).json({ error: "That doesn't look like a Tiingo API key." });
         }
+        // Validate live before persisting — a typo'd key that gets written
+        // breaks charts and the Time Machine with no path to correct it.
+        const tr = await fetch(`https://api.tiingo.com/api/test?token=${tiingo}`, { signal: AbortSignal.timeout(6000) }).catch(() => null);
+        if (!tr?.ok) {
+          return res.status(400).json({ error: "Tiingo did not accept that key. Double-check it and try again." });
+        }
         let keepLines = [];
         try {
           keepLines = fs.readFileSync(ENV_FILE, "utf8").split(/\r?\n/)
@@ -129,6 +135,12 @@ app.post("/api/setup", async (req, res) => {
     }
     if (!q || (!q.c && !q.pc)) {
       return res.status(400).json({ error: "Finnhub did not accept that key. Double-check it and try again." });
+    }
+    if (tiingo) {
+      const tr = await fetch(`https://api.tiingo.com/api/test?token=${tiingo}`, { signal: AbortSignal.timeout(6000) }).catch(() => null);
+      if (!tr?.ok) {
+        return res.status(400).json({ error: "Tiingo did not accept that key — leave the field empty to add it later." });
+      }
     }
     // Merge, never clobber: a hand-added line (HOST, PORT, panel paths)
     // must survive the setup screen writing the keys.
@@ -222,6 +234,7 @@ app.get("/api/compare", async (req, res) => {
     // Budget-aware: under rate pressure, compare fewer peers rather than
     // 429-ing the user's own next analysis (8 metrics calls is a real burst).
     const peerBudget = callsLastMinute() > 35 ? 3 : 7;
+    const shed = peerBudget < 7;
     const symbols = [ticker, ...(Array.isArray(peersRaw) ? peersRaw : [])
       .filter((p) => typeof p === "string" && p && p !== ticker).slice(0, peerBudget)];
     const settled = await Promise.allSettled(symbols.map((s) => getMetrics(s, apiKey)));
@@ -248,7 +261,7 @@ app.get("/api/compare", async (req, res) => {
 
       };
     }).filter((r) => Object.values(r).some((v) => v != null && v !== r.symbol));
-    if (settled.every((r) => r.status === "fulfilled")) {
+    if (!shed && settled.every((r) => r.status === "fulfilled")) {
       // Partial (rate-limited) tables still get served, but never pinned for
       // 10 minutes — the budget usually recovers in seconds.
       compareCache.set(ticker, { at: Date.now(), rows });
@@ -386,6 +399,7 @@ function startInsiderSweep() {
     const since = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
     const perTicker = [];
     let complete = true;
+    let fetchFailed = false;
     for (let i = 0; i < universe.length; i += 5) {
       let waited = 0;
       while (callsLastMinute() > 37 && waited < 90_000) {
@@ -405,6 +419,7 @@ function startInsiderSweep() {
           const value = buys.reduce((sum, r) => sum + r.change * (r.transactionPrice || 0), 0);
           return buyers ? { ticker: t, buyers, value: Math.round(value) } : null;
         } catch {
+          fetchFailed = true; // a 429 is not "no buyers" — don't pin it for a day
           return null;
         }
       }));
@@ -415,7 +430,7 @@ function startInsiderSweep() {
       .filter((r) => r.buyers >= 2 || r.value >= 250_000)
       .sort((a, b) => (b.buyers - a.buyers) || (b.value - a.value))
       .slice(0, 8);
-    insiderCache = { at: Date.now(), rows, complete };
+    insiderCache = { at: Date.now(), rows, complete: complete && !fetchFailed };
     insiderSweepRunning = false;
   })().catch(() => {
     insiderSweepRunning = false;
@@ -594,9 +609,10 @@ app.get("/api/feed", async (req, res) => {
         const items = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []))
           .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
           .slice(0, limit);
-        return { tab, items, asOf: new Date().toISOString() };
+        const failed = settled.filter((r) => r.status === "rejected").length;
+        return { tab, items, failed, asOf: new Date().toISOString() };
       });
-      if (payload.items.length || !tickers.length) {
+      if ((payload.items.length && !payload.failed) || !tickers.length) {
         feedCache.set(key, { at: Date.now(), payload });
         if (feedCache.size > 60) feedCache.delete(feedCache.keys().next().value);
       }

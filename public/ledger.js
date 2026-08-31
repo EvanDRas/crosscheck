@@ -52,11 +52,24 @@ function renderSummary(data) {
     ["Right on direction", called.length ? `${right} of ${called.length}` : "—"],
     ["Formula eras", eras || "—"],
   ];
+  const thru = data.entries.reduce((m, e) => (e.gradedThrough && e.gradedThrough > (m ?? "") ? e.gradedThrough : m), null);
+  const rp = called.length ? (right / called.length) * 100 : null;
+  const daysRunning = dates.length ? Math.max(1, Math.round((Date.now() - Date.parse(dates[0])) / 86_400_000)) : 0;
+  const read = called.length < 20 ? "too few aged directional calls to judge yet"
+    : rp >= 53 ? "a shade better than a coin flip so far — treat that as noise until it lasts"
+    : rp <= 47 ? "a shade worse than a coin flip so far — also within noise"
+    : "about a coin flip, which is exactly what the backtests predicted";
+  const headline = graded.length
+    ? `<p class="sub"><b>The story so far:</b> after ${data.entries.length} calls over ${daysRunning} days, the formula is right on
+       direction ${called.length ? `${Math.round(rp)}% of the time (${right} of ${called.length})` : "— (none aged)"} and its average
+       graded call sits ${pct(avgExcess)} vs the market — ${read}.</p>`
+    : "";
   $("summaryCard").innerHTML = `
     <h2>Summary</h2>
+    ${headline}
     <p class="sub">${data.source === "official" ? `<b>Official forward test</b> — the project's published call log (formula
-    output only), which this installation grades itself with its own keys. Your personal picks below stay
-    local; run <code>npm run batch</code> to build a local formula ledger instead. ` : ""}As of ${new Date(data.asOf).toLocaleString("en-US")}. Total-return grading: split- and
+    output only), which this installation grades itself with its own keys. Your personal picks above stay
+    local; run <code>npm run batch</code> to build a local formula ledger instead. ` : ""}Graded ${new Date(data.asOf).toLocaleString("en-US")}${thru ? `, prices through the ${thru} close` : ""}. Total-return grading: split- and
     dividend-adjusted closes (call date &rarr; latest), SPY measured the same way over the same window.
     SPY is an S&amp;P 500 index fund — shorthand for "the market." Costs excluded.
     Terms: <b>excess</b> = the call's return minus SPY's over the same window (positive = beat the market) ·
@@ -104,7 +117,10 @@ function renderAggregates(data) {
     </div>`;
 }
 
-function renderCalls(data) {
+function renderCalls(data, showAll = false) {
+  const era = data.entries.some((e) => e.formulaVersion === "v2") ? "v2" : "v1";
+  const CAP = 100;
+  const visible = showAll ? data.entries : data.entries.slice(0, CAP);
   const anyRaw = data.entries.some((e) => e.basis === "raw");
   const anyFrozen = data.entries.some((e) => e.frozen);
   const notes = [];
@@ -119,13 +135,13 @@ function renderCalls(data) {
         <thead><tr>
           <th>Date</th><th>Ticker</th><th>Verdict</th><th class="num">Score</th>
           <th>Near-term</th><th>Long-term</th>
-          <th class="num">Price then</th><th class="num">Now</th>
+          <th class="num">Price then</th><th class="num">Latest close</th>
           <th class="num">Return</th><th class="num">vs SPY</th><th class="num">Age</th>
         </tr></thead>
         <tbody>
-          ${data.entries.map((e) => `
+          ${visible.map((e) => `
             <tr>
-              <td>${esc(e.date)}</td>
+              <td>${esc(e.date)}${(e.formulaVersion ?? "v1") !== era ? ` <span class="era-tag">${esc(e.formulaVersion ?? "v1")}</span>` : ""}</td>
               <td><a href="/#${esc(e.ticker)}">${esc(e.ticker)}</a></td>
               <td><span class="pill-sm ${pillClass(e.verdict)}">${esc(e.verdict)}</span></td>
               <td class="num">${isNum(e.score) ? Math.round(e.score) : "—"}</td>
@@ -137,9 +153,11 @@ function renderCalls(data) {
               <td class="num">${deltaCell(e.excess)}</td>
               <td class="num">${e.ageDays === 0 ? "today" : `${e.ageDays}d`}</td>
             </tr>`).join("")}
+          ${!showAll && data.entries.length > CAP ? `<tr><td colspan="11" style="text-align:center; padding:10px"><button type="button" id="showAllCalls" class="linklike">Show all ${data.entries.length} calls</button></td></tr>` : ""}
         </tbody>
       </table>
     </div>`;
+  document.getElementById("showAllCalls")?.addEventListener("click", () => renderCalls(data, true));
 }
 
 function renderMyPicks(data) {
@@ -165,7 +183,7 @@ function renderMyPicks(data) {
       <table class="ledger-table">
         <thead><tr>
           <th>Date</th><th>Ticker</th><th>Your call</th><th>Note</th>
-          <th class="num">Price then</th><th class="num">Now</th>
+          <th class="num">Price then</th><th class="num">Latest close</th>
           <th class="num">Return</th><th class="num">vs SPY</th><th>Right?</th>
         </tr></thead>
         <tbody>
@@ -194,7 +212,8 @@ function renderMyPicks(data) {
 // vs SPY so far. The spread IS the honesty — wins and losses in one glance.
 function renderCallsMap(data) {
   const card = $("mapCard");
-  const rows = data.entries.filter((e) => e.excess != null && e.ageDays > 0 && e.basis === "tr");
+  const era = data.entries.some((e) => e.formulaVersion === "v2") ? "v2" : "v1";
+  const rows = data.entries.filter((e) => (e.formulaVersion ?? "v1") === era && e.excess != null && e.ageDays > 0 && e.basis === "tr");
   if (rows.length < 5) {
     card.hidden = true;
     return;
@@ -222,8 +241,12 @@ function renderCallsMap(data) {
   };
   card.innerHTML = `
     <h2>Calls map</h2>
-    <p class="sub">Every aged, total-return-graded call: when it was made vs how it stands against SPY today.
-    Dots above the line beat the index. Hover any dot.</p>
+    <p class="sub">Every aged, total-return-graded call from the current formula era: when it was made vs how it
+    stands against SPY. Color is the call itself — green buys want to finish <i>above</i> the line, red sells are
+    right when they finish <i>below</i> it. Hover any dot.
+    <span class="pill-sm v-strongbuy">STRONG BUY</span> <span class="pill-sm v-buy">BUY</span>
+    <span class="pill-sm v-hold">HOLD</span> <span class="pill-sm v-sell">SELL</span>
+    <span class="pill-sm v-strongsell">STRONG SELL</span></p>
     <div class="ledger-table-wrap"><svg class="calls-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graded calls vs SPY over time">
       ${yTick(maxAbs * 0.66)}${yTick(0)}${yTick(-maxAbs * 0.66)}
       <line class="map-zero" x1="${pad.l}" x2="${W - pad.r}" y1="${Y(0)}" y2="${Y(0)}"></line>

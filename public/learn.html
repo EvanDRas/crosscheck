@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Learn — Crosscheck</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%234f86c6%22/><path d=%22M24 55 L42 72 L77 31%22 fill=%22none%22 stroke=%22%23ffffff%22 stroke-width=%2213%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
-  <link rel="stylesheet" href="style.css?v=61" />
+  <link rel="stylesheet" href="style.css?v=62" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0c0d0f" />
 </head>
@@ -87,7 +87,8 @@
       <h2>4 · Can it survive a bad year? Current ratio, debt</h2>
       <p>The <b>current ratio</b> (short-term assets ÷ short-term liabilities) asks whether the company can pay
          next year's bills from what it already holds. <b>Debt-to-equity</b> asks how much of the company is
-         funded by lenders rather than owners. Debt is cheap fuel in good times and a wrecking ball in bad ones.</p>
+         funded by lenders rather than owners. Debt is cheap fuel in good times and a wrecking ball in bad ones. The front page's
+         <b>The economy right now</b> card shows the current price of that fuel — the Fed's rate — straight from FRED.</p>
       <p>Boeing is the textbook case: a great franchise whose balance sheet was hollowed out by buybacks and
          then crushed by the 737 MAX grounding and the pandemic. Health metrics never predicted the crash —
          but they showed there was no cushion when it came.</p>
@@ -122,7 +123,9 @@
          <b>Form 4</b> is an insider's own trade, filed within two business days.</p>
       <p>Crosscheck pulls fundamentals directly from these filings and cross-checks them against the data
          vendor. When the two disagree, the result page says so (the ⚠︎ marks). That disagreement is itself a
-         lesson: "official" numbers come in several versions.</p>
+         lesson: "official" numbers come in several versions. On the front page, the news desk's <b>Filings</b> tab
+         streams what your followed companies filed — an 8-K often lands before the story written about it — and
+         the <b>Insider radar</b> card watches Form 4s for clustered buying.</p>
       <p class="learn-live"><a href="/#AAPL">Apple's recent filings and insider trades →</a></p>
     </section>
 
@@ -131,11 +134,11 @@
       <p>A company's third-quarter results are not known on September 30. They are known when the 10-Q is
          filed, often six weeks later. A backtest that uses September 30 data on September 30 is quietly using
          the future — and will "discover" strategies that could never have been traded.</p>
-      <p>The <b>Time Machine</b> is built to make this concrete: pick any stock and any date since 2010, and it
+      <p>The <b>Time Machine</b> is built to make this concrete: pick any stock and any date since 2010 — it is the one feature that needs the free Tiingo key from the setup card — and it
          reconstructs the verdict from filings <em>filed by that day</em> and prices through that close. Then it
          shows what happened next. Try NVDA on 2023-01-03: the formula said SELL — the stock then beat the S&amp;P by roughly +1,370% (Study 2).
          That is not a bug in the demo — it is the point.</p>
-      <p class="learn-live"><a href="/">Open the Time Machine moments on the homepage →</a></p>
+      <p class="learn-live"><a href="/">Open the Time machine — the button beside Analyze at the top of the front page →</a></p>
     </section>
 
     <section class="card" id="l-return">
@@ -146,7 +149,8 @@
          the difference between yours and the benchmark's is <b>excess return</b>.</p>
       <p>Every call on the track record page is graded this way, split-adjusted, over the same window as the
          S&amp;P. Losses are published next to wins. If you keep your own calls there too, time grades you the
-         same way.</p>
+         same way. The <b>Your portfolio</b> card on the front page asks the same question about money you
+         actually hold — the same dollars in an S&amp;P fund instead, dividends counted.</p>
       <p class="learn-live"><a href="/ledger.html">The track record →</a></p>
     </section>
 
@@ -191,7 +195,7 @@
     how to read public data; they are not recommendations. Always do your own research.
   </footer>
 
-  <script src="glossary.js?v=61"></script>
+  <script src="glossary.js?v=62"></script>
   <script>
 
     // P/E calculator: turns the ratio into years and a PEG.
@@ -205,7 +209,7 @@
         if (!(p > 0) || !(e > 0)) { $("calcOut").textContent = "Enter a positive price and EPS."; return; }
         const pe = p / e;
         const peg = g > 0 ? pe / g : null;
-        $("calcOut").innerHTML = `P/E <b>${pe.toFixed(1)}×</b> — at today's profit it takes <b>${pe.toFixed(0)} years</b> of earnings to pay back the price.
+        $("calcOut").innerHTML = `P/E <b>${pe.toFixed(1)}×</b> — at today's profit it takes about <b>${Math.round(pe)} year${Math.round(pe) === 1 ? "" : "s"}</b> of earnings to pay back the price.
           ${peg != null ? `With ${g}% growth the PEG is <b>${peg.toFixed(2)}</b> — ${peg < 1 ? "growth more than covers the price." : peg < 2 ? "a fair price for the growth, if it happens." : "you are paying a lot for growth that has to show up."}` : "With no growth, the P/E is the whole story."}`;
       };
       ["calcPrice", "calcEps", "calcGrowth"].forEach((id) => $(id).addEventListener("input", run));

@@ -160,9 +160,12 @@ function renderCompany(d) {
     const delta = isNum(q.change) && isNum(q.changePercent)
       ? `${arrow} ${q.change > 0 ? "+" : ""}${fmtNum(q.change)} (${q.changePercent > 0 ? "+" : ""}${fmtNum(q.changePercent)}%)`
       : isNum(q.change) ? `${arrow} ${q.change > 0 ? "+" : ""}${fmtNum(q.change)}` : "";
-    // On weekends the quote is Friday's — calling it "today" is wrong.
+    // On weekends, holidays, and before the open the quote is the prior
+    // session's — calling it "today" is wrong.
     const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
-    const dayLabel = ny.getDay() === 0 || ny.getDay() === 6 ? "last session" : "today";
+    const nyIso = `${ny.getFullYear()}-${String(ny.getMonth() + 1).padStart(2, "0")}-${String(ny.getDate()).padStart(2, "0")}`;
+    const nyMins = ny.getHours() * 60 + ny.getMinutes();
+    const dayLabel = ny.getDay() === 0 || ny.getDay() === 6 || nyMins < 570 || MARKET_HOLIDAYS.has(nyIso) ? "last session" : "today";
     priceHtml = `
       <div class="price-now">${fmtMoney(q.price, currency)}</div>
       <div class="price-delta ${dir}">${esc(delta)} ${dayLabel}</div>
@@ -1189,7 +1192,19 @@ function render(d) {
   el.status.hidden = true;
   el.btn.disabled = false;
   el.demoNote.hidden = !d.demo;
+  if (d.demo) {
+    // The banner shouldn't tell keyed installs to add the key they have.
+    el.demoNote.textContent = hasKey
+      ? "Demo mode — every number and headline on this page is fictional sample data. Type any real ticker to leave the demo."
+      : "Demo mode — every number and headline on this page is fictional sample data. Real tickers work without a key too (SEC-filings data only) — add a free Finnhub key for live quotes, analysts, and earnings.";
+  }
   $("shareCardBtn").hidden = Boolean(d.demo); // a share card of fictional data helps no one
+
+  // A fresh payload owns the banner space — soft refreshes must not leave
+  // yesterday's errors or warnings floating over today's data.
+  el.error.hidden = true;
+  el.suggest.hidden = true;
+  el.warnings.hidden = true;
 
   if (d.warnings?.length) {
     // Disagreements are not outages — label the banner by what it holds.
@@ -1298,10 +1313,22 @@ function renderTimeMachine(p) {
     <section class="card">
       <h2>What actually happened since</h2>
       <p class="sub">${o.years.toFixed(1)} years, ${esc(p.date)} → ${esc(o.through)}, split- and dividend-adjusted.</p>
+      ${(() => {
+        if (!isNum(o.ret) || !isNum(o.spyRet)) return "";
+        const beat = o.excess > 0.0001;
+        const trail = o.excess < -0.0001;
+        const dollars = `$100 in ${esc(p.ticker)} became $${Math.round(100 * (1 + o.ret))}; in the S&P it became $${Math.round(100 * (1 + o.spyRet))}`;
+        const dir = beat ? `went on to beat the market by ${(o.excess * 100).toFixed(1)} points`
+          : trail ? `went on to trail the market by ${(-o.excess * 100).toFixed(1)} points` : "went on to match the market";
+        const v = p.scoring?.insufficientData ? null : p.scoring?.verdict;
+        const grade = /BUY/.test(v ?? "") ? (beat ? " — the outcome a buy call hopes for" : " — not the outcome a buy call hopes for")
+          : /SELL/.test(v ?? "") ? (trail ? " — the outcome a sell call hopes for" : " — not the outcome a sell call hopes for") : "";
+        return `<p class="sub">The formula's call that day was <b>${esc(v ?? "no verdict")}</b>, and the stock ${dir} (${dollars})${grade}.</p>`;
+      })()}
       <div class="tm-outcome">
         <div class="tm-stat"><div class="tm-label">${esc(p.ticker)}</div><div class="tm-val">${cell(o.ret)}</div></div>
         <div class="tm-stat"><div class="tm-label">S&P (SPY)</div><div class="tm-val">${cell(o.spyRet)}</div></div>
-        <div class="tm-stat"><div class="tm-label">Excess</div><div class="tm-val">${cell(o.excess)}</div></div>
+        <div class="tm-stat"><div class="tm-label">vs the market</div><div class="tm-val">${cell(o.excess)}</div></div>
       </div>
       <p class="scoring-note evidence-note">One graded call is an anecdote — the point is that you can run this on ANY
       ticker and date and the formula can't hide from its history. Full methodology and 16,497-call results:
@@ -1538,7 +1565,7 @@ function tickersIn(text) {
   const out = [];
   for (const [t, aliases] of Object.entries(names)) {
     const pats = [...aliases, ...(t.length >= 4 ? [t] : [])];
-    if (pats.some((a) => new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text))) out.push(t);
+    if (pats.some((a) => new RegExp(`(?<![\\w-])${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`, "i").test(text))) out.push(t);
   }
   return out;
 }
@@ -1763,7 +1790,7 @@ const fmtUsd = (v) => `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US
 
 function renderPortfolio() {
   const card = $("portfolioCard");
-  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value) return; // mid-entry (input holds text) — repaint next cycle
+  if (card.contains(document.activeElement) && document.activeElement.closest?.("form")) return; // user is in the form — repaint after blur
   const lots = readPf();
   const form = `
     <form class="pf-add" autocomplete="off">
@@ -1877,7 +1904,15 @@ function parseBrokerCsv(text) {
   const headIdx = lines.findIndex((l) => /symbol/i.test(l) && /(quantity|shares|qty)/i.test(l));
   if (headIdx === -1) return { lots: [], error: "No header row with Symbol and Quantity columns found — is this a positions CSV?" };
   const head = splitCsvLine(lines[headIdx]).map((h) => h.trim().toLowerCase());
-  const col = (...names) => head.findIndex((h) => names.some((n) => h === n || h.includes(n)));
+  // Try names in priority order so "cost basis total" can't be shadowed by
+  // the earlier "average cost basis" column matching the looser "cost basis".
+  const col = (...names) => {
+    for (const n of names) {
+      const i = head.findIndex((h) => h === n || h.includes(n));
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
   const iSym = col("symbol");
   const iQty = col("quantity", "shares", "qty");
   const iAvg = col("average cost basis", "average cost", "avg cost", "average price", "cost/share");
@@ -1907,6 +1942,7 @@ $("portfolioCard").addEventListener("change", async (e) => {
   const input = e.target.closest?.("#pfImportFile");
   if (!input || !input.files?.length) return;
   const text = await input.files[0].text();
+  input.value = ""; // so re-selecting the same file fires change again
   const { lots: found, error } = parseBrokerCsv(text);
   if (error || !found.length) {
     pfImportMsg = error ?? "No usable positions found in that file.";
@@ -2016,7 +2052,7 @@ async function checkAlerts() {
 
 function renderAlerts() {
   const card = $("alertCard");
-  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value) return; // mid-entry (input holds text) — repaint next cycle
+  if (card.contains(document.activeElement) && document.activeElement.closest?.("form")) return; // user is in the form — repaint after blur
   const alerts = readAlerts();
   const form = `
     <form class="pf-add alert-add" autocomplete="off">
@@ -2394,7 +2430,7 @@ async function loadWatchQuotes(fresh = false) {
 
 function renderWatch() {
   const card = $("watchCard");
-  if (card.contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value) return; // mid-entry (input holds text) — repaint next cycle
+  if (card.contains(document.activeElement) && document.activeElement.closest?.("form")) return; // user is in the form — repaint after blur
   const w = readWatch();
   const addForm = `
     <form class="watch-add" autocomplete="off">
@@ -2573,7 +2609,7 @@ function renderHeat() {
           <div class="heat-sector-label">${esc(sec)} <span class="${chgCls(avg(list))}">${esc(fmtPct(avg(list), true))}</span></div>
           <div class="heat-tiles">
             ${[...list].sort((a, b) => b.changePercent - a.changePercent).map((r) => `
-              <button type="button" class="heat-tile mkt-row" data-t="${esc(r.ticker)}" style="${heatStyle(r.changePercent)}" title="${esc(r.ticker)}${verdictOf(r.ticker) ? ` · formula: ${verdictOf(r.ticker).verdict} ${verdictOf(r.ticker).score}/100` : ""}">
+              <button type="button" class="heat-tile mkt-row" data-t="${esc(r.ticker)}" style="${heatStyle(r.changePercent)}" title="${(() => { const nm = moversData?.names?.[r.ticker]?.[0]; const v = verdictOf(r.ticker); return esc(`${nm ? `${nm} (${r.ticker})` : r.ticker} — ${r.changePercent > 0 ? "up" : r.changePercent < 0 ? "down" : "flat"} ${Math.abs(r.changePercent).toFixed(1)}% today${v ? ` · formula's latest read: ${v.verdict}, ${v.score}/100 — a rank of fundamentals, not a forecast` : ""}`); })()}">
                 ${verdictOf(r.ticker) ? `<span class="heat-dot ${verdictClass(verdictOf(r.ticker).verdict)}"></span>` : ""}
                 <span class="heat-sym">${esc(r.ticker)}</span>
                 <span class="heat-chg">${esc(fmtPct(r.changePercent, true))}</span>
@@ -2614,12 +2650,32 @@ function renderMovers(m) {
     return;
   }
   const sorted = [...rows].sort((a, b) => b.changePercent - a.changePercent);
+  // One sentence on what kind of day it was — extremes usually travel in
+  // sector packs, and a quiet day deserves to be called quiet.
+  const top = sorted[0];
+  const bot = sorted[sorted.length - 1];
+  const clusterOf = (list) => {
+    const c = {};
+    for (const r of list) {
+      const sec = moversData?.sectors?.[r.ticker];
+      if (sec) c[sec] = (c[sec] ?? 0) + 1;
+    }
+    const hit = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    return hit && hit[1] >= 3 ? hit : null;
+  };
+  const gc = clusterOf(sorted.slice(0, 5));
+  const lc = clusterOf(sorted.slice(-5));
+  const pack = gc ? `${gc[1]} of the 5 biggest gainers are ${gc[0]} names` : lc ? `${lc[1]} of the 5 biggest losers are ${lc[0]} names` : null;
+  const moverStory = Math.max(top.changePercent, -bot.changePercent) < 1
+    ? `A quiet session in the frozen 50 — nothing moved even 1% (${top.ticker} led at ${fmtPct(top.changePercent, true)}).`
+    : `${top.ticker} led the frozen 50 (${fmtPct(top.changePercent, true)}); ${bot.ticker} lagged (${fmtPct(bot.changePercent, true)})${pack ? ` — ${pack}: big moves usually travel in sector packs` : "."}`;
   const cols = [
     ["Gainers", sorted.slice(0, 5)],
     ["Losers", sorted.slice(-5).reverse()],
   ];
   card.innerHTML = `
     <h2>Movers</h2>
+    <p class="sub">${esc(moverStory)}</p>
     <div class="movers-cols">
       ${cols.map(([label, list]) => `
         <div>
@@ -2711,6 +2767,8 @@ $("momentsCard").addEventListener("click", (e) => {
   if (t && d) {
     el.input.value = t;
     el.dateInput.value = d;
+    el.dateInput.hidden = false; // the armed date must be visible and clearable
+    $("tmToggle")?.classList.add("active");
     timeMachine(t, d);
   }
 });
@@ -2979,6 +3037,12 @@ $("setupSaveBtn").addEventListener("click", async () => {
   const btn = $("setupSaveBtn");
   btn.disabled = true;
   const tiingoOnly = !$("setupFinnhub").value.trim() && $("setupTiingo").value.trim();
+  if (tiingoOnly && !hasKey) {
+    errEl.textContent = "A free Finnhub key is required first — the Tiingo key is an optional add-on for charts and the Time Machine.";
+    errEl.hidden = false;
+    btn.disabled = false;
+    return;
+  }
   btn.textContent = tiingoOnly ? "Saving Tiingo key…" : "Validating with Finnhub…";
   try {
     const res = await fetch("/api/setup", {
@@ -3144,6 +3208,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   const row = e.target.closest?.(".mkt-row[data-t]");
   if (!row || tourEls) return;
+  if (e.target !== row && e.target.closest?.("button, a, input, select")) return; // stars/removes keep their own keys
   e.preventDefault();
   el.dateInput.value = "";
   go(row.dataset.t);

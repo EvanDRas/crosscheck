@@ -183,7 +183,7 @@ window.TERMS = {
   insiders: {
     name: "Insider transactions",
     what: "Open-market buys and sells by executives and directors, reported to the SEC on Form 4 within two business days.",
-    use: "Shown for context; only open-market purchases and sales are counted (option exercises and grants are noise).",
+    use: "Shown for context; only open-market purchases and sales are counted. The front page's Insider radar card scans the ledger universe for clustered buys (option exercises and grants are noise).",
     caveat: "Insiders sell for a hundred reasons (taxes, houses, diversification) but buy for one. A cluster of buys means more than any amount of selling.",
     live: "META",
   },
