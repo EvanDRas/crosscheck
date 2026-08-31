@@ -219,8 +219,11 @@ app.get("/api/compare", async (req, res) => {
     if (hit && Date.now() - hit.at < 600_000) return res.json({ rows: hit.rows });
 
     const peersRaw = await getPeers(ticker, apiKey);
+    // Budget-aware: under rate pressure, compare fewer peers rather than
+    // 429-ing the user's own next analysis (8 metrics calls is a real burst).
+    const peerBudget = callsLastMinute() > 35 ? 3 : 7;
     const symbols = [ticker, ...(Array.isArray(peersRaw) ? peersRaw : [])
-      .filter((p) => typeof p === "string" && p && p !== ticker).slice(0, 7)];
+      .filter((p) => typeof p === "string" && p && p !== ticker).slice(0, peerBudget)];
     const settled = await Promise.allSettled(symbols.map((s) => getMetrics(s, apiKey)));
 
     const pick = (m, ...keys) => {
