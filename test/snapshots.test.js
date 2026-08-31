@@ -55,6 +55,36 @@ test("diffSnapshots tells the story of a score move, not just the numbers", () =
   assert.ok(!line.includes("Momentum"), line); // unmoved categories stay out
 });
 
+test("diffSnapshots chains a valuation move to the share price that caused it", () => {
+  const prev = takeSnapshot(payload({
+    scoring: { score: 67.3, verdict: "BUY", categories: [{ label: "Valuation", score: 62 }] },
+    metrics: { pe: 35.0 },
+    quote: { price: 100 },
+  }));
+  const curr = takeSnapshot(payload({
+    scoring: { score: 61.0, verdict: "BUY", categories: [{ label: "Valuation", score: 44 }] },
+    metrics: { pe: 44.0 },
+    quote: { price: 124 },
+  }));
+  const line = diffSnapshots(prev, curr).find((c) => c.startsWith("Score"));
+  assert.ok(line.includes("with the share price up 24.0% since your last look"), line);
+});
+
+test("diffSnapshots chains a fundamentals move to the filing that caused it", () => {
+  const prev = takeSnapshot(payload({
+    scoring: { score: 70, verdict: "BUY", categories: [{ label: "Profitability", score: 80 }] },
+    metrics: { netMargin: 30.0 },
+  }));
+  const curr = takeSnapshot(payload({
+    scoring: { score: 66, verdict: "BUY", categories: [{ label: "Profitability", score: 68 }] },
+    metrics: { netMargin: 24.0 },
+    filings: [{ form: "10-Q", filed: "2026-08-26", label: "", url: "" }],
+  }));
+  const line = diffSnapshots(prev, curr).find((c) => c.startsWith("Score"));
+  assert.ok(line.includes("kept less of each sales dollar"), line);
+  assert.ok(line.includes("fresh numbers from the 10-Q filed 2026-08-26"), line);
+});
+
 test("diffSnapshots narrates from legacy metrics when the old snapshot has no categories", () => {
   // A pre-upgrade snapshot: score + the three legacy metrics, no cats/drivers.
   const prev = { at: "2026-08-24T14:00:00.000Z", score: 75, verdict: "STRONG BUY", pe: 33.0, netMargin: 35.0, revenueGrowth: 14.0 };
