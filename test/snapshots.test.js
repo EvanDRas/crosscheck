@@ -34,6 +34,23 @@ test("diffSnapshots reports score/verdict moves, new filings, insider changes", 
   assert.ok(changes.some((c) => c.includes("Insider sells") && c.includes("1 → 4")), changes.join("|"));
 });
 
+test("diffSnapshots attributes a score move to the categories that drove it", () => {
+  const prev = takeSnapshot(payload({
+    scoring: { score: 67.3, verdict: "BUY", categories: [
+      { label: "Valuation", score: 62 }, { label: "Growth", score: 80 }, { label: "Momentum", score: 55 },
+    ] },
+  }));
+  const curr = takeSnapshot(payload({
+    scoring: { score: 61.0, verdict: "BUY", categories: [
+      { label: "Valuation", score: 44 }, { label: "Growth", score: 79 }, { label: "Momentum", score: 55 },
+    ] },
+  }));
+  const changes = diffSnapshots(prev, curr);
+  const line = changes.find((c) => c.startsWith("Score"));
+  assert.ok(line.includes("moved by Valuation 62 → 44"), line);
+  assert.ok(!line.includes("Momentum"), line); // unmoved categories stay out
+});
+
 test("diffSnapshots stays quiet when nothing meaningful moved", () => {
   const prev = takeSnapshot(payload());
   const curr = takeSnapshot(payload({ scoring: { score: 67.8, verdict: "BUY" } })); // +0.5 < threshold
