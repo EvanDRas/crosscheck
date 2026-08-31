@@ -34,20 +34,24 @@ test("diffSnapshots reports score/verdict moves, new filings, insider changes", 
   assert.ok(changes.some((c) => c.includes("Insider sells") && c.includes("1 → 4")), changes.join("|"));
 });
 
-test("diffSnapshots attributes a score move to the categories that drove it", () => {
+test("diffSnapshots tells the story of a score move, not just the numbers", () => {
   const prev = takeSnapshot(payload({
     scoring: { score: 67.3, verdict: "BUY", categories: [
       { label: "Valuation", score: 62 }, { label: "Growth", score: 80 }, { label: "Momentum", score: 55 },
     ] },
+    metrics: { pe: 35.0, netMargin: 27.6, revenueGrowth: 14.2 },
   }));
   const curr = takeSnapshot(payload({
     scoring: { score: 61.0, verdict: "BUY", categories: [
       { label: "Valuation", score: 44 }, { label: "Growth", score: 79 }, { label: "Momentum", score: 55 },
     ] },
+    metrics: { pe: 44.0, netMargin: 27.6, revenueGrowth: 14.2 },
   }));
   const changes = diffSnapshots(prev, curr);
   const line = changes.find((c) => c.startsWith("Score"));
-  assert.ok(line.includes("moved by Valuation 62 → 44"), line);
+  assert.ok(line.includes("Valuation 62 → 44"), line);
+  assert.ok(line.includes("the price grew faster than earnings"), line);
+  assert.ok(line.includes("35.0") && line.includes("44.0"), line);
   assert.ok(!line.includes("Momentum"), line); // unmoved categories stay out
 });
 
