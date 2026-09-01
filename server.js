@@ -596,7 +596,11 @@ app.get("/api/feed", async (req, res) => {
         const settled = await Promise.allSettled(tickers.map(async (t) => {
           const filings = await getRecentFilings(t, 6);
           return (filings ?? []).map((f) => ({
-            headline: `${t} filed a ${f.form} — ${f.label}`,
+            headline: (() => {
+              const name = /^[345](\/A)?$/.test(f.form) ? `Form ${f.form}` : f.form; // bare "4" reads badly
+              const art = /^(8|11|18|S[- C]|F-)/.test(name) ? "an" : "a"; // "an 8-K", "an S-1"
+              return `${t} filed ${art} ${name} — ${f.label}`;
+            })(),
             source: "SEC EDGAR",
             date: f.filed ? `${f.filed}T12:00:00.000Z` : null,
             link: f.url,
@@ -761,7 +765,10 @@ app.get("/api/timemachine", async (req, res) => {
   try {
     const ticker = String(req.query.ticker ?? "").trim().toUpperCase();
     const date = String(req.query.date ?? "").trim();
-    if (!TICKER_RE.test(ticker) || ticker === "DEMO") {
+    if (ticker === "DEMO") {
+      return res.status(400).json({ error: "The time machine needs a real ticker — DEMO is fictional, so it has no past to revisit. Try one you remember the era of, like AAPL in 2016." });
+    }
+    if (!TICKER_RE.test(ticker)) {
       return res.status(400).json({ error: "Enter a real ticker symbol." });
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < "2010-01-01" || date > marketDate(new Date(Date.now() - 7 * 86_400_000))) {

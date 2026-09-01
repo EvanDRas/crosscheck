@@ -1549,6 +1549,7 @@ function renderMarket(m) {
   renderInsiderRadar(m.insiders ?? null);
   renderCrypto(m.crypto ?? []);
   renderNewsCard();
+  watchScreenArrived(); // verdict flips + stored-verdict refresh need the screen payload
   renderWatch(); // verdict pills need screenData, which just arrived
   if (moversData) renderHeat(); // so do the heat-tile dots
 }
@@ -2407,9 +2408,42 @@ function computeWatchDeltas() {
   }
 }
 
+// Verdict flips since the last session — rarer than a price wiggle and much
+// higher signal, so they get their own line. Verdicts ride the screen
+// payload (works keyless too), so this runs on every screen arrival: the
+// flip diff once per session, the stored-verdict refresh every time (so
+// next session compares against how THIS one ended).
+function watchScreenArrived() {
+  try {
+    if (!screenData.length) return;
+    if (!sessionStorage.getItem("cc_watch_flips_session")) {
+      const prev = readJSON("cc_watch_seen", {});
+      const flips = [];
+      for (const t of readWatch()) {
+        const was = prev[t]?.verdict;
+        const now = screenData.find((r) => r.ticker === t)?.verdict;
+        if (was && now && was !== now) flips.push({ t, was, now });
+      }
+      if (flips.length) {
+        watchDelta = { ...(watchDelta ?? {}), flips: flips.slice(0, 3) };
+        writeJSON("cc_watch_delta", watchDelta);
+      }
+      sessionStorage.setItem("cc_watch_flips_session", "1");
+    }
+    const seen = readJSON("cc_watch_seen", {});
+    for (const t of readWatch()) {
+      const v = screenData.find((r) => r.ticker === t)?.verdict;
+      if (v) seen[t] = { ...(seen[t] ?? {}), verdict: v };
+    }
+    writeJSON("cc_watch_seen", seen);
+  } catch {
+    /* private mode */
+  }
+}
+
 function rememberWatchPrices() {
   const seen = readJSON("cc_watch_seen", {});
-  for (const [t, q] of Object.entries(watchQuotes)) if (q.price) seen[t] = { price: q.price, at: Date.now() };
+  for (const [t, q] of Object.entries(watchQuotes)) if (q.price) seen[t] = { ...(seen[t] ?? {}), price: q.price, at: Date.now() };
   writeJSON("cc_watch_seen", seen);
 }
 
@@ -2479,7 +2513,9 @@ function renderWatch() {
     ${!hasKey && w.length ? `<p class="pf-total-sub">Add a free Finnhub key (setup card at the top of the page) for live prices.</p>` : ""}
     ${addForm}
     ${watchDelta?.deltas?.length ? `<p class="watch-delta">Since your last visit: ${watchDelta.deltas.map((d) =>
-      `<button type="button" class="watch-delta-item mkt-row ${d.pct > 0 ? "pos" : "neg"}" data-t="${esc(d.t)}">${esc(d.t)} ${esc(fmtPct(d.pct, true))}</button>`).join(" ")}</p>` : ""}`;
+      `<button type="button" class="watch-delta-item mkt-row ${d.pct > 0 ? "pos" : "neg"}" data-t="${esc(d.t)}">${esc(d.t)} ${esc(fmtPct(d.pct, true))}</button>`).join(" ")}</p>` : ""}
+    ${watchDelta?.flips?.length ? `<p class="watch-delta">The formula changed its mind while you were away: ${watchDelta.flips.map((f) =>
+      `<button type="button" class="watch-delta-item mkt-row" data-t="${esc(f.t)}">${esc(f.t)} <span class="pill-sm ${verdictClass(f.was)}">${esc(f.was)}</span> → <span class="pill-sm ${verdictClass(f.now)}">${esc(f.now)}</span></button>`).join(" ")} — open it to see why.</p>` : ""}`;
 }
 
 // Follow by typing: validate the shape, add, and let the quote fetch judge
