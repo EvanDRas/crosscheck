@@ -373,6 +373,13 @@ function histSourceLabel(h) {
 function renderHistory(d) {
   const h = d.history;
   if (!h || !Array.isArray(h.series) || h.series.length < 2) {
+    // A silently vanished chart looks broken — when the server knows why
+    // there's no chart, the card says so instead of hiding.
+    if (d.historyNote) {
+      el.history.hidden = false;
+      el.history.innerHTML = `<h2>Price history</h2><p class="sub">${esc(d.historyNote)}</p>`;
+      return;
+    }
     el.history.hidden = true;
     return;
   }
