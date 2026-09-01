@@ -747,6 +747,7 @@ async function buildHomeStats() {
       days: new Set(entries.map((e) => e.date)).size,
       graded: graded.length,
       rightPct: seasoned.length >= 30 ? (100 * right) / seasoned.length : null,
+      seasoned: seasoned.length, // so the tile can say "N of 30" instead of falsely claiming none exist
       best: best ? { ticker: best.ticker, excessPct: 100 * best.excess, verdict: best.verdict } : null,
       worst: worst ? { ticker: worst.ticker, excessPct: 100 * worst.excess, verdict: worst.verdict } : null,
       asOf: new Date().toISOString(),
@@ -1095,9 +1096,11 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
       // Matched window: the stock leg ends at its last panel/Tiingo close, so
       // SPY must end there too — Yahoo's series includes today's intraday
       // bar, which would otherwise give SPY a head start on every row.
-      spyRet = spySeries
-        ? spyTrReturn(spySeries, g.anchorDate, g.latestDate)
-        : spyNow != null && e.spy ? (spyNow - e.spy) / e.spy : null;
+      // No price-only SPY fallback here: the logged level vs a live quote is
+      // a DIFFERENT window than the stock's adjusted-close leg, and a
+      // mixed-window excess under the "tr" label would poison every stat
+      // that promises same-window grading. Ungraded beats subtly wrong.
+      spyRet = spySeries ? spyTrReturn(spySeries, g.anchorDate, g.latestDate) : null;
     } else if (quotes[e.ticker] != null) {
       basis = "raw";
       nowPrice = quotes[e.ticker];
@@ -1159,6 +1162,10 @@ async function buildLedgerPayload() {
       asOf: new Date().toISOString(),
       warning: warnings.length ? warnings.join(" ") : null,
       source,
+      // The client must never guess the era from entry contents — a v1-only
+      // ledger under v2 code would call v1 "current" and contradict the
+      // aggregates built above.
+      currentEra: SCORING_VERSION,
     };
   }
 }
@@ -1213,9 +1220,12 @@ app.get("/api/picks", async (_req, res) => {
     // passed to grade).
     const graded = rows.filter((r) => r.excess != null && r.ageDays > 0 && Math.abs(r.excess) > 1e-9);
     const correct = graded.filter((r) => (r.direction === "buy" ? r.excess > 0 : r.excess < 0)).length;
+    // Price-only (raw) rows break across splits; the formula ledger excludes
+    // them from every stat, so the accuracy line must at least disclose them.
+    const rawGraded = graded.filter((r) => r.basis === "raw").length;
     res.json({
       entries: rows,
-      summary: graded.length ? { graded: graded.length, correct, accuracy: correct / graded.length } : null,
+      summary: graded.length ? { graded: graded.length, correct, accuracy: correct / graded.length, rawGraded } : null,
       asOf: new Date().toISOString(),
       warning: warnings.length ? warnings.join(" ") : null,
     });

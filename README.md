@@ -44,8 +44,7 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
 - **Tiingo** (optional free key): fresh split/dividend-adjusted closes for
   tickers the local panel doesn't cover — live chart + 52-week stats for any
   US name, and total-return ledger grading instead of the raw-quote fallback.
-  It also unlocks the Time Machine and the homepage moments row, and powers
-  the grading behind the daily game — the key that makes the fun parts work.
+  It also unlocks the Time Machine and the homepage moments row.
 - **News** is aggregated server-side from Google News RSS (spans hundreds of
   publishers), Yahoo Finance RSS, and Finnhub company-news — parsed, filtered
   for relevance (every item must mention the company's core name, a distinctive
@@ -56,7 +55,7 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   through visible piecewise-linear anchors, metrics average into six weighted
   categories (Valuation 20 / Profitability 20 / Growth 20 / Health 15 /
   Momentum 10 / Analyst 15), weights renormalize over whatever data exists, and
-  the UI shows every sub-score. Fewer than two scorable categories → an honest
+  the UI shows every sub-score. Fewer than four scorable categories → an honest
   "NOT ENOUGH DATA" instead of a fake verdict.
 - **Market overview homepage**: the landing page opens on live index levels
   (S&P 500, Nasdaq 100, Dow, Russell 2000 via ETF proxies), today's biggest
@@ -92,8 +91,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   calculator. Every key number on a result page has a `?` that opens its
   definition in place: what it is, and what it can't tell you. The homepage
   rotates one concept a day with a live example.
-- **Beyond stocks**: a macro strip with the six numbers that explain most
-  red days — VIX, the 10-year Treasury yield, oil, gold, Bitcoin, and
+- **Beyond stocks**: a macro strip with the five numbers that explain most
+  red days — VIX, the 10-year Treasury yield, oil, gold, and
   EUR/USD — plus an economic calendar (Fed decisions, jobs reports, options
   expiries; only dependable dates, nothing guessed) and this week's
   earnings from the universe, each row one click from the full analysis.
@@ -115,8 +114,9 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   8-Ks straight from EDGAR, often before the news story about them.
 - **Price alerts** (honest about their one limit: checked while the app is
   open — a local tool can't fire when it's closed), a **crypto strip**
-  (change window stated exactly), and a portfolio **dividend line** that
-  reports what was actually paid over the last 12 months, never a forecast.
+  (change window stated exactly), and a portfolio **dividend line** showing
+  the trailing 12 months of per-share payouts at your current share counts —
+  a record, never a forecast.
 - **A real front page**: newspaper hierarchy — a hero lead story, a today
   bar (market open/closed, live "updated Xs ago", your visit streak), and
   three columns: your portfolio and watchlist, the news feed, and the forward-test/record rail.
@@ -124,8 +124,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   from Google's topic feeds (keyless) merged with the wire items; **For
   you** builds a feed from the stocks you've starred — company news per
   ticker, keyless, relevance-filtered. A Newer / Older pager pages through each tab.
-- **Watchlist**: star any stock anywhere (screen rows, suggestions) and it
-  lives in "Your stocks" — live price, today's move, and the formula's
+- **Following**: star any stock anywhere (screen rows, suggestions) and it
+  lives in the "Following" card — live price, today's move, and the formula's
   latest verdict side by side — and powers the For you feed.
 - **News that pops**: every headline tagged with the universe tickers it
   mentions (with today's move, clickable), and a "trending" row derived

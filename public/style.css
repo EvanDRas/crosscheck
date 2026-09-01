@@ -1115,56 +1115,6 @@ a:hover { text-decoration: underline; }
 .heat-dot.v-hold { background: var(--warning); }
 .heat-dot.v-sell, .heat-dot.v-strongsell { background: var(--critical); }
 
-/* ---------- Call it (the game) ---------- */
-
-.callit { max-width: 760px; }
-.callit-lead, .callit-q, .callit-note { font-size: 13px; color: var(--ink-2); margin: 0 0 10px; line-height: 1.5; }
-.callit-msg { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
-.callit-head { font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
-.callit-head b { color: var(--ink); font-family: var(--mono); }
-.callit-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 8px 18px;
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-  padding: 10px 0;
-  margin-bottom: 10px;
-}
-.callit-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; margin-top: 2px; }
-.callit-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.callit-btn {
-  background: var(--surface);
-  border: 1px solid var(--baseline);
-  color: var(--ink);
-  border-radius: 3px;
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.callit-btn:hover { border-color: var(--accent); }
-.callit-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.callit-score {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 12.5px;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-.callit-score b { color: var(--ink-2); font-weight: 600; margin-right: 4px; }
-.callit-reset { background: none; border: none; color: var(--muted); font-size: 11px; cursor: pointer; }
-.callit-reset:hover { color: var(--ink-2); }
-.callit-outcome { font-size: 14px; margin-bottom: 8px; }
-.callit-outcome.pos b { color: var(--good); }
-.callit-outcome.neg b { color: var(--critical); }
-.callit-verdicts { font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; margin-bottom: 8px; }
-.callit-verdicts .pos { color: var(--good); }
-.callit-verdicts .neg { color: var(--critical); }
-
 /* ---------- Learn page calculator ---------- */
 
 .calc { border-top: 1px solid var(--hairline); padding-top: 10px; margin-top: 6px; }
@@ -1368,15 +1318,6 @@ a:hover { text-decoration: underline; }
 }
 .chip:hover, .chip.on { border-color: var(--warning); color: var(--ink); }
 .learn-cols.stack { grid-template-columns: 1fr; }
-
-/* ---------- Daily 5 + watch deltas ---------- */
-
-.callit-daily-head { font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
-.callit-daily-head b { color: var(--ink); }
-.callit-daily-rows { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 10px; }
-.callit-day-row { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink-2); }
-.callit-day-row .pos { color: var(--good); }
-.callit-day-row .neg { color: var(--critical); }
 .watch-delta { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
 .watch-delta-item {
   background: none;
@@ -1527,13 +1468,6 @@ a:hover { text-decoration: underline; }
 .cal-in { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
 .cal-row.mkt-row { cursor: pointer; }
 .cal-row.mkt-row:hover { background: rgba(255, 255, 255, 0.035); }
-
-/* Right-or-Wrong round display */
-.callit-call { padding: 10px 0 4px; }
-.callit-call-line { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
-.callit-call-line b { color: var(--ink); }
-.callit-tkr { font-family: var(--mono); letter-spacing: 0.5px; }
-.callit-call-verdict { margin: 8px 0; }
 
 /* ---- economy card ---- */
 .econ-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid var(--hairline); }

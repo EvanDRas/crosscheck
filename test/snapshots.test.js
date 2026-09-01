@@ -29,7 +29,9 @@ test("diffSnapshots reports score/verdict moves, new filings, insider changes", 
     insiders: { sells: { count: 4 }, buys: { count: 0 } },
   }));
   const changes = diffSnapshots(prev, curr);
-  assert.ok(changes.some((c) => c.includes("Score 67 → 58") && c.includes("BUY → HOLD")), changes.join("|"));
+  // Scores display at the same 1dp precision they are banded at — "67 → 58"
+  // would round 67.3 while the verdict was decided on the 67.3.
+  assert.ok(changes.some((c) => c.includes("Score 67.3 → 58.1") && c.includes("BUY → HOLD")), changes.join("|"));
   assert.ok(changes.some((c) => c.includes("New SEC filing: 8-K on 2026-08-07")), changes.join("|"));
   assert.ok(changes.some((c) => c.includes("Insider sells") && c.includes("1 → 4")), changes.join("|"));
 });
@@ -108,4 +110,45 @@ test("diffSnapshots stays quiet when nothing meaningful moved", () => {
   const curr = takeSnapshot(payload({ scoring: { score: 67.8, verdict: "BUY" } })); // +0.5 < threshold
   assert.deepEqual(diffSnapshots(prev, curr), []);
   assert.deepEqual(diffSnapshots(null, curr), []);
+});
+
+test("diffSnapshots refuses to narrate negative ratios (loss-to-profit flip)", () => {
+  // A company that just turned profitable: P/E -12 -> +25. The scorer treats
+  // negative P/E as no-data, so the narrator must not spin it as "the price
+  // grew faster than earnings".
+  const prev = takeSnapshot(payload({
+    scoring: { score: 50.0, verdict: "HOLD", categories: [{ label: "Valuation", score: 60 }] },
+    metrics: { pe: -12.0 },
+  }));
+  const curr = takeSnapshot(payload({
+    scoring: { score: 46.0, verdict: "SELL", categories: [{ label: "Valuation", score: 40 }] },
+    metrics: { pe: 25.0 },
+  }));
+  assert.equal(prev.drivers.pe, null); // stored as null at write time
+  const line = diffSnapshots(prev, curr).find((c) => c.startsWith("Score"));
+  assert.ok(!line.includes("grew faster than earnings"), line);
+});
+
+test("diffSnapshots names a vanished category instead of calling it sub-point drift", () => {
+  const prev = takeSnapshot(payload({
+    scoring: { score: 68.8, verdict: "BUY", categories: [
+      { label: "Valuation", score: 62 }, { label: "Analyst view", score: 90 },
+    ] },
+  }));
+  const curr = takeSnapshot(payload({
+    scoring: { score: 65.0, verdict: "HOLD", categories: [
+      { label: "Valuation", score: 62 },
+    ] },
+  }));
+  const line = diffSnapshots(prev, curr).find((c) => c.startsWith("Score"));
+  assert.ok(line.includes("Analyst view had no data this time"), line);
+  assert.ok(line.includes("weights renormalized"), line);
+  assert.ok(!line.includes("sub-point drifts"), line);
+});
+
+test("diffSnapshots announces a same-day filing of a different form", () => {
+  const prev = takeSnapshot(payload({ filings: [{ form: "10-Q", filed: "2026-07-31", label: "", url: "" }] }));
+  const curr = takeSnapshot(payload({ filings: [{ form: "8-K", filed: "2026-07-31", label: "", url: "" }] }));
+  const changes = diffSnapshots(prev, curr);
+  assert.ok(changes.some((c) => c.includes("New SEC filing: 8-K on 2026-07-31")), changes.join("|"));
 });

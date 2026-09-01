@@ -49,6 +49,28 @@ const NA = '<span class="na">N/A</span>';
 const fmtNum = (v, digits = 2) => (isNum(v) ? v.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: 0 }) : null);
 const fmtX = (v) => (isNum(v) ? `${fmtNum(v)}×` : null);
 const fmtEps = (v) => (isNum(v) ? v.toFixed(2) : null); // EPS always 2dp so "1.48 vs 1.50" lines up
+// Scores are computed and BANDED at one decimal — display them the same way,
+// or a 65.9 HOLD renders as "66" beside a "≥66 BUY" band table.
+const fmtScore = (v) => (isNum(v) ? (v % 1 === 0 ? String(v) : v.toFixed(1)) : "—");
+// The market's calendar day (America/New_York) as YYYY-MM-DD. Bare dates
+// parse as UTC midnight, so countdowns must diff against THIS, not Date.now().
+const nyDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+// Provenance values at 2dp everywhere a ⚠︎/✓ tooltip shows them — raw floats
+// in one tooltip and rounded ones in another read as different numbers.
+const pn = (v) => (typeof v === "number" ? String(Math.round(v * 100) / 100) : String(v));
+// One ticker shape for everything the user can store (portfolio, alerts,
+// follows) — it matches what the CSV importer and the search box accept, so
+// a symbol like BRK.B or MOG-A can't be held but not followed.
+const STORABLE_TICKER_RE = /^[A-Z][A-Z0-9.\-]{0,9}$/;
+// On weekends, holidays, and before the open a quote's day-change is the
+// prior session's — calling it "today" is wrong. Shared by the price header
+// and the portfolio total so they can never disagree.
+function sessionDayLabel() {
+  const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const nyIso = `${ny.getFullYear()}-${String(ny.getMonth() + 1).padStart(2, "0")}-${String(ny.getDate()).padStart(2, "0")}`;
+  const nyMins = ny.getHours() * 60 + ny.getMinutes();
+  return ny.getDay() === 0 || ny.getDay() === 6 || nyMins < 570 || MARKET_HOLIDAYS.has(nyIso) ? "last session" : "today";
+}
 const fmtPct = (v, signed = false) => (isNum(v) ? `${signed && v > 0 ? "+" : ""}${fmtNum(v)}%` : null);
 const fmtMoney = (v, currency = "USD") =>
   isNum(v) ? v.toLocaleString("en-US", { style: "currency", currency, maximumFractionDigits: 2 }) : null;
@@ -161,12 +183,7 @@ function renderCompany(d) {
     const delta = isNum(q.change) && isNum(q.changePercent)
       ? `${arrow} ${q.change > 0 ? "+" : ""}${fmtNum(q.change)} (${q.changePercent > 0 ? "+" : ""}${fmtNum(q.changePercent)}%)`
       : isNum(q.change) ? `${arrow} ${q.change > 0 ? "+" : ""}${fmtNum(q.change)}` : "";
-    // On weekends, holidays, and before the open the quote is the prior
-    // session's — calling it "today" is wrong.
-    const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
-    const nyIso = `${ny.getFullYear()}-${String(ny.getMonth() + 1).padStart(2, "0")}-${String(ny.getDate()).padStart(2, "0")}`;
-    const nyMins = ny.getHours() * 60 + ny.getMinutes();
-    const dayLabel = ny.getDay() === 0 || ny.getDay() === 6 || nyMins < 570 || MARKET_HOLIDAYS.has(nyIso) ? "last session" : "today";
+    const dayLabel = sessionDayLabel();
     priceHtml = `
       <div class="price-now">${fmtMoney(q.price, currency)}</div>
       <div class="price-delta ${dir}">${esc(delta)} ${dayLabel}</div>
@@ -209,7 +226,7 @@ function horizonBlockHtml(s) {
     const call = h.insufficientData
       ? `<span class="pill-sm v-nodata">NO DATA</span>`
       : `<span class="pill-sm ${verdictClass(h.verdict)}">${esc(h.verdict)}</span>
-         <span class="h-score">${Math.round(h.score)}</span>`;
+         <span class="h-score">${fmtScore(h.score)}</span>`;
     return `
       <div class="horizon-row">
         <span class="h-label">${esc(h.label)} <span class="h-hint">(${esc(h.hint)})</span></span>
@@ -233,7 +250,7 @@ function renderVerdict(d) {
     const detail = c.details
       .map((m) => {
         const p = m.key ? d.metricProvenance?.[m.key] : null;
-        const mark = p?.src === "conflict" ? ` <span class="prov prov-warn" title="Sources disagree on this number — Finnhub ${esc(String(p.finnhub))} vs SEC filings ${esc(String(p.edgar))}">⚠︎</span>` : "";
+        const mark = p?.src === "conflict" ? ` <span class="prov prov-warn" title="Sources disagree on this number — Finnhub ${esc(pn(p.finnhub))} vs SEC filings ${esc(pn(p.edgar))}">⚠︎</span>` : "";
         return `${esc(m.label)} ${esc(fmtDetailValue(m) ?? "N/A")}${m.score != null ? ` → ${m.score}` : ""}${mark}`;
       })
       .join(" · ");
@@ -269,7 +286,7 @@ function renderVerdict(d) {
     ? `<div class="verdict-score">–<small>/100</small></div>
        <div class="verdict-pill v-nodata">NOT ENOUGH DATA</div>
        <div class="verdict-conf">${s.availableCount}/${s.totalCategories} categories had data</div>`
-    : `<div class="verdict-score">${Math.round(s.score)}<small>/100</small></div>
+    : `<div class="verdict-score">${fmtScore(s.score)}<small>/100</small></div>
        <div class="verdict-pill ${verdictClass(s.verdict)}">${esc(s.verdict)}</div>
        <div class="verdict-conf">Data coverage: ${esc(s.confidence)} (${s.availableCount}/${s.totalCategories} categories) — how much was measurable, not how sure the call is</div>`;
 
@@ -497,7 +514,6 @@ function renderKeyNumbers(d) {
   };
   // Provenance chips: SEC = value came from EDGAR filings (Finnhub had none),
   // ✓ = both sources agree, ⚠︎ = they disagree (hover for both values).
-  const pn = (v) => (typeof v === "number" ? String(Math.round(v * 100) / 100) : String(v));
   const provMark = (key) => {
     const p = key ? d.metricProvenance?.[key] : null;
     if (!p) return "";
@@ -723,12 +739,14 @@ function renderAnalyst(d) {
 function nextEarningsLine(d) {
   const n = d.nextEarnings;
   if (!n?.date) return "";
-  const days = Math.round((Date.parse(n.date) - Date.now()) / 86_400_000);
+  // Whole ET calendar days — diffing against Date.now() read "in 0 days"
+  // for tomorrow's report from 8 AM ET onward, and dropped today's notice.
+  const days = Math.round((Date.parse(n.date) - Date.parse(nyDay())) / 86_400_000);
   const when = { amc: "after the close", bmo: "before the open", dmh: "during market hours" }[n.hour] ?? "";
   // An EPS estimate at or above the share price is share-class garbage.
   const est = isNum(n.epsEstimate) && (!isNum(d.quote?.price) || n.epsEstimate < d.quote.price)
-    ? ` — street expects EPS ${fmtNum(n.epsEstimate)}` : "";
-  return ` <b>Next report: ${esc(n.date)}${days >= 0 ? ` (in ${days} day${days === 1 ? "" : "s"}${when ? `, ${when}` : ""})` : ""}${est}.</b> Earnings days are the year's biggest single-day moves — know the date before money moves.`;
+    ? ` — street expects EPS ${fmtEps(n.epsEstimate)}` : "";
+  return ` <b>Next report: ${esc(n.date)}${days >= 0 ? ` (${days === 0 ? "today" : `in ${days} day${days === 1 ? "" : "s"}`}${when ? `, ${when}` : ""})` : ""}${est}.</b> Earnings days are the year's biggest single-day moves — know the date before money moves.`;
 }
 
 function renderEarnings(d) {
@@ -742,11 +760,15 @@ function renderEarnings(d) {
     <p class="sub">Reported EPS vs analyst estimate.${nextEarningsLine(d)}</p>
     <div class="earn-grid">
       ${rows.map((e) => {
+        // Sign comes from the value itself — a hardcoded "+" printed "+-1.3%"
+        // when the vendor's sign disagreed, and "+0%" on an exact meet.
+        const sp = isNum(e.surprisePercent) && e.surprisePercent !== 0
+          ? ` ${e.surprisePercent > 0 ? "+" : ""}${fmtNum(e.surprisePercent, 1)}%` : "";
         const chip = e.beat == null
           ? `<span class="earn-chip na">no estimate</span>`
           : e.beat
-            ? `<span class="earn-chip beat">▲ Beat${isNum(e.surprisePercent) ? ` +${fmtNum(e.surprisePercent, 1)}%` : ""}</span>`
-            : `<span class="earn-chip miss">▼ Miss${isNum(e.surprisePercent) ? ` ${fmtNum(e.surprisePercent, 1)}%` : ""}</span>`;
+            ? `<span class="earn-chip beat">▲ Beat${sp}</span>`
+            : `<span class="earn-chip miss">▼ Miss${sp}</span>`;
         return `
           <div class="earn-card">
             <div class="earn-q">${e.quarter && e.year ? `Q${esc(e.quarter)} ${esc(e.year)}` : "Quarter"}</div>
@@ -815,6 +837,8 @@ function renderPeers(d) {
         const res = await fetch(`/api/compare?ticker=${encodeURIComponent(d.ticker)}`);
         const body = await res.json();
         if (!res.ok) throw new Error(body.error ?? "Comparison failed.");
+        // Same formatters as the Key numbers tiles — the caption says "same
+        // vendor data as the tiles above", so the rendering must match too.
         const f = (v, suffix = "", digits = 1) => (isNum(v) ? `${fmtNum(v, digits)}${suffix}` : "—");
         $("compareOut").innerHTML = `
           <div class="ledger-table-wrap" style="margin-top:12px">
@@ -825,11 +849,11 @@ function renderPeers(d) {
                   <tr class="${r.symbol === d.ticker ? "cmp-me" : ""}">
                     <td><a href="/#${esc(r.symbol)}">${esc(r.symbol)}</a></td>
                     <td class="num">${isNum(r.marketCap) ? esc(fmtMarketCap(r.marketCap)) : "—"}</td>
-                    <td class="num">${f(r.pe, "×")}</td>
-                    <td class="num">${f(r.ps, "×")}</td>
-                    <td class="num">${f(r.netMargin, "%")}</td>
-                    <td class="num">${f(r.roe, "%")}</td>
-                    <td class="num">${f(r.revenueGrowth, "%")}</td>
+                    <td class="num">${fmtX(r.pe) ?? "—"}</td>
+                    <td class="num">${fmtX(r.ps) ?? "—"}</td>
+                    <td class="num">${fmtPct(r.netMargin) ?? "—"}</td>
+                    <td class="num">${fmtPct(r.roe) ?? "—"}</td>
+                    <td class="num">${fmtPct(r.revenueGrowth, true) ?? "—"}</td>
                     <td class="num">${f(r.debtEquity, "", 2)}</td>
                   </tr>`).join("")}
               </tbody>
@@ -854,7 +878,7 @@ function renderNews(d) {
   }
   el.news.innerHTML = `
     <h2>News</h2>
-    <p class="sub">Merged from Google News (hundreds of publishers), Yahoo Finance, and Finnhub — filtered to items that actually mention the company, deduplicated, newest first.</p>
+    <p class="sub">Merged from Google News (hundreds of publishers), Yahoo Finance${hasKey ? ", and Finnhub" : ""} — filtered to items that actually mention the company, deduplicated, newest first.</p>
     <ul class="news-list">
       ${items.map((n) => `
         <li class="news-item">
@@ -888,7 +912,7 @@ function buildBrief(d) {
 
   L.push("", "## Quote");
   if (d.quote && isNum(d.quote.price)) {
-    L.push(line("Price", `${fmtMoney(d.quote.price, p.currency || "USD")} (${fmtNum(d.quote.change) ?? "?"} / ${fmtNum(d.quote.changePercent) ?? "?"}% today, prev close ${fmtMoney(d.quote.previousClose, p.currency || "USD") ?? "N/A"})`));
+    L.push(line("Price", `${fmtMoney(d.quote.price, p.currency || "USD")} (${d.quote.change > 0 ? "+" : ""}${fmtNum(d.quote.change) ?? "?"} / ${fmtPct(d.quote.changePercent, true) ?? "?%"} today, prev close ${fmtMoney(d.quote.previousClose, p.currency || "USD") ?? "N/A"})`));
   } else {
     L.push("- Live quote unavailable");
   }
@@ -907,7 +931,7 @@ function buildBrief(d) {
   if (s.insufficientData) {
     L.push(`- NOT ENOUGH DATA — only ${s.availableCount}/${s.totalCategories} scoring categories had data.`);
   } else {
-    L.push(`- Overall ${Math.round(s.score)}/100 → ${s.verdict} (data coverage ${s.confidence}, ${s.availableCount}/${s.totalCategories} categories)`);
+    L.push(`- Overall ${fmtScore(s.score)}/100 → ${s.verdict} (data coverage ${s.confidence}, ${s.availableCount}/${s.totalCategories} categories)`);
     L.push(`- Bands (percentile-calibrated vs 16,497 historical S&P scores; a verdict states rank among large caps): >=74 STRONG BUY (top ~10%), >=66 BUY (top ~30%), >=55 HOLD, >=47 SELL, <47 STRONG SELL. Weights renormalize over categories with data.`);
   }
   for (const c of s.categories) {
@@ -920,7 +944,7 @@ function buildBrief(d) {
       const comps = h.components.map((c) => `${c.label} ${c.available ? c.score : "n/a"} (w ${c.weight})`).join(", ");
       L.push(h.insufficientData
         ? `- ${h.label} (${h.hint}): NO DATA — ${comps}`
-        : `- ${h.label} (${h.hint}): ${Math.round(h.score)}/100 → ${h.verdict} (confidence ${h.confidence}) — ${comps}`);
+        : `- ${h.label} (${h.hint}): ${fmtScore(h.score)}/100 → ${h.verdict} (confidence ${h.confidence}) — ${comps}`);
     }
   }
 
@@ -972,7 +996,8 @@ function buildBrief(d) {
   L.push("", "## Earnings — last 4 quarters (EPS actual vs estimate)");
   if (d.earnings?.length) {
     for (const e of d.earnings) {
-      const tag = e.beat == null ? "no estimate" : e.beat ? `BEAT${isNum(e.surprisePercent) ? ` +${fmtNum(e.surprisePercent, 1)}%` : ""}` : `MISS${isNum(e.surprisePercent) ? ` ${fmtNum(e.surprisePercent, 1)}%` : ""}`;
+      const sp = isNum(e.surprisePercent) && e.surprisePercent !== 0 ? ` ${e.surprisePercent > 0 ? "+" : ""}${fmtNum(e.surprisePercent, 1)}%` : "";
+      const tag = e.beat == null ? "no estimate" : e.beat ? `BEAT${sp}` : `MISS${sp}`;
       L.push(`- Q${e.quarter ?? "?"} ${e.year ?? "?"} (${e.period ?? "?"}): ${fmtEps(e.actual) ?? "N/A"} vs ${fmtEps(e.estimate) ?? "N/A"} est. — ${tag}`);
     }
   } else {
@@ -984,7 +1009,9 @@ function buildBrief(d) {
 
   L.push("", `## Recent news (${d.news?.length ?? 0} items, multiple sources, deduped, newest first)`);
   for (const n of d.news ?? []) {
-    const when = n.date ? new Date(n.date).toISOString().slice(0, 10) : "?";
+    // Local calendar day, matching the brief's locally-rendered "Generated"
+    // stamp — toISOString dated a 9:30 PM ET story tomorrow.
+    const when = n.date ? new Date(n.date).toLocaleDateString("en-CA") : "?";
     L.push(`- [${n.source}, ${when}] ${n.headline}${n.summary ? ` — ${n.summary}` : ""}${n.link && n.link !== "#" ? ` (${n.link})` : ""}`);
   }
 
@@ -1028,7 +1055,7 @@ function stopLive() {
 // simply stays put. The stream dies silently on any server/key problem.
 function startLive(d) {
   stopLive();
-  if (d.demo || !d.quote || !isNum(d.quote.previousClose)) return;
+  if (d.demo || !d.quote || !isNum(d.quote.previousClose) || d.quote.previousClose <= 0) return; // pc=0 would print "(+null%)"
   const currency = d.profile?.currency || "USD";
   const prevClose = d.quote.previousClose;
   const es = new EventSource(`/api/stream?ticker=${encodeURIComponent(d.ticker)}`);
@@ -1052,7 +1079,7 @@ function startLive(d) {
     const arrow = dir === "up" ? "▲" : dir === "down" ? "▼" : "•";
     if (deltaEl) {
       deltaEl.className = `price-delta ${dir}`;
-      deltaEl.textContent = `${arrow} ${change > 0 ? "+" : ""}${fmtNum(change)} (${pct > 0 ? "+" : ""}${fmtNum(pct)}%) today`;
+      deltaEl.textContent = `${arrow} ${change > 0 ? "+" : ""}${fmtNum(change)}${isNum(pct) ? ` (${pct > 0 ? "+" : ""}${fmtNum(pct)}%)` : ""} today`;
     }
     if (sub) {
       // Upstream trade timestamps aren't reliable wall-clock; the arrival
@@ -1093,7 +1120,9 @@ function drawShareCard(d) {
   x.fillStyle = "#7d828b";
   x.font = "13px system-ui, sans-serif";
   x.textAlign = "right";
-  x.fillText(new Date(d.asOf).toISOString().slice(0, 10), W - 40, 54);
+  // ET market day, matching the ledger's stamp — toISOString dated an
+  // 8:30 PM ET analysis tomorrow while the public log said today.
+  x.fillText(new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(d.asOf)), W - 40, 54);
   x.textAlign = "left";
 
   // Ticker + name
@@ -1108,10 +1137,12 @@ function drawShareCard(d) {
   const band = s.insufficientData ? null : (s.verdict ?? null);
   x.fillStyle = "#e9eaec";
   x.font = mono.replace("(px)", "96px");
-  x.fillText(s.insufficientData ? "–" : String(Math.round(s.score)), 40, 290);
+  const scoreTxt = s.insufficientData ? "–" : fmtScore(s.score);
+  x.fillText(scoreTxt, 40, 290);
+  const scoreW = x.measureText(scoreTxt).width; // measured, not chars×58 — "41.5" has a narrow dot
   x.fillStyle = "#7d828b";
   x.font = mono.replace("(px)", "24px");
-  x.fillText("/100", 40 + x.measureText(" ").width + (s.insufficientData ? 60 : String(Math.round(s.score)).length * 58), 290);
+  x.fillText("/100", 40 + scoreW + 10, 290);
   if (band) {
     const col = BAND_COLORS[band] ?? "#7d828b";
     x.strokeStyle = col;
@@ -1293,7 +1324,7 @@ function renderTimeMachine(p) {
   const cell = (v) => (v == null ? "—" : `<span class="${v > 0.0001 ? "delta-up" : v < -0.0001 ? "delta-down" : "delta-flat"}">${v > 0 ? "+" : ""}${(v * 100).toFixed(1)}%</span>`);
   const hero = s.insufficientData
     ? `<div class="verdict-score">–<small>/100</small></div><div class="verdict-pill v-nodata">NOT ENOUGH DATA</div>`
-    : `<div class="verdict-score">${Math.round(s.score)}<small>/100</small></div>
+    : `<div class="verdict-score">${fmtScore(s.score)}<small>/100</small></div>
        <div class="verdict-pill ${verdictClass(s.verdict)}">${esc(s.verdict)}</div>
        <div class="verdict-conf">${s.availableCount}/6 categories knowable then</div>`;
 
@@ -1319,8 +1350,8 @@ function renderTimeMachine(p) {
         const beat = o.excess > 0.0001;
         const trail = o.excess < -0.0001;
         const dollars = `$100 in ${esc(p.ticker)} became $${Math.round(100 * (1 + o.ret))}; in the S&P it became $${Math.round(100 * (1 + o.spyRet))}`;
-        const dir = beat ? `went on to beat the market by ${(o.excess * 100).toFixed(1)} points`
-          : trail ? `went on to trail the market by ${(-o.excess * 100).toFixed(1)} points` : "went on to match the market";
+        const dir = beat ? `went on to beat the market by ${(o.excess * 100).toFixed(1)}%`
+          : trail ? `went on to trail the market by ${(-o.excess * 100).toFixed(1)}%` : "went on to match the market";
         const v = p.scoring?.insufficientData ? null : p.scoring?.verdict;
         const grade = /BUY/.test(v ?? "") ? (beat ? " — the outcome a buy call hopes for" : " — not the outcome a buy call hopes for")
           : /SELL/.test(v ?? "") ? (trail ? " — the outcome a sell call hopes for" : " — not the outcome a sell call hopes for") : "";
@@ -1591,6 +1622,7 @@ function renderMacro(rows) {
   const val = (r) => {
     if (r.kind === "yield") return `${fmtNum(r.value, 2)}%`;
     if (r.kind === "fx") return fmtNum(r.value, 4);
+    if (r.kind === "usd") return `$${fmtNum(r.value, r.value >= 1000 ? 0 : 2)}`; // oil/gold are prices — the crypto card says $, so this must too
     if (r.value >= 1000) return fmtNum(r.value, 0);
     return fmtNum(r.value, 2);
   };
@@ -1614,7 +1646,10 @@ function renderCalendar(events) {
     card.hidden = true;
     return;
   }
-  const daysUntil = (d) => Math.max(0, Math.round((Date.parse(d) - Date.now()) / 86_400_000));
+  // Whole ET days — against Date.now(), tomorrow's FOMC read "today" from
+  // 8 AM ET onward (bare dates parse as UTC midnight).
+  const et = Date.parse(nyDay());
+  const daysUntil = (d) => Math.max(0, Math.round((Date.parse(d) - et) / 86_400_000));
   card.innerHTML = `
     <h2>Economic calendar</h2>
     <p class="sub">The scheduled events that move everything at once. Only dependable dates — nothing guessed.</p>
@@ -1643,7 +1678,7 @@ function renderEarningsWeek(rows) {
       <div class="cal-row mkt-row" tabindex="0" role="link" data-t="${esc(r.symbol)}">
         <span class="cal-date">${esc(dayName(r.date))}</span>
         <span class="cal-name mkt-sym">${esc(r.symbol)}</span>
-        <span class="cal-in">${r.epsEstimate != null ? `est EPS $${esc(r.epsEstimate.toFixed(2))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
+        <span class="cal-in">${r.epsEstimate != null ? `est EPS ${esc(fmtEps(r.epsEstimate))}` : ""}${r.hour === "bmo" ? " · pre-open" : r.hour === "amc" ? " · after close" : ""}</span>
       </div>`).join("")}`;
   card.hidden = false;
 }
@@ -1790,7 +1825,7 @@ async function loadPfQuotes(fresh = false) {
   renderPortfolio();
 }
 
-const fmtUsd = (v) => `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const fmtUsd = (v) => `${v < 0 ? "-" : ""}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })}`; // ASCII minus, matching every % formatter beside it
 
 function renderPortfolio() {
   const card = $("portfolioCard");
@@ -1801,7 +1836,7 @@ function renderPortfolio() {
       <input name="t" type="text" maxlength="10" spellcheck="false" placeholder="Ticker" aria-label="Ticker" />
       <input name="sh" type="number" min="0" step="any" placeholder="Shares" aria-label="Shares" />
       <input name="cost" type="number" min="0" step="any" placeholder="$/share" aria-label="Cost per share" />
-      <input name="date" type="date" max="${localDay()}" aria-label="Buy date (optional)" title="Buy date — optional, but it unlocks the honest question: would the S&amp;P have done better?" />
+      <input name="date" type="date" max="${nyDay()}" aria-label="Buy date (optional)" title="Buy date — optional, but it unlocks the honest question: would the S&amp;P have done better?" />
       <button type="submit">Add</button>
     </form>
     <label class="pf-import">Import your broker's positions CSV (Fidelity: Positions &#8594; the Download icon) — read in this browser only, never uploaded.
@@ -1845,7 +1880,7 @@ function renderPortfolio() {
         ${plPct != null ? `<span class="badge ${chgCls(plPct)}">${esc(fmtPct(plPct, true))}</span>` : ""}
         <span class="star-cell"><button type="button" class="pf-rm" data-rm="${i}" title="Remove this lot">×</button></span>
       </div>
-      ${spyDiff != null ? `<div class="watch-verdict"><span class="sect-mo ${spyDiff >= 0 ? "pos" : "neg"}">${spyDiff >= 0 ? "beating" : "trailing"} the S&amp;P by ${esc(fmtPct(Math.abs(spyDiff), false))}</span><span class="watch-score">since ${esc(l.date)} · dividends counted</span></div>` : ""}
+      ${spyDiff != null ? `<div class="watch-verdict"><span class="sect-mo ${spyDiff >= 0 ? "pos" : "neg"}">${spyDiff >= 0 ? "beating" : "trailing"} the S&amp;P by ${esc(fmtPct(Math.abs(spyDiff), false))}</span><span class="watch-score">since ${esc(l.date)} · S&amp;P dividends counted; your side is price-only</span></div>` : ""}
     </div>`;
   }).join("");
   const pl = value - costTot;
@@ -1854,12 +1889,13 @@ function renderPortfolio() {
     ? (() => {
         const spyPct = ((spyVal - spyCost) / spyCost) * 100;
         const diff = datedVal - spyVal;
-        return `<div class="pf-total-sub">Same money in the S&amp;P instead (dividends counted): ${esc(fmtPct(spyPct, true))} —
-          you're ${diff >= 0 ? "ahead" : "behind"} by ${esc(fmtUsd(Math.abs(diff)))} on the dated lots.</div>`;
+        return `<div class="pf-total-sub">Same money in the S&amp;P instead (its dividends counted): ${esc(fmtPct(spyPct, true))} —
+          you're ${diff >= 0 ? "ahead" : "behind"} by ${esc(fmtUsd(Math.abs(diff)))} on the dated lots. Your side is price-only,
+          so dividend payers look a little worse here than they really did.</div>`;
       })()
     : `<div class="pf-total-sub">Add buy dates to unlock the vs-S&amp;P comparison.</div>`;
   const incomeLine = income > 0
-    ? `<div class="pf-total-sub">Dividends: these positions paid ${esc(fmtUsd(income))} over the last 12 months — a record of what happened, not a promise of what's next.</div>`
+    ? `<div class="pf-total-sub">Dividends: trailing 12 months at your current share counts — ${esc(fmtUsd(income))}. What these holdings paid per share over the past year, not necessarily what you received (lots held under a year collected less).</div>`
     : "";
   card.innerHTML = `
     <h2>Your portfolio</h2>
@@ -1867,7 +1903,7 @@ function renderPortfolio() {
     ${quoted ? `<div class="pf-total">
       <span>${esc(fmtUsd(value))}</span>
       ${plPctTot != null ? `<span class="badge ${chgCls(plPctTot)}">${esc(fmtUsd(pl))} (${esc(fmtPct(plPctTot, true))})</span>` : ""}
-      ${isNum(dayChg) && dayChg !== 0 ? `<span class="pf-day ${dayChg >= 0 ? "pos" : "neg"}">${esc(fmtUsd(dayChg))} today</span>` : ""}
+      ${isNum(dayChg) && dayChg !== 0 ? `<span class="pf-day ${dayChg >= 0 ? "pos" : "neg"}">${esc(fmtUsd(dayChg))} ${sessionDayLabel()}</span>` : ""}
     </div>${spyLine}${incomeLine}` : hasKey ? `<div class="pf-total-sub">Loading prices…</div>` : `<div class="pf-total-sub">Add a free Finnhub key (top of the page on first run) for live prices.</div>`}
     ${form}
     <p class="pf-privacy">Private: positions live in this browser only and are never uploaded.</p>`;
@@ -1927,8 +1963,8 @@ function parseBrokerCsv(text) {
     const f = splitCsvLine(line);
     const rawSym = String(f[iSym] ?? "").trim();
     if (/\*\*$/.test(rawSym)) continue; // Fidelity core/money-market position
-    const t = rawSym.replace(/[^A-Za-z.\-]/g, "").toUpperCase();
-    if (!/^[A-Z][A-Z.\-]{0,9}$/.test(t)) continue;
+    const t = rawSym.replace(/[^A-Za-z0-9.\-]/g, "").toUpperCase();
+    if (!STORABLE_TICKER_RE.test(t)) continue;
     const sh = money(f[iQty]);
     if (!(sh > 0)) continue;
     let cost = iAvg >= 0 ? money(f[iAvg]) : null;
@@ -1956,9 +1992,12 @@ $("portfolioCard").addEventListener("change", async (e) => {
   const existing = readPf();
   const have = new Set(existing.map((l) => l.t));
   const fresh = found.filter((l) => !have.has(l.t));
+  const room = Math.max(0, 30 - existing.length);
+  const stored = Math.min(fresh.length, room); // report what was KEPT, not what the file held
   writeJSON(PF_KEY, [...existing, ...fresh].slice(0, 30));
-  pfImportMsg = `Imported ${fresh.length} position${fresh.length === 1 ? "" : "s"}`
+  pfImportMsg = `Imported ${stored} position${stored === 1 ? "" : "s"}`
     + (found.length - fresh.length ? ` (${found.length - fresh.length} already tracked — left untouched)` : "")
+    + (fresh.length - stored ? ` (${fresh.length - stored} dropped — the portfolio caps at 30 lots)` : "")
     + `. Broker files carry no buy dates, so add dates by hand to unlock the vs-S&P comparison.`;
   loadPfQuotes();
 });
@@ -1970,9 +2009,16 @@ $("portfolioCard").addEventListener("submit", (e) => {
   const sh = Number(f.elements.sh?.value);
   const cost = Number(f.elements.cost?.value);
   const date = String(f.elements.date?.value ?? "") || null;
-  if (!/^[A-Z][A-Z.]{0,9}$/.test(t) || t === "DEMO" || !(sh > 0) || !(cost > 0)) return;
-  if (date && date > localDay()) return;
-  writeJSON(PF_KEY, [...readPf(), { t, sh, cost, date }]);
+  if (!STORABLE_TICKER_RE.test(t) || t === "DEMO" || !(sh > 0) || !(cost > 0)) return;
+  if (date && date > nyDay()) return; // the benchmark runs on ET days — a tomorrow-in-ET date would silently lose its vs-S&P line
+  const lots = readPf();
+  document.activeElement?.blur?.(); // focus in the form blocks the repaint guard — the submit's own render must land
+  if (lots.length >= 30) {
+    pfImportMsg = "The portfolio caps at 30 lots — remove one to add another.";
+    renderPortfolio();
+    return;
+  }
+  writeJSON(PF_KEY, [...lots, { t, sh, cost, date }]);
   f.reset();
   loadPfQuotes();
 });
@@ -2019,6 +2065,7 @@ function renderCrypto(rows) {
 const ALERT_KEY = "cc_alerts";
 const readAlerts = () => readJSON(ALERT_KEY, []).filter((a) =>
   a && typeof a.t === "string" && (a.dir === "above" || a.dir === "below") && isNum(a.price) && a.price > 0).slice(0, 20);
+let alertMsg = "";
 let alertQuotes = {};
 const alertNotified = new Set();
 
@@ -2046,7 +2093,7 @@ async function checkAlerts() {
       alertNotified.add(id);
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         try {
-          new Notification(`${a.t} is ${a.dir} $${a.price}`, { body: `Now ${fmtPrice(q.price)} — Crosscheck price alert` });
+          new Notification(`${a.t} is ${a.dir} ${fmtPrice(a.price)}`, { body: `Now ${fmtPrice(q.price)} — Crosscheck price alert` });
         } catch { /* notifications unavailable */ }
       }
     }
@@ -2078,6 +2125,7 @@ function renderAlerts() {
           <button type="button" class="pf-rm" data-rmalert="${i}" title="Remove alert">×</button></span>
       </div>`;
     }).join("") : `<p class="watch-empty">Set a level and the card lights up when it crosses — with a desktop notification if you allow them.</p>`}
+    ${alertMsg ? `<p class="pf-total-sub">${esc(alertMsg)}</p>` : ""}
     ${form}`;
 }
 
@@ -2087,8 +2135,16 @@ $("alertCard").addEventListener("submit", (e) => {
   const t = String(f.elements.t?.value ?? "").trim().toUpperCase();
   const dir = f.elements.dir?.value === "below" ? "below" : "above";
   const price = Number(f.elements.price?.value);
-  if (!/^[A-Z][A-Z.]{0,9}$/.test(t) || t === "DEMO" || !(price > 0)) return;
-  writeJSON(ALERT_KEY, [...readAlerts(), { t, dir, price }]);
+  if (!STORABLE_TICKER_RE.test(t) || t === "DEMO" || !(price > 0)) return;
+  const alerts = readAlerts();
+  document.activeElement?.blur?.(); // see the portfolio submit — the repaint guard must not eat this render
+  if (alerts.length >= 20) {
+    alertMsg = "Alerts cap at 20 — remove one to add another.";
+    renderAlerts();
+    return;
+  }
+  alertMsg = "";
+  writeJSON(ALERT_KEY, [...alerts, { t, dir, price }]);
   if (typeof Notification !== "undefined" && Notification.permission === "default") {
     Notification.requestPermission().catch(() => {});
   }
@@ -2130,13 +2186,16 @@ const hasImg = (n) => /^https:\/\//i.test(n?.image ?? "");
 // reader merely glanced at into their personal feed.
 const youTickers = () => readWatch().slice(0, 6);
 
+let feedSeq = 0; // every load gets a sequence number so a stale resolution can never paint (tab-name equality couldn't tell "same tab, newer load" apart)
 async function loadFeed(tab, limit = 10) {
+  const seq = ++feedSeq;
   feedTab = tab;
   feedPage = 0;
   feedItems = []; // a switched tab shows Loading, never the old tab's stories
   const t = tab === "you" || tab === "filings" ? youTickers() : [];
   if ((tab === "you" || tab === "filings") && !t.length) {
     feedItems = [];
+    feedLoading = false; // an in-flight load may have set it — the follow prompt must not spin
     renderNewsCard();
     return;
   }
@@ -2144,11 +2203,11 @@ async function loadFeed(tab, limit = 10) {
   renderNewsCard();
   try {
     const res = await fetch(`/api/feed?tab=${tab}&limit=${limit}${t.length ? `&t=${encodeURIComponent(t.join(","))}` : ""}`);
-    if (res.ok && feedTab === tab) feedItems = (await res.json()).items ?? [];
+    if (res.ok && feedSeq === seq) feedItems = (await res.json()).items ?? [];
   } catch {
     /* keep whatever was showing */
   }
-  if (feedTab !== tab) return; // superseded by a newer tab click
+  if (feedSeq !== seq) return; // superseded by a newer load
   feedLoading = false;
   renderNewsCard();
 }
@@ -2281,12 +2340,18 @@ const MARKET_HOLIDAYS = new Set([
   "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24",
 ]);
 
+// NYSE 1:00 PM early closes — from 1 to 4 PM these days the exchange is
+// shut, and "Market open" would be a lie for three hours.
+const MARKET_HALF_DAYS = new Set(["2026-11-27", "2026-12-24", "2027-11-26"]);
+
 function marketStatus() {
   const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+  if (ny.getFullYear() > 2027) return null; // the calendar runs out — say nothing rather than guess
   const iso = `${ny.getFullYear()}-${String(ny.getMonth() + 1).padStart(2, "0")}-${String(ny.getDate()).padStart(2, "0")}`;
   if (MARKET_HOLIDAYS.has(iso)) return "closed";
   const mins = ny.getHours() * 60 + ny.getMinutes();
-  return ny.getDay() >= 1 && ny.getDay() <= 5 && mins >= 570 && mins < 960 ? "open" : "closed";
+  const closeMins = MARKET_HALF_DAYS.has(iso) ? 780 : 960;
+  return ny.getDay() >= 1 && ny.getDay() <= 5 && mins >= 570 && mins < closeMins ? "open" : "closed";
 }
 
 // Visit streak: consecutive days the front page was opened.
@@ -2310,7 +2375,7 @@ function renderToday() {
   const ago = lastUpdatedAt ? Math.max(0, Math.round((Date.now() - lastUpdatedAt) / 1000)) : null;
   $("todayBar").innerHTML = `
     <span class="today-date">${esc(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</span>
-    <span class="today-mkt ${st}"><i></i>Market ${st}</span>
+    ${st ? `<span class="today-mkt ${st}"><i></i>Market ${st}</span>` : ""}
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
     ${s.current > 1 ? `<span class="today-upd">${s.current}-day streak${s.best > s.current ? ` · best ${s.best}` : ""}</span>` : ""}
     <button type="button" id="tourBtn" class="today-daily${readJSON("cc_tour_done", false) ? "" : " pulse"}">New here? Tour the site</button>
@@ -2356,12 +2421,12 @@ function toggleWatch(t) {
   writeJSON(WATCH_KEY, w.includes(t) ? w.filter((x) => x !== t) : [t, ...w].slice(0, 12));
   refreshStars();
   loadWatchQuotes();
-  if (feedTab === "you") loadFeed("you", 96);
+  if (feedTab === "you" || feedTab === "filings") loadFeed(feedTab, 96); // both tabs are driven by the follow list
 }
 
 const starBtn = (t) => {
   const on = readWatch().includes(t);
-  return `<button type="button" class="star${on ? " on" : ""}" data-star="${esc(t)}" title="${on ? "Unwatch" : "Watch"} ${esc(t)}">${on ? "★" : "☆"}</button>`;
+  return `<button type="button" class="star${on ? " on" : ""}" data-star="${esc(t)}" title="${on ? "Unfollow" : "Follow"} ${esc(t)}">${on ? "★" : "☆"}</button>`;
 };
 
 function refreshStars() {
@@ -2524,10 +2589,11 @@ $("watchCard").addEventListener("submit", (e) => {
   e.preventDefault();
   const input = e.target.querySelector("input");
   const t = String(input?.value ?? "").trim().toUpperCase();
-  if (!/^[A-Z][A-Z.]{0,9}$/.test(t) || t === "DEMO") {
+  if (!STORABLE_TICKER_RE.test(t) || t === "DEMO") {
     input?.select();
     return;
   }
+  document.activeElement?.blur?.(); // the repaint guard must not eat the follow's own render
   if (!readWatch().includes(t)) toggleWatch(t);
   else input.value = "";
 });
@@ -2556,7 +2622,7 @@ function renderScreen() {
   const arrow = (k) => (screenSort.key === k ? (screenSort.dir === -1 ? " ↓" : " ↑") : "");
   scr.innerHTML = `
     <h2>Verdict screen</h2>
-    <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData[0].date)})${screenSource === "official" ? " · the official forward test, published by the project" : ""} ·
+    <p class="sub">${screenData.length} stocks ranked by the formula's latest score (logged ${esc(screenData.reduce((m, r) => (r.date > m ? r.date : m), screenData[0].date))})${screenSource === "official" ? " · the official forward test, published by the project" : ""} ·
       every call graded on the <a href="/ledger.html">track record</a> · not advice — the formula's own
       <a href="/evidence.html">backtests</a> showed no predictive edge.</p>
     <p class="sub">Why these 50: household-name US large caps spanning all 11 sectors in rough S&amp;P proportion,
@@ -2648,7 +2714,7 @@ function renderHeat() {
           <div class="heat-sector-label">${esc(sec)} <span class="${chgCls(avg(list))}">${esc(fmtPct(avg(list), true))}</span></div>
           <div class="heat-tiles">
             ${[...list].sort((a, b) => b.changePercent - a.changePercent).map((r) => `
-              <button type="button" class="heat-tile mkt-row" data-t="${esc(r.ticker)}" style="${heatStyle(r.changePercent)}" title="${(() => { const nm = moversData?.names?.[r.ticker]?.[0]; const v = verdictOf(r.ticker); return esc(`${nm ? `${nm} (${r.ticker})` : r.ticker} — ${r.changePercent > 0 ? "up" : r.changePercent < 0 ? "down" : "flat"} ${Math.abs(r.changePercent).toFixed(1)}% today${v ? ` · formula's latest read: ${v.verdict}, ${v.score}/100 — a rank of fundamentals, not a forecast` : ""}`); })()}">
+              <button type="button" class="heat-tile mkt-row" data-t="${esc(r.ticker)}" style="${heatStyle(r.changePercent)}" title="${(() => { const nm = moversData?.names?.[r.ticker]?.[0]; const v = verdictOf(r.ticker); return esc(`${nm ? `${nm} (${r.ticker})` : r.ticker} — ${r.changePercent > 0 ? "up" : r.changePercent < 0 ? "down" : "flat"} ${fmtNum(Math.abs(r.changePercent))}% today${v ? ` · formula's latest read: ${v.verdict}, ${v.score}/100 — a rank of fundamentals, not a forecast` : ""}`); })()}">
                 ${verdictOf(r.ticker) ? `<span class="heat-dot ${verdictClass(verdictOf(r.ticker).verdict)}"></span>` : ""}
                 <span class="heat-sym">${esc(r.ticker)}</span>
                 <span class="heat-chg">${esc(fmtPct(r.changePercent, true))}</span>
@@ -2753,7 +2819,7 @@ function renderRecord(s) {
     ["Calls logged", String(s.calls), ""],
     ["Days with calls", String(s.days), ""], // distinct call dates — the ledger's "over N days" is the calendar span, a different number
     ["Graded so far", String(s.graded), ""],
-    ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}%` : "no calls 30d old yet", isNum(s.rightPct) && s.rightPct >= 53 ? "pos" : ""],
+    ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}%` : s.seasoned > 0 ? `only ${s.seasoned} of the 30 calls needed` : "no calls 30d old yet", isNum(s.rightPct) && s.rightPct >= 53 ? "pos" : ""],
     s.best && s.graded >= 5 ? ["Best aged call", callLabel(s.best), (callEdge(s.best) ?? 0) > 0 ? "pos" : ""] : null,
     s.worst && s.graded >= 5 ? ["Worst aged call", callLabel(s.worst), (callEdge(s.worst) ?? 0) < 0 ? "neg" : ""] : null,
   ].filter(Boolean);
@@ -2905,8 +2971,13 @@ for (const id of ["screenCard", "moversCard", "heatCard", "marketNews", "heroLea
 
 // Keep the landing data fresh while it's on screen. The server caches the
 // payload for 2 minutes, so this polling costs nothing extra upstream.
+// Alerts check UNCONDITIONALLY — the card promises "checked every two
+// minutes while Crosscheck is open", and a user reading a ticker page for
+// an hour is still "open". loadMarket calls checkAlerts itself, so the
+// standalone check runs only when the front page isn't driving one.
 setInterval(() => {
   if (!el.intro.hidden) loadMarket();
+  else checkAlerts();
 }, 120_000);
 
 window.addEventListener("hashchange", () => {

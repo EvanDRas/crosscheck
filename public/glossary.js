@@ -120,7 +120,7 @@ window.TERMS = {
   confidence: {
     name: "Data coverage",
     what: "How many of the six categories had enough data to score. High means five or six of the six; lower means the verdict rests on fewer legs.",
-    use: "Fewer than two scorable categories means NOT ENOUGH DATA instead of a fake verdict. Degraded results are never logged to the track record.",
+    use: "Fewer than four scorable categories means NOT ENOUGH DATA instead of a fake verdict. Degraded results are never logged to the track record.",
     caveat: "High confidence means the inputs were present, not that the call is right.",
     live: "DEMO",
   },

@@ -10,6 +10,11 @@ const pillClass = (v) =>
 
 const money = (v) => (isNum(v) ? v.toLocaleString("en-US", { style: "currency", currency: "USD" }) : "—");
 
+// The server declares the current formula era; guessing it from entry
+// contents made a v1-only ledger call v1 "current" and contradict the
+// server-built (v2-filtered) aggregates on the same page.
+const currentEra = (data) => data.currentEra ?? (data.entries.some((e) => e.formulaVersion === "v2") ? "v2" : "v1");
+
 function pct(v, digits = 2) {
   if (!isNum(v)) return null;
   const x = v * 100;
@@ -27,7 +32,7 @@ function renderSummary(data) {
   // Same hygiene as the aggregates AND the homepage tiles: current-era,
   // aged, total-return-graded rows only — one definition of "graded"
   // everywhere, or the site contradicts itself about its headline number.
-  const era = data.entries.some((e) => e.formulaVersion === "v2") ? "v2" : "v1";
+  const era = currentEra(data);
   const graded = data.entries.filter((e) => (e.formulaVersion ?? "v1") === era && e.excess != null && e.ageDays > 0 && e.basis === "tr");
   const dates = data.entries.map((e) => e.date).sort();
   const avgExcess = graded.length ? graded.reduce((a, e) => a + e.excess, 0) / graded.length : null;
@@ -54,7 +59,10 @@ function renderSummary(data) {
   ];
   const thru = data.entries.reduce((m, e) => (e.gradedThrough && e.gradedThrough > (m ?? "") ? e.gradedThrough : m), null);
   const rp = called.length ? (right / called.length) * 100 : null;
-  const daysRunning = dates.length ? Math.max(1, Math.round((Date.now() - Date.parse(dates[0])) / 86_400_000)) : 0;
+  // Both sides parse as UTC midnights of ET market days, so the span rolls
+  // at the day boundary — Date.now() on the left made it roll at 8 AM ET.
+  const todayEt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  const daysRunning = dates.length ? Math.max(1, Math.round((Date.parse(todayEt) - Date.parse(dates[0])) / 86_400_000)) : 0;
   const read = called.length < 20 ? "too few aged directional calls to judge yet"
     : rp >= 57 ? "better than a coin flip so far — but these calls overlap in time and share one market backdrop, so it only counts if it holds for months"
     : rp >= 53 ? "a shade better than a coin flip so far — treat that as noise until it lasts"
@@ -63,7 +71,7 @@ function renderSummary(data) {
     : "about a coin flip, which is exactly what the backtests predicted";
   const headline = graded.length
     ? `<p class="sub"><b>The story so far:</b> after ${data.entries.length} calls over ${daysRunning} days, the formula is right on
-       direction ${called.length ? `${Math.round(rp)}% of the time (${right} of ${called.length})` : "— (none aged)"} and its average
+       direction ${called.length ? `${Math.round(rp)}% of the time (${right} of ${called.length})` : "— (no directional calls aged yet — HOLDs abstain)"} and its average
        graded call sits ${pct(avgExcess)} vs the market — ${read}.</p>`
     : "";
   $("summaryCard").innerHTML = `
@@ -120,7 +128,7 @@ function renderAggregates(data) {
 }
 
 function renderCalls(data, showAll = false) {
-  const era = data.entries.some((e) => e.formulaVersion === "v2") ? "v2" : "v1";
+  const era = currentEra(data);
   const CAP = 100;
   const visible = showAll ? data.entries : data.entries.slice(0, CAP);
   const anyRaw = data.entries.some((e) => e.basis === "raw");
@@ -128,6 +136,7 @@ function renderCalls(data, showAll = false) {
   const notes = [];
   if (anyRaw) notes.push("* graded from raw live quotes (ticker outside the local panel) — not split/dividend-adjusted.");
   if (anyFrozen) notes.push("† price series stopped updating (left the index); graded through its last close, SPY over the same window.");
+  notes.push("Returns run from the call date's split/dividend-adjusted close to the latest adjusted close, so they won't match arithmetic on the Price then column — especially across splits.");
   $("callsCard").innerHTML = `
     <h2>All calls — newest first</h2>
     <p class="sub">Each row froze the moment it was logged; only the "now" columns move.</p>
@@ -146,7 +155,7 @@ function renderCalls(data, showAll = false) {
               <td>${esc(e.date)}${(e.formulaVersion ?? "v1") !== era ? ` <span class="era-tag">${esc(e.formulaVersion ?? "v1")}</span>` : ""}</td>
               <td><a href="/#${esc(e.ticker)}">${esc(e.ticker)}</a></td>
               <td><span class="pill-sm ${pillClass(e.verdict)}">${esc(e.verdict)}</span></td>
-              <td class="num">${isNum(e.score) ? Math.round(e.score) : "—"}</td>
+              <td class="num">${isNum(e.score) ? (e.score % 1 === 0 ? e.score : e.score.toFixed(1)) : "—"}</td>
               <td>${e.ntVerdict ? `<span class="pill-sm ${pillClass(e.ntVerdict)}">${esc(e.ntVerdict)}</span>` : "—"}</td>
               <td>${e.ltVerdict ? `<span class="pill-sm ${pillClass(e.ltVerdict)}">${esc(e.ltVerdict)}</span>` : "—"}</td>
               <td class="num">${money(e.price)}</td>
@@ -174,7 +183,7 @@ function renderMyPicks(data) {
     return;
   }
   const s = data.summary;
-  const acc = s ? `${s.correct} of ${s.graded} right (${Math.round(s.accuracy * 100)}%)` : "— (calls need at least a day of age)";
+  const acc = s ? `${s.correct} of ${s.graded} right (${Math.round(s.accuracy * 100)}%)${s.rawGraded ? ` — ${s.rawGraded} graded price-only*` : ""}` : "— (calls need at least a day of age)";
   const dirLabel = { buy: "BUY", avoid: "PASS", sell: "SELL" };
   const dirClass = { buy: "v-buy", avoid: "v-hold", sell: "v-sell" };
   card.innerHTML = `
@@ -190,7 +199,9 @@ function renderMyPicks(data) {
         </tr></thead>
         <tbody>
           ${data.entries.map((e) => {
-            const graded = e.excess != null && e.ageDays > 0;
+            // A dead-even excess is a tie, not a miss — the accuracy stat
+            // excludes it, so the row's mark must agree.
+            const graded = e.excess != null && e.ageDays > 0 && Math.abs(e.excess) > 1e-9;
             const right = !graded ? "—" : (e.direction === "buy" ? e.excess > 0 : e.excess < 0) ? "✓" : "✗";
             return `
             <tr>
@@ -199,7 +210,7 @@ function renderMyPicks(data) {
               <td><span class="pill-sm ${dirClass[e.direction] ?? ""}">${esc(dirLabel[e.direction] ?? e.direction)}</span></td>
               <td class="pick-note">${esc(e.note ?? "")}</td>
               <td class="num">${money(e.price)}</td>
-              <td class="num">${money(e.nowPrice)}</td>
+              <td class="num">${money(e.nowPrice)}${e.basis === "raw" ? "*" : ""}</td>
               <td class="num">${deltaCell(e.ret)}</td>
               <td class="num">${deltaCell(e.excess)}</td>
               <td>${right}</td>
@@ -207,14 +218,15 @@ function renderMyPicks(data) {
           }).join("")}
         </tbody>
       </table>
-    </div>`;
+    </div>
+    ${data.entries.some((e) => e.basis === "raw") ? `<p class="sub">* graded price-only (no split/dividend adjustment) — a split can distort these rows; add a free Tiingo key for adjusted grading.</p>` : ""}`;
 }
 
 // Every graded call as a dot: x = when the call was made, y = its excess
 // vs SPY so far. The spread IS the honesty — wins and losses in one glance.
 function renderCallsMap(data) {
   const card = $("mapCard");
-  const era = data.entries.some((e) => e.formulaVersion === "v2") ? "v2" : "v1";
+  const era = currentEra(data);
   const rows = data.entries.filter((e) => (e.formulaVersion ?? "v1") === era && e.excess != null && e.ageDays > 0 && e.basis === "tr");
   if (rows.length < 5) {
     card.hidden = true;
