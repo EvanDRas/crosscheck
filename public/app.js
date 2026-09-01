@@ -124,6 +124,9 @@ function setError(msg) {
   el.btn.disabled = false;
   el.error.textContent = msg;
   el.error.hidden = false;
+  // A failed analysis must never strand the user on a blank page — bring
+  // the front page back under the banner so the site stays usable.
+  if (el.results.hidden && el.tmResults.hidden) el.intro.hidden = false;
 }
 
 // ---------- render ----------

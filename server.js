@@ -849,6 +849,17 @@ app.get("/api/analyze", async (req, res) => {
   }
 
   try {
+    // Interactive analyses outrank background sweeps: on a cold start the
+    // front page's own loading (movers, insiders, grading) can burn the
+    // whole 60/min budget, and typing a ticker right then 429'd in the
+    // user's face. Wait for headroom instead — a slower answer beats an
+    // error telling the user to do the waiting themselves.
+    if (process.env.FINNHUB_API_KEY) {
+      const deadline = Date.now() + 75_000;
+      while (callsLastMinute() > 45 && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
     const payload = await analyzeTicker(ticker, { apiKey: process.env.FINNHUB_API_KEY });
 
     // "Since you last looked": diff against the previous different-day
