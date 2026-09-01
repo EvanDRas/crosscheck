@@ -48,6 +48,7 @@ const NA = '<span class="na">N/A</span>';
 
 const fmtNum = (v, digits = 2) => (isNum(v) ? v.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: 0 }) : null);
 const fmtX = (v) => (isNum(v) ? `${fmtNum(v)}×` : null);
+const fmtEps = (v) => (isNum(v) ? v.toFixed(2) : null); // EPS always 2dp so "1.48 vs 1.50" lines up
 const fmtPct = (v, signed = false) => (isNum(v) ? `${signed && v > 0 ? "+" : ""}${fmtNum(v)}%` : null);
 const fmtMoney = (v, currency = "USD") =>
   isNum(v) ? v.toLocaleString("en-US", { style: "currency", currency, maximumFractionDigits: 2 }) : null;
@@ -750,7 +751,7 @@ function renderEarnings(d) {
           <div class="earn-card">
             <div class="earn-q">${e.quarter && e.year ? `Q${esc(e.quarter)} ${esc(e.year)}` : "Quarter"}</div>
             <div class="earn-date">${esc(e.period ?? "")}</div>
-            <div class="earn-eps">EPS <b>${fmtNum(e.actual) ?? "N/A"}</b> vs ${fmtNum(e.estimate) ?? "N/A"} est.</div>
+            <div class="earn-eps">EPS <b>${fmtEps(e.actual) ?? "N/A"}</b> vs ${fmtEps(e.estimate) ?? "N/A"} est.</div>
             ${chip}
           </div>`;
       }).join("")}
@@ -972,7 +973,7 @@ function buildBrief(d) {
   if (d.earnings?.length) {
     for (const e of d.earnings) {
       const tag = e.beat == null ? "no estimate" : e.beat ? `BEAT${isNum(e.surprisePercent) ? ` +${fmtNum(e.surprisePercent, 1)}%` : ""}` : `MISS${isNum(e.surprisePercent) ? ` ${fmtNum(e.surprisePercent, 1)}%` : ""}`;
-      L.push(`- Q${e.quarter ?? "?"} ${e.year ?? "?"} (${e.period ?? "?"}): ${fmtNum(e.actual) ?? "N/A"} vs ${fmtNum(e.estimate) ?? "N/A"} est. — ${tag}`);
+      L.push(`- Q${e.quarter ?? "?"} ${e.year ?? "?"} (${e.period ?? "?"}): ${fmtEps(e.actual) ?? "N/A"} vs ${fmtEps(e.estimate) ?? "N/A"} est. — ${tag}`);
     }
   } else {
     L.push("- No earnings history available");
@@ -1559,13 +1560,15 @@ let moversData = null;
 
 // Which universe names does a headline mention? Aliases come from
 // data/universe.json; bare tickers count only at 4+ letters (T, V, MA, GE…
-// are ordinary words).
+// are ordinary words) and only in uppercase — "cost" and "meta" are prose,
+// COST and META are symbols.
 function tickersIn(text) {
   const names = moversData?.names ?? {};
   const out = [];
+  const bound = (a) => `(?<![\\w-])${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`;
   for (const [t, aliases] of Object.entries(names)) {
-    const pats = [...aliases, ...(t.length >= 4 ? [t] : [])];
-    if (pats.some((a) => new RegExp(`(?<![\\w-])${a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`, "i").test(text))) out.push(t);
+    if (aliases.some((a) => new RegExp(bound(a), "i").test(text))
+      || (t.length >= 4 && new RegExp(bound(t)).test(text))) out.push(t);
   }
   return out;
 }
@@ -2712,7 +2715,7 @@ function renderRecord(s) {
   // until then the honest label is "too early", not a green number.
   const tiles = [
     ["Calls logged", String(s.calls), ""],
-    ["Days running", String(s.days), ""],
+    ["Days with calls", String(s.days), ""], // distinct call dates — the ledger's "over N days" is the calendar span, a different number
     ["Graded so far", String(s.graded), ""],
     ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}%` : "no calls 30d old yet", isNum(s.rightPct) && s.rightPct >= 53 ? "pos" : ""],
     s.best && s.graded >= 5 ? ["Best aged call", callLabel(s.best), (callEdge(s.best) ?? 0) > 0 ? "pos" : ""] : null,

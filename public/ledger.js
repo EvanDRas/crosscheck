@@ -56,7 +56,9 @@ function renderSummary(data) {
   const rp = called.length ? (right / called.length) * 100 : null;
   const daysRunning = dates.length ? Math.max(1, Math.round((Date.now() - Date.parse(dates[0])) / 86_400_000)) : 0;
   const read = called.length < 20 ? "too few aged directional calls to judge yet"
+    : rp >= 57 ? "better than a coin flip so far — but these calls overlap in time and share one market backdrop, so it only counts if it holds for months"
     : rp >= 53 ? "a shade better than a coin flip so far — treat that as noise until it lasts"
+    : rp <= 43 ? "worse than a coin flip so far — the same caution applies before reading anything into it"
     : rp <= 47 ? "a shade worse than a coin flip so far — also within noise"
     : "about a coin flip, which is exactly what the backtests predicted";
   const headline = graded.length
