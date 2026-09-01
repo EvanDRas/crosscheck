@@ -2217,15 +2217,27 @@ async function loadFeed(tab, limit = 10) {
 // the slot: the wire mix includes world news, and a stock site leading
 // with geopolitics reads off-brand.
 const MARKETISH = /\b(stocks?|shares|markets?|nasdaq|s&p|dow|earnings|fed|wall street|investors?|rally|selloff|inflation|tariffs?)\b/i;
+// Outlets whose links hit a paywall or registration wall. They stay in the
+// list (the headline alone is information), but the hero is the click a
+// visitor is MOST likely to make — leading them into a paywall is a bad
+// first experience.
+const PAYWALLED = /new york times|wall street journal|financial times|bloomberg|barron|economist|washington post|seeking alpha|business insider|the information/i;
 function pickLead() {
   const items = newsData?.items ?? [];
   // Preference order: market photo story, any photo story, market text
   // story, anything — a keyless install gets no photos (Google RSS carries
-  // none), and a dead hero slot reads as broken.
-  return items.find((n) => hasImg(n) && (tickersIn(n.headline).length || MARKETISH.test(n.headline)))
-    ?? items.find(hasImg)
-    ?? items.find((n) => tickersIn(n.headline).length || MARKETISH.test(n.headline))
-    ?? items[0];
+  // none), and a dead hero slot reads as broken. Each tier is tried on
+  // freely readable outlets first; paywalled sources only get the hero when
+  // nothing else exists at all.
+  const open = items.filter((n) => !PAYWALLED.test(n.source ?? ""));
+  for (const pool of [open, items]) {
+    const pick = pool.find((n) => hasImg(n) && (tickersIn(n.headline).length || MARKETISH.test(n.headline)))
+      ?? pool.find(hasImg)
+      ?? pool.find((n) => tickersIn(n.headline).length || MARKETISH.test(n.headline))
+      ?? pool[0];
+    if (pick) return pick;
+  }
+  return null;
 }
 
 function renderHero() {
