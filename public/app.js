@@ -2256,16 +2256,21 @@ const MARKETISH = /\b(stocks?|shares|markets?|nasdaq|s&p|dow|earnings|fed|wall s
 const PAYWALLED = /new york times|wall street journal|financial times|bloomberg|barron|economist|washington post|seeking alpha|business insider|the information/i;
 function pickLead() {
   const items = newsData?.items ?? [];
-  // Preference order: market photo story, any photo story, market text
-  // story, anything — a keyless install gets no photos (Google RSS carries
-  // none), and a dead hero slot reads as broken. Each tier is tried on
-  // freely readable outlets first; paywalled sources only get the hero when
-  // nothing else exists at all.
+  // Preference order: market photo story, market TEXT story, any photo,
+  // anything. A text lead now fills its box with the next headlines, so a
+  // market story always outranks an off-topic photo — "what's worth
+  // streaming this month" must never lead a stock site just because it
+  // brought a picture. Each tier is tried on freely readable outlets
+  // first; paywalled sources only get the hero when nothing else exists.
+  // Consumer-guide listicles mention Netflix/Disney by name and sneak past
+  // the ticker test — "what's worth streaming" is not market coverage.
+  const GUIDEISH = /\b(what'?s (worth|new|coming)|worth (streaming|watching)|best (shows?|movies|series|tv)|coming to (netflix|hulu|max|disney)|guide to)\b/i;
+  const marketish = (n) => !GUIDEISH.test(n.headline) && (tickersIn(n.headline).length || MARKETISH.test(n.headline));
   const open = items.filter((n) => !PAYWALLED.test(n.source ?? ""));
   for (const pool of [open, items]) {
-    const pick = pool.find((n) => hasImg(n) && (tickersIn(n.headline).length || MARKETISH.test(n.headline)))
+    const pick = pool.find((n) => hasImg(n) && marketish(n))
+      ?? pool.find(marketish)
       ?? pool.find(hasImg)
-      ?? pool.find((n) => tickersIn(n.headline).length || MARKETISH.test(n.headline))
       ?? pool[0];
     if (pick) return pick;
   }
