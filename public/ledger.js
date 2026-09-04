@@ -258,9 +258,7 @@ function renderCallsMap(data) {
     <p class="sub">Every aged, total-return-graded call from the current formula era: when it was made vs how it
     stands against SPY. Color is the call itself — green buys want to finish <i>above</i> the line, red sells are
     right when they finish <i>below</i> it. Hover any dot.
-    <span class="pill-sm v-strongbuy">STRONG BUY</span> <span class="pill-sm v-buy">BUY</span>
-    <span class="pill-sm v-hold">HOLD</span> <span class="pill-sm v-sell">SELL</span>
-    <span class="pill-sm v-strongsell">STRONG SELL</span></p>
+    <span class="map-legend"><span class="swatch sw-sb"></span>STRONG BUY<span class="swatch sw-b"></span>BUY<span class="swatch sw-h"></span>HOLD<span class="swatch sw-s"></span>SELL<span class="swatch sw-ss"></span>STRONG SELL</span></p>
     <div class="ledger-table-wrap"><svg class="calls-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graded calls vs SPY over time">
       ${yTick(maxAbs * 0.66)}${yTick(0)}${yTick(-maxAbs * 0.66)}
       <line class="map-zero" x1="${pad.l}" x2="${W - pad.r}" y1="${Y(0)}" y2="${Y(0)}"></line>

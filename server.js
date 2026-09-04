@@ -12,7 +12,7 @@ import { readLedger, aggregateLedger } from "./lib/ledger.js";
 import { SCORING_VERSION } from "./lib/scoring.js";
 import { readPicks, logPick, PICK_DIRECTIONS } from "./lib/picks.js";
 import { updateSnapshot } from "./lib/snapshots.js";
-import { getQuoteCached } from "./lib/quotes.js";
+import { getQuoteCached, hasFreshQuote } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
 import { pointInTimeCall } from "./lib/timemachine.js";
@@ -397,40 +397,42 @@ function startInsiderSweep() {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const { universe } = moversMeta();
     const since = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
-    const perTicker = [];
-    let complete = true;
-    let fetchFailed = false;
-    for (let i = 0; i < universe.length; i += 5) {
+    // Resumable: successes from an interrupted sweep are kept, and the next
+    // trigger fetches only what's missing — one 429 out of ~50 calls used to
+    // throw the whole sweep away and re-spend it every 30 minutes.
+    const done = insiderCache && !insiderCache.complete && insiderCache.done ? { ...insiderCache.done } : {};
+    const todo = universe.filter((t) => !(t in done));
+    let interrupted = false;
+    for (let i = 0; i < todo.length; i += 5) {
       let waited = 0;
       while (callsLastMinute() > 37 && waited < 90_000) {
         await sleep(3000);
         waited += 3000;
       }
       if (callsLastMinute() > 37) {
-        complete = false;
+        interrupted = true;
         break;
       }
-      const chunk = await Promise.all(universe.slice(i, i + 5).map(async (t) => {
+      await Promise.all(todo.slice(i, i + 5).map(async (t) => {
         try {
           const doc = await getInsiderTransactions(t, apiKey);
           const buys = (doc?.data ?? []).filter((r) =>
             !r.isDerivative && r.transactionCode === "P" && r.change > 0 && (r.transactionDate ?? "") >= since);
           const buyers = new Set(buys.map((r) => r.name)).size;
           const value = buys.reduce((sum, r) => sum + r.change * (r.transactionPrice || 0), 0);
-          return buyers ? { ticker: t, buyers, value: Math.round(value) } : null;
+          done[t] = buyers ? { ticker: t, buyers, value: Math.round(value) } : null;
         } catch {
-          fetchFailed = true; // a 429 is not "no buyers" — don't pin it for a day
-          return null;
+          /* stays out of `done` → retried next trigger; a 429 is not "no buyers" */
         }
       }));
-      perTicker.push(...chunk.filter(Boolean));
       await sleep(400);
     }
-    const rows = perTicker
-      .filter((r) => r.buyers >= 2 || r.value >= 250_000)
+    const complete = !interrupted && Object.keys(done).length >= universe.length;
+    const rows = Object.values(done)
+      .filter((r) => r && (r.buyers >= 2 || r.value >= 250_000))
       .sort((a, b) => (b.buyers - a.buyers) || (b.value - a.value))
       .slice(0, 8);
-    insiderCache = { at: Date.now(), rows, complete: complete && !fetchFailed };
+    insiderCache = { at: Date.now(), rows, done, complete };
     insiderSweepRunning = false;
   })().catch(() => {
     insiderSweepRunning = false;
@@ -683,24 +685,41 @@ app.get("/api/quotes", async (req, res) => {
   const list = parseTickers(req.query.t, 12);
   if (!apiKey || !list.length) return res.json({ quotes: {} });
   const wantDiv = req.query.div === "1";
+  // Sparks only when the caller renders them (the Following card) — the
+  // portfolio and alert loops were burning Tiingo budget for discarded data.
+  const wantSpark = req.query.spark === "1";
   // fresh=1 (the Refresh button) bypasses the 2-minute quote cache when the
   // rate budget allows; under pressure it quietly falls back to cached.
   const maxAge = req.query.fresh === "1" && callsLastMinute() < 30 ? 10_000 : undefined;
   const quotes = {};
-  await Promise.all(list.map(async (t) => {
+  const fill = async (t) => {
     try {
       const q = await getQuoteCached(t, apiKey, maxAge);
       if (!q?.c) return;
       quotes[t] = { price: q.c, change: q.d ?? null, changePercent: q.dp ?? null };
       if (wantDiv) quotes[t].dps = await getDpsTTM(t, apiKey).catch(() => 0);
-      if (hasTiingoKey()) {
+      if (wantSpark && hasTiingoKey()) {
         const s = await sparkSeries(t);
         if (s) quotes[t].spark = s;
       }
     } catch {
       /* left out — the row shows a dash */
     }
-  }));
+  };
+  // Warm symbols answer instantly and cost nothing; only the cold remainder
+  // spends budget, paced so a cold landing with a full portfolio can't burst
+  // past 60/min and 429 its own rows. Bounded wait: partial beats hanging.
+  const warm = list.filter((t) => hasFreshQuote(t, maxAge));
+  const cold = list.filter((t) => !hasFreshQuote(t, maxAge));
+  await Promise.all(warm.map(fill));
+  for (let i = 0; i < cold.length; i += 8) {
+    let waited = 0;
+    while (callsLastMinute() > 40 && waited < 20_000) {
+      await new Promise((r) => setTimeout(r, 1000));
+      waited += 1000;
+    }
+    await Promise.all(cold.slice(i, i + 8).map(fill));
+  }
   res.json({ quotes });
 });
 
@@ -836,7 +855,9 @@ app.get("/api/analyze", async (req, res) => {
     const apiKey = process.env.FINNHUB_API_KEY;
     if (apiKey && cached.payload.quote) {
       try {
-        const q = await getQuote(ticker, apiKey);
+        // Shared cache, not a direct fetch — so the analyze header and the
+        // Following/portfolio rows can never disagree about the same price.
+        const q = await getQuoteCached(ticker, apiKey, 10_000);
         if (q && (q.c || q.pc)) {
           cached.payload.quote = { price: q.c, change: q.d, changePercent: q.dp, previousClose: q.pc, open: q.o, high: q.h, low: q.l };
           cached.payload.asOf = new Date().toISOString();

@@ -111,7 +111,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   the universe (SEC Form 4), surfaced when two or more distinct insiders
   bought — insiders sell for many reasons, but they only buy for one.
 - **IPO calendar** and an **SEC filings feed** for the stocks you follow —
-  8-Ks straight from EDGAR, often before the news story about them.
+  filings straight from EDGAR (8-Ks, 10-K/Qs, Form 4s, proxies), often
+  before the news story about them.
 - **Price alerts** (honest about their one limit: checked while the app is
   open — a local tool can't fire when it's closed), a **crypto strip**
   (change window stated exactly), and a portfolio **dividend line** showing
@@ -123,7 +124,8 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
 - **Feed tabs — Briefing / For you / Markets / World / Filings**: world and business news
   from Google's topic feeds (keyless) merged with the wire items; **For
   you** builds a feed from the stocks you've starred — company news per
-  ticker, keyless, relevance-filtered. A Newer / Older pager pages through each tab.
+  ticker, keyless, relevance-filtered. A pager (Back / More on the Briefing,
+  Newer / Older elsewhere) pages through each tab.
 - **Following**: star any stock anywhere (screen rows, suggestions) and it
   lives in the "Following" card — live price, today's move, and the formula's
   latest verdict side by side — and powers the For you feed.

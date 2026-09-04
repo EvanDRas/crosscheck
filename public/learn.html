@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Learn — Crosscheck</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%234f86c6%22/><path d=%22M24 55 L42 72 L77 31%22 fill=%22none%22 stroke=%22%23ffffff%22 stroke-width=%2213%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
-  <link rel="stylesheet" href="style.css?v=68" />
+  <link rel="stylesheet" href="style.css?v=69" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0c0d0f" />
 </head>
@@ -78,7 +78,7 @@
          harder to massage than earnings. Together they describe a machine: how much it makes, how efficiently,
          and whether it is getting bigger.</p>
       <p>Compare within an industry or not at all. Visa runs net margins above 50%; Walmart runs near 2%; both
-         are superb businesses. The <b>Compare</b> button on every result page (it needs a free Finnhub key) puts a company next to its
+         are superb businesses. The <b>Compare</b> button on real tickers' result pages (it needs a free Finnhub key, and the fictional DEMO page has no peers to compare) puts a company next to its
          actual peers, which is the only comparison that means anything.</p>
       <p class="learn-live"><a href="/#V">High-margin machine: V →</a> <a href="/#WMT">Thin-margin giant: WMT →</a></p>
     </section>
@@ -134,7 +134,7 @@
       <p>A company's third-quarter results are not known on September 30. They are known when the 10-Q is
          filed, often six weeks later. A backtest that uses September 30 data on September 30 is quietly using
          the future — and will "discover" strategies that could never have been traded.</p>
-      <p>The <b>Time Machine</b> is built to make this concrete: pick any stock and any date since 2010 — it is the one feature that needs the free Tiingo key from the setup card — and it
+      <p>The <b>Time Machine</b> is built to make this concrete: pick any stock and any date since 2010 — it needs the free Tiingo key from the setup card, which also powers price charts and total-return grading — and it
          reconstructs the verdict from filings <em>filed by that day</em> and prices through that close. Then it
          shows what happened next. Try NVDA on 2023-01-03: the formula said SELL — the stock then beat the S&amp;P by roughly +1,370% (Study 2).
          That is not a bug in the demo — it is the point.</p>
@@ -147,8 +147,9 @@
          with no effort. So the bar is never "did it go up" but "did it beat the alternative." And the
          alternative's return includes dividends, which price charts ignore. That is <b>total return</b>, and
          the difference between yours and the benchmark's is <b>excess return</b>.</p>
-      <p>Every call on the track record page is graded this way, split-adjusted, over the same window as the
-         S&amp;P. Losses are published next to wins. If you keep your own calls there too, time grades you the
+      <p>Calls on the track record page are graded this way — split- and dividend-adjusted, over the same window
+         as the S&amp;P — wherever adjusted prices exist; rows that could only be graded on raw quotes are marked
+         with a * and excluded from the headline stats. Losses are published next to wins. If you keep your own calls there too, time grades you the
          same way. The <b>Your portfolio</b> card on the front page asks the same question about money you
          actually hold — the same dollars in an S&amp;P fund instead, dividends counted.</p>
       <p class="learn-live"><a href="/ledger.html">The track record →</a></p>
@@ -195,7 +196,7 @@
     how to read public data; they are not recommendations. Always do your own research.
   </footer>
 
-  <script src="glossary.js?v=68"></script>
+  <script src="glossary.js?v=69"></script>
   <script>
 
     // P/E calculator: turns the ratio into years and a PEG.

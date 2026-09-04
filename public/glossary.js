@@ -78,7 +78,7 @@ window.TERMS = {
   debtEquity: {
     name: "Debt-to-equity",
     what: "Total debt divided by shareholders' equity. How much of the company is funded by borrowing versus by its owners.",
-    use: "Financial health category. Values above 20× are treated as unreadable (usually a distorted equity base) rather than scored.",
+    use: "Financial health category. A vendor value above 20× is treated as unreadable (usually a distorted equity base) — the SEC-filed figure replaces it when available, and that replacement IS scored.",
     caveat: "Debt is cheap fuel in good times and a wrecking ball in bad ones. The question is never just how much, but how stable the cash flows that service it are.",
     live: "BA",
   },
@@ -134,7 +134,7 @@ window.TERMS = {
   totalReturn: {
     name: "Total return",
     what: "Price change plus dividends, adjusted for splits. The only honest way to compare a stock against an index over time.",
-    use: "Every track-record call is graded on total return versus the S&P 500 over the same window — never a mixed basis.",
+    use: "Track-record calls are graded on total return versus the S&P 500 over the same window wherever adjusted prices exist; price-only fallbacks are marked * and kept out of the headline stats — never a mixed basis.",
     caveat: "A stock up 5% while the index is up 8% lost to the market. Up is not the bar; beating the alternative is.",
     live: "PG",
   },

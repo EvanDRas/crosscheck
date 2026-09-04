@@ -191,7 +191,7 @@ function renderCompany(d) {
       <div class="price-now">${fmtMoney(q.price, currency)}</div>
       <div class="price-delta ${dir}">${esc(delta)} ${dayLabel}</div>
       <div class="price-sub"><span class="price-asof">Prev close ${fmtMoney(q.previousClose, currency) ?? "N/A"} · as of ${new Date(d.asOf).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
-        <button type="button" id="qRefresh" class="q-refresh" title="Refresh — re-pull this stock, price and all">&#8635;</button></div>`;
+        <button type="button" id="qRefresh" class="q-refresh" title="Refresh — re-pull this stock, price and all" aria-label="Refresh this stock's data">&#8635;</button></div>`;
   }
 
   el.company.innerHTML = `
@@ -313,7 +313,7 @@ function renderVerdict(d) {
          <button type="button" data-dir="sell">I'd sell</button>
          <input type="text" class="pick-note" id="pickNote" maxlength="120" spellcheck="false"
                 placeholder="why? (optional — future you will want to know)" />
-         <span class="pick-msg" id="pickMsg"></span>
+         <span class="pick-msg" id="pickMsg" role="status"></span>
        </div>`;
 
   el.verdict.innerHTML = `
@@ -400,6 +400,7 @@ function renderHistory(d) {
     b.addEventListener("click", () => {
       histRange = b.dataset.r;
       renderHistory(d);
+      el.history.querySelector(`[data-r="${histRange}"]`)?.focus(); // re-render replaced the button
     })
   );
   drawHistoryChart(h);
@@ -540,14 +541,15 @@ function renderKeyNumbers(d) {
     <div class="kn-grid">
       ${tiles.map(([label, val, key, term]) => `
         <div class="kn-tile${term && window.TERMS?.[term] ? " has-term" : ""}" ${term ? `data-term="${esc(term)}"` : ""}>
-          <div class="kn-label">${esc(label)}${provMark(key)}${term && window.TERMS?.[term] ? ` <span class="term-q" title="What is this?">?</span>` : ""}</div>
+          <div class="kn-label">${esc(label)}${provMark(key)}${term && window.TERMS?.[term] ? ` <button type="button" class="term-q" aria-expanded="false" aria-label="What is ${esc(label)}?">?</button>` : ""}</div>
           <div class="kn-value${val == null ? " na" : ""}">${val == null ? "N/A" : esc(val)}</div>
           ${term ? termPop(term) : ""}
         </div>`).join("")}
     </div>`;
 }
 
-// One open definition at a time; clicking the same tile closes it.
+// One open definition at a time; clicking the same tile closes it. The ?
+// is a real button so keyboards reach the definitions too.
 el.keyNumbers.addEventListener("click", (e) => {
   if (e.target.closest("a")) return;
   const tile = e.target.closest(".kn-tile.has-term");
@@ -555,6 +557,7 @@ el.keyNumbers.addEventListener("click", (e) => {
   const wasOpen = tile.classList.contains("open");
   el.keyNumbers.querySelectorAll(".kn-tile.open").forEach((t) => t.classList.remove("open"));
   if (!wasOpen) tile.classList.add("open");
+  el.keyNumbers.querySelectorAll(".kn-tile .term-q").forEach((b) => b.setAttribute("aria-expanded", String(b.closest(".kn-tile").classList.contains("open"))));
 });
 
 function fmtBillions(v) {
@@ -1103,8 +1106,6 @@ function startLive(d) {
 
 // ---------- share card: the verdict as an image, honesty baked in ----------
 
-const BAND_COLORS = { "STRONG BUY": "#3d9c6b", BUY: "#63a97f", HOLD: "#c0912f", SELL: "#c07048", "STRONG SELL": "#bf4d4d" };
-
 function drawShareCard(d) {
   const s = d.scoring;
   const W = 1000;
@@ -1114,20 +1115,29 @@ function drawShareCard(d) {
   c.height = H;
   const x = c.getContext("2d");
   const mono = '600 (px) ui-monospace, Consolas, monospace';
+  // Colors come from the live tokens, not a duplicate palette — the exported
+  // image must match whatever the site looks like today.
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n, fb) => (css.getPropertyValue(n) || fb).trim();
+  const BAND_COLORS = {
+    "STRONG BUY": tok("--good", "#3d9c6b"),
+    BUY: `color-mix(in srgb, ${tok("--good", "#3d9c6b")} 70%, white)`,
+    HOLD: tok("--warning", "#c0912f"),
+    SELL: tok("--serious", "#c07048"),
+    "STRONG SELL": tok("--critical", "#bf4d4d"),
+  };
 
-  x.fillStyle = "#0c0d0f";
+  x.fillStyle = tok("--page", "#0c0d0f");
   x.fillRect(0, 0, W, H);
-  x.strokeStyle = "#33373e";
+  x.strokeStyle = tok("--baseline", "#33373e");
   x.lineWidth = 2;
   x.strokeRect(1, 1, W - 2, H - 2);
 
-  // Wordmark
-  x.fillStyle = "#4f86c6";
-  x.fillRect(40, 42, 12, 12);
-  x.fillStyle = "#e9eaec";
-  x.font = "800 22px system-ui, sans-serif";
-  x.fillText("C R O S S C H E C K", 64, 54);
-  x.fillStyle = "#7d828b";
+  // Wordmark — the same Georgia serif as the masthead, not a stray sans.
+  x.fillStyle = tok("--ink", "#e9eaec");
+  x.font = '700 26px Georgia, "Times New Roman", serif';
+  x.fillText("Crosscheck", 40, 56);
+  x.fillStyle = tok("--muted", "#7d828b");
   x.font = "13px system-ui, sans-serif";
   x.textAlign = "right";
   // ET market day, matching the ledger's stamp — toISOString dated an
@@ -1136,21 +1146,21 @@ function drawShareCard(d) {
   x.textAlign = "left";
 
   // Ticker + name
-  x.fillStyle = "#e9eaec";
+  x.fillStyle = tok("--ink", "#e9eaec");
   x.font = mono.replace("(px)", "44px");
   x.fillText(d.ticker, 40, 130);
-  x.fillStyle = "#b9bcc2";
+  x.fillStyle = tok("--ink-2", "#b9bcc2");
   x.font = "16px system-ui, sans-serif";
   x.fillText((d.profile?.name ?? "").slice(0, 60), 40, 158);
 
   // Score + band
   const band = s.insufficientData ? null : (s.verdict ?? null);
-  x.fillStyle = "#e9eaec";
+  x.fillStyle = tok("--ink", "#e9eaec");
   x.font = mono.replace("(px)", "96px");
   const scoreTxt = s.insufficientData ? "–" : fmtScore(s.score);
   x.fillText(scoreTxt, 40, 290);
   const scoreW = x.measureText(scoreTxt).width; // measured, not chars×58 — "41.5" has a narrow dot
-  x.fillStyle = "#7d828b";
+  x.fillStyle = tok("--muted", "#7d828b");
   x.font = mono.replace("(px)", "24px");
   x.fillText("/100", 40 + scoreW + 10, 290);
   if (band) {
@@ -1168,18 +1178,18 @@ function drawShareCard(d) {
   const cats = s.categories ?? [];
   let cy = 110;
   for (const cat of cats) {
-    x.fillStyle = "#b9bcc2";
+    x.fillStyle = tok("--ink-2", "#b9bcc2");
     x.font = "13px system-ui, sans-serif";
     x.fillText(cat.label, 560, cy);
-    x.fillStyle = "#e9eaec";
+    x.fillStyle = tok("--ink", "#e9eaec");
     x.font = mono.replace("(px)", "14px");
     x.textAlign = "right";
     x.fillText(cat.available ? String(cat.score) : "—", W - 40, cy);
     x.textAlign = "left";
-    x.fillStyle = "#1b1e22";
+    x.fillStyle = tok("--surface-2", "#1b1e22");
     x.fillRect(560, cy + 8, 400, 5);
     if (cat.available) {
-      const bandCls = cat.score >= 66 ? "#3d9c6b" : cat.score >= 55 ? "#c0912f" : cat.score >= 47 ? "#c07048" : "#bf4d4d";
+      const bandCls = cat.score >= 66 ? tok("--good", "#3d9c6b") : cat.score >= 55 ? tok("--warning", "#c0912f") : cat.score >= 47 ? tok("--serious", "#c07048") : tok("--critical", "#bf4d4d");
       x.fillStyle = bandCls;
       x.fillRect(560, cy + 8, 4 * cat.score, 5);
     }
@@ -1187,14 +1197,14 @@ function drawShareCard(d) {
   }
 
   // The honesty line — the whole point of sharing this instead of a hot tip.
-  x.strokeStyle = "#33373e";
+  x.strokeStyle = tok("--baseline", "#33373e");
   x.setLineDash([3, 4]);
   x.beginPath();
   x.moveTo(40, 420);
   x.lineTo(W - 40, 420);
   x.stroke();
   x.setLineDash([]);
-  x.fillStyle = "#7d828b";
+  x.fillStyle = tok("--muted", "#7d828b");
   x.font = "14px system-ui, sans-serif";
   const disclaimer = "Backtested honestly: this formula (16,497 point-in-time calls, 2011–2024) showed no predictive power. A score states rank among large caps on these metrics — it does not forecast returns. Not financial advice.";
   let line = "";
@@ -1208,7 +1218,7 @@ function drawShareCard(d) {
     line += word + " ";
   }
   x.fillText(line, 40, ly);
-  x.fillStyle = "#4f86c6";
+  x.fillStyle = tok("--accent", "#4f86c6");
   x.font = "13px system-ui, sans-serif";
   x.fillText("crosscheck — the honest stock analyzer · github.com/EvanDRas/crosscheck", 40, H - 28);
 
@@ -1726,7 +1736,7 @@ function renderEconomy(rows) {
           <span class="cal-name">${esc(r.label)}</span>
           <span class="econ-sub">${esc(r.sub)}</span>
         </div>
-        <span class="econ-val${r.tone === "bad" ? " neg" : ""}">${esc(r.value)}</span>
+        <span class="econ-val${r.tone === "bad" ? " neg" : ""}">${esc(r.value)}${r.tone === "bad" ? ` <span class="prov prov-warn" title="${esc(r.hint ?? "worse than its usual range")}">⚠︎</span>` : ""}</span>
       </div>`).join("")}`;
   card.hidden = false;
 }
@@ -1850,7 +1860,7 @@ function renderPortfolio() {
       <button type="submit">Add</button>
     </form>
     <label class="pf-import">Import your broker's positions CSV (Fidelity: Positions &#8594; the Download icon) — read in this browser only, never uploaded.
-      <input id="pfImportFile" type="file" accept=".csv,text/csv,text/plain" hidden /></label>
+      <input id="pfImportFile" type="file" accept=".csv,text/csv,text/plain" class="visually-hidden" /></label>
     ${pfImportMsg ? `<p class="pf-total-sub">${esc(pfImportMsg)}</p>` : ""}`;
   if (!lots.length) {
     card.innerHTML = `
@@ -1888,7 +1898,7 @@ function renderPortfolio() {
         <span class="pf-shares">${esc(fmtNum(l.sh, l.sh % 1 ? 2 : 0))} @ ${esc(fmtPrice(l.cost))}</span>
         <span class="watch-price">${q ? esc(fmtPrice(q.price)) : "—"}</span>
         ${plPct != null ? `<span class="badge ${chgCls(plPct)}">${esc(fmtPct(plPct, true))}</span>` : ""}
-        <span class="star-cell"><button type="button" class="pf-rm" data-rm="${i}" title="Remove this lot">×</button></span>
+        <span class="star-cell"><button type="button" class="pf-rm" data-rm="${i}" title="Remove this lot" aria-label="Remove the ${esc(l.t)} lot">×</button></span>
       </div>
       ${spyDiff != null ? `<div class="watch-verdict"><span class="sect-mo ${spyDiff >= 0 ? "pos" : "neg"}">${spyDiff >= 0 ? "beating" : "trailing"} the S&amp;P by ${esc(fmtPct(Math.abs(spyDiff), false))}</span><span class="watch-score">since ${esc(l.date)} · S&amp;P dividends counted; your side is price-only</span></div>` : ""}
     </div>`;
@@ -2094,13 +2104,24 @@ async function checkAlerts() {
   } catch {
     /* keep last quotes */
   }
+  let changed = false;
   for (const a of alerts) {
     const q = alertQuotes[a.t];
     if (!q) continue;
     const hit = a.dir === "above" ? q.price >= a.price : q.price <= a.price;
     const id = `${a.t}|${a.dir}|${a.price}`;
-    if (hit && !alertNotified.has(id)) {
+    // notifiedAt persists across reloads so an already-crossed alert doesn't
+    // re-fire a desktop notification on every page load; it clears when the
+    // price un-crosses, so a genuine re-cross notifies again. The in-memory
+    // Set stays as a same-session guard in case localStorage writes fail.
+    if (!hit && a.notifiedAt) {
+      delete a.notifiedAt;
+      changed = true;
+    }
+    if (hit && !a.notifiedAt && !alertNotified.has(id)) {
       alertNotified.add(id);
+      a.notifiedAt = Date.now();
+      changed = true;
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         try {
           new Notification(`${a.t} is ${a.dir} ${fmtPrice(a.price)}`, { body: `Now ${fmtPrice(q.price)} — Crosscheck price alert` });
@@ -2108,6 +2129,7 @@ async function checkAlerts() {
       }
     }
   }
+  if (changed) writeJSON(ALERT_KEY, alerts);
   renderAlerts();
 }
 
@@ -2132,7 +2154,7 @@ function renderAlerts() {
       return `<div class="cal-row${hit ? " alert-hit" : ""}">
         <span class="cal-name"><span class="mkt-sym">${esc(a.t)}</span> ${a.dir === "above" ? "above" : "below"} ${esc(fmtPrice(a.price))}</span>
         <span class="cal-in">${hit ? `<span class="badge ${a.dir === "above" ? "pos" : "neg"}">CROSSED · now ${q ? esc(fmtPrice(q.price)) : ""}</span>` : q ? `now ${esc(fmtPrice(q.price))}` : "…"}
-          <button type="button" class="pf-rm" data-rmalert="${i}" title="Remove alert">×</button></span>
+          <button type="button" class="pf-rm" data-rmalert="${i}" title="Remove alert" aria-label="Remove the ${esc(a.t)} alert">×</button></span>
       </div>`;
     }).join("") : `<p class="watch-empty">Set a level and the card lights up when it crosses — with a desktop notification if you allow them.</p>`}
     ${alertMsg ? `<p class="pf-total-sub">${esc(alertMsg)}</p>` : ""}
@@ -2258,12 +2280,22 @@ function renderHero() {
     return;
   }
   const tags = tickersIn(lead.headline);
+  // A photo fills the hero; a text-only lead left a big empty box under the
+  // headline. Real front pages fill that space with the next headlines.
+  const more = hasImg(lead) ? [] : (newsData?.items ?? [])
+    .filter((n) => n !== lead && n.link !== lead.link && n.headline !== lead.headline)
+    .slice(0, 3);
   hero.innerHTML = `
     <a class="hero-link" href="${esc(safeHref(lead.link))}" target="_blank" rel="noopener noreferrer">
       ${hasImg(lead) ? `<img class="hero-img" src="${esc(lead.image)}" alt="" referrerpolicy="no-referrer" onerror="this.parentElement.querySelector('.hero-title')?.classList.add('hero-title-xl'); this.remove()">` : ""}
       <div class="hero-title${hasImg(lead) ? "" : " hero-title-xl"}">${esc(lead.headline)}</div>
     </a>
-    <div class="news-meta">${esc(lead.source)}${lead.date ? ` · ${esc(relTime(lead.date))}` : ""}${tags.length ? ` <span class="news-tags">${tags.map(tagChip).join("")}</span>` : ""}</div>`;
+    <div class="news-meta">${esc(lead.source)}${lead.date ? ` · ${esc(relTime(lead.date))}` : ""}${tags.length ? ` <span class="news-tags">${tags.map(tagChip).join("")}</span>` : ""}</div>
+    ${more.length ? `<div class="hero-more">${more.map((n) => `
+      <a class="hero-more-item" href="${esc(safeHref(n.link))}" target="_blank" rel="noopener noreferrer">
+        <span class="hero-more-title">${esc(n.headline)}</span>
+        <span class="news-meta">${esc(n.source)}${n.date ? ` · ${esc(relTime(n.date))}` : ""}</span>
+      </a>`).join("")}</div>` : ""}`;
   hero.hidden = false;
 }
 
@@ -2276,7 +2308,7 @@ function renderNewsCard() {
   // Trending comes from the broad market pool (not the current tab) and
   // shows on the Briefing, where a skim-reader wants it.
   const counts = new Map();
-  for (const n of newsData?.items ?? []) for (const t of tickersIn(n.headline)) counts.set(t, (counts.get(t) ?? 0) + 1);
+  for (const n of newsData?.items ?? []) for (const t of tickersIn(n.headline)) counts.set(t, (counts.get(t) ?? 0) + (n.covered ?? 1)); // weight by syndication breadth, not just row count
   const trending = feedTab === "briefing" ? [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t) : [];
   const tagsFor = (n) => tagged.find((x) => x.n === n)?.tags ?? [];
   // Impact badge: an honest attention heuristic (topic + how many outlets
@@ -2320,15 +2352,20 @@ function renderNewsCard() {
 }
 
 $("marketNews").addEventListener("click", (e) => {
+  const card = $("marketNews");
   const tab = e.target.closest?.("[data-tab]")?.dataset?.tab;
   if (tab) {
     loadFeed(tab, 96);
+    // The re-render replaced the button — put keyboard focus back on it.
+    card.querySelector(`[data-tab="${tab}"]`)?.focus();
     return;
   }
   const pg = e.target.closest?.("[data-pg]")?.dataset?.pg;
   if (pg) {
     feedPage += pg === "next" ? 1 : -1;
     renderNewsCard();
+    const same = card.querySelector(`[data-pg="${pg}"]`);
+    (same && !same.disabled ? same : card.querySelector(".news-pager button:not(:disabled)"))?.focus();
     document.getElementById("marketNews").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
@@ -2399,11 +2436,12 @@ function renderToday() {
     <span class="today-date">${esc(new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }))}</span>
     ${st ? `<span class="today-mkt ${st}"><i></i>Market ${st}</span>` : ""}
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
-    ${s.current > 1 ? `<span class="today-upd">${s.current}-day streak${s.best > s.current ? ` · best ${s.best}` : ""}</span>` : ""}
+    ${s.current > 1 ? `<span class="today-streak">${s.current}-day streak${s.best > s.current ? ` · best ${s.best}` : ""}</span>` : ""}
     <button type="button" id="tourBtn" class="today-daily${readJSON("cc_tour_done", false) ? "" : " pulse"}">New here? Tour the site</button>
     <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
-setInterval(() => { if (!el.intro.hidden) renderToday(); }, 5000);
+// The 5s tick must not rebuild the bar out from under a focused tour button.
+setInterval(() => { if (!el.intro.hidden && !$("todayBar").contains(document.activeElement)) renderToday(); }, 5000);
 
 let refreshing = false;
 async function refreshNow() {
@@ -2448,7 +2486,7 @@ function toggleWatch(t) {
 
 const starBtn = (t) => {
   const on = readWatch().includes(t);
-  return `<button type="button" class="star${on ? " on" : ""}" data-star="${esc(t)}" title="${on ? "Unfollow" : "Follow"} ${esc(t)}">${on ? "★" : "☆"}</button>`;
+  return `<button type="button" class="star${on ? " on" : ""}" data-star="${esc(t)}" title="${on ? "Unfollow" : "Follow"} ${esc(t)}" aria-label="${on ? "Unfollow" : "Follow"} ${esc(t)}" aria-pressed="${on}">${on ? "★" : "☆"}</button>`;
 };
 
 function refreshStars() {
@@ -2457,6 +2495,10 @@ function refreshStars() {
     const on = w.includes(b.dataset.star);
     b.classList.toggle("on", on);
     if (b.classList.contains("star")) b.textContent = on ? "★" : "☆";
+    const t = b.dataset.star;
+    b.title = `${on ? "Unfollow" : "Follow"} ${t}`;
+    b.setAttribute("aria-label", `${on ? "Unfollow" : "Follow"} ${t}`);
+    b.setAttribute("aria-pressed", String(on));
   });
 }
 
@@ -2542,7 +2584,7 @@ async function loadWatchQuotes(fresh = false) {
     return;
   }
   try {
-    const res = await fetch(`/api/quotes?t=${encodeURIComponent(w.join(","))}${fresh ? "&fresh=1" : ""}`);
+    const res = await fetch(`/api/quotes?t=${encodeURIComponent(w.join(","))}&spark=1${fresh ? "&fresh=1" : ""}`);
     if (res.ok) watchQuotes = (await res.json()).quotes ?? {};
   } catch {
     /* rows show dashes */
@@ -2657,13 +2699,13 @@ function renderScreen() {
     <div class="screen-scroll">
       <table class="mkt-table screen-table">
         <thead>
-          <tr><th>#</th><th class="sortable" data-sort="ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score">Score${arrow("score")}</th><th>Verdict</th></tr>
+          <tr><th>#</th><th class="sortable" data-sort="ticker" tabindex="0" role="button" aria-label="Sort by ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score" tabindex="0" role="button" aria-label="Sort by score">Score${arrow("score")}</th><th>Verdict</th></tr>
         </thead>
         <tbody>
           ${(() => { const rank = new Map([...screenData].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).map((r, i) => [r.ticker, i + 1])); return rows.map((r) => `
-            <tr class="mkt-row" tabindex="0" role="link" data-t="${esc(r.ticker)}">
+            <tr class="mkt-row" data-t="${esc(r.ticker)}">
               <td class="rank">${rank.get(r.ticker) ?? "—"}</td>
-              <td class="mkt-sym">${esc(r.ticker)} ${starBtn(r.ticker)}</td>
+              <td class="mkt-sym"><span tabindex="0" role="link">${esc(r.ticker)}</span> ${starBtn(r.ticker)}</td>
               <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
               <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
             </tr>`).join(""); })()}
@@ -2675,17 +2717,24 @@ function renderScreen() {
 
 // Filter chips and sortable headers live inside the same card as the rows;
 // they have no data-t / .mkt-row, so the row-click delegation ignores them.
+$("screenCard").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const th = e.target.closest?.("th[data-sort]");
+  if (th) { e.preventDefault(); th.click(); } // role=button must honor the keyboard
+});
 $("screenCard").addEventListener("click", (e) => {
   const f = e.target.closest?.("[data-f]")?.dataset?.f;
   if (f) {
     screenFilter = f;
     renderScreen();
+    $("screenCard").querySelector(`[data-f="${f}"]`)?.focus(); // re-render replaced the chip
     return;
   }
   const s = e.target.closest?.("th[data-sort]")?.dataset?.sort;
   if (s) {
     screenSort = { key: s, dir: screenSort.key === s ? -screenSort.dir : (s === "score" ? -1 : 1) };
     renderScreen();
+    $("screenCard").querySelector(`th[data-sort="${s}"]`)?.focus();
   }
 });
 
@@ -2809,8 +2858,8 @@ function renderMovers(m) {
           <div class="movers-label">${label}</div>
           <table class="mkt-table">
             ${list.map((r) => `
-              <tr class="mkt-row" tabindex="0" role="link" data-t="${esc(r.ticker)}">
-                <td class="mkt-sym">${esc(r.ticker)}</td>
+              <tr class="mkt-row" data-t="${esc(r.ticker)}">
+                <td class="mkt-sym"><span tabindex="0" role="link">${esc(r.ticker)}</span></td>
                 <td class="num">${esc(fmtPrice(r.price) ?? "—")}</td>
                 <td class="num"><span class="badge ${chgCls(r.changePercent)}">${esc(fmtPct(r.changePercent, true) ?? "—")}</span></td>
               </tr>`).join("")}
@@ -3072,12 +3121,17 @@ function taClose() {
   ta.hidden = true;
   taItems = [];
   taActive = -1;
+  el.input.setAttribute("aria-expanded", "false");
+  el.input.removeAttribute("aria-activedescendant");
 }
 
 function taRender() {
   ta.innerHTML = taItems.map((r, i) =>
-    `<button type="button" data-i="${i}" class="${i === taActive ? "active" : ""}"><b>${esc(r.symbol)}</b><span>${esc(r.name)}</span></button>`).join("");
+    `<button type="button" role="option" id="ta-opt-${i}" aria-selected="${i === taActive}" data-i="${i}" class="${i === taActive ? "active" : ""}"><b>${esc(r.symbol)}</b><span>${esc(r.name)}</span></button>`).join("");
   ta.hidden = !taItems.length;
+  el.input.setAttribute("aria-expanded", String(!ta.hidden));
+  if (taActive >= 0) el.input.setAttribute("aria-activedescendant", `ta-opt-${taActive}`);
+  else el.input.removeAttribute("aria-activedescendant");
 }
 
 el.input.addEventListener("input", () => {
@@ -3106,8 +3160,10 @@ el.input.addEventListener("keydown", (e) => {
   if (ta.hidden) return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault();
-    const d = e.key === "ArrowDown" ? 1 : -1;
-    taActive = (taActive + d + taItems.length) % taItems.length;
+    // From no selection, Down enters at the top and Up at the bottom — the
+    // modulo alone made the first Up land second-to-last.
+    if (taActive < 0) taActive = e.key === "ArrowDown" ? 0 : taItems.length - 1;
+    else taActive = (taActive + (e.key === "ArrowDown" ? 1 : -1) + taItems.length) % taItems.length;
     taRender();
   } else if (e.key === "Enter") {
     if (taActive >= 0) {
@@ -3241,7 +3297,7 @@ const TOUR_STEPS = [
   { el: "#tmToggle", when: () => hasTiingo, title: "The no-hindsight time machine", text: `Pick a past date and see exactly what the formula would have said <i>then</i>, using only what was filed and priced by that day.` },
   { el: "#portfolioCard", title: "Your money, honestly measured", text: `Add what you own (buy dates included) and get the comparison most brokers skip: <b>would the same money in the S&amp;P have done better?</b> It never leaves this browser.` },
   { el: "#watchCard", title: "Follow what you care about", text: `Followed stocks live here with price and verdict — and the news desk's <b>For you</b> tab shows only their stories.` },
-  { el: "#marketNews", title: "The news desk", text: `<b>Briefing</b> ranks today's market-wide stories by likely impact. <b>Filings</b> shows what your companies legally told the SEC — often before the news writes it up. Flip pages with Newer / Older.` },
+  { el: "#marketNews", title: "The news desk", text: `<b>Briefing</b> ranks today's market-wide stories by likely impact. <b>Filings</b> shows what your companies legally told the SEC — often before the news writes it up. The pager at the bottom flips pages.` },
   { el: "#recordCard", title: "The forward test", text: `The formula's live, unfixable track record: every call frozen the day it's made, then graded against the S&amp;P. A sell only counts as right when the stock <i>trails</i> the market.` },
   { el: "#economyCard", title: "The backdrop", text: `Inflation, jobs, the Fed's rate, and the classic recession gauge — pulled straight from the Fed's own public data, not from anyone's opinion.` },
   { el: "#alertCard", title: "Price alerts", text: `Set a level and the card lights up when it crosses — while the app is open. A tool that runs on your own PC can't watch while it's closed, and it tells you so.` },
@@ -3261,6 +3317,7 @@ function tourEnd() {
   tourEls = null;
   writeJSON("cc_tour_done", true);
   if (!el.intro.hidden) renderToday();
+  $("tourBtn")?.focus(); // hand focus back where the tour began (after renderToday rebuilds it)
 }
 
 function tourVisibleSteps() {
@@ -3297,9 +3354,12 @@ function tourShow() {
       <span class="tour-btns">
         ${tourAt > 0 ? `<button type="button" data-tour="back">Back</button>` : ""}
         <button type="button" data-tour="next" class="tour-next">${tourAt === tourList.length - 1 ? "Done" : "Next"}</button>
-        <button type="button" data-tour="exit" title="Exit the tour">×</button>
+        <button type="button" data-tour="exit" title="Exit the tour" aria-label="Exit the tour">×</button>
       </span>
     </div>`;
+  // Each step rebuilds the panel, destroying the focused Next button —
+  // without this, Enter stops advancing after the first step.
+  tourEls.panel.querySelector('[data-tour="next"]')?.focus();
 }
 
 function tourStart() {
@@ -3311,6 +3371,9 @@ function tourStart() {
     backdrop.className = "tour-backdrop";
     const panel = document.createElement("div");
     panel.className = "tour-panel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-label", "Site tour");
     document.body.append(backdrop, panel);
     backdrop.addEventListener("click", tourEnd);
     panel.addEventListener("click", (e) => {
