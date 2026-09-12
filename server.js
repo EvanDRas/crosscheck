@@ -1257,7 +1257,7 @@ app.post("/api/picks", async (req, res) => {
     ]);
     if (!q?.c) return res.status(502).json({ error: "Could not get a live price to freeze the pick at." });
     const now = new Date().toISOString();
-    const added = logPick({
+    const added = await logPick({
       t: now,
       date: marketDate(),
       ticker,

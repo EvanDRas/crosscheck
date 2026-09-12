@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   coreCompanyName, relevanceTerms, isRelevant, stripHtml,
   titleTokens, isNearDuplicate, dedupeAndSort, impactScore,
+  assembleBriefing, assembleMarketList,
 } from "../lib/news.js";
 
 // ---------- company-name core ----------
@@ -134,4 +135,72 @@ test("stripHtml refuses out-of-range codepoints instead of throwing", () => {
   assert.equal(stripHtml("x &#0; y"), "x y");
   assert.equal(stripHtml("x &#1114112; y"), "x y");
   assert.equal(stripHtml(null), "");
+});
+
+// ---------- briefing assembly: churn filter + exemptions + backfill ----------
+
+const NAMES = { AAPL: ["Apple"], MSFT: ["Microsoft"], NVDA: ["Nvidia"] };
+const scoredItem = (headline, impact, link) => ({ headline, impact, covered: 1, link, date: D0 });
+
+test("assembleBriefing drops single-company churn but keeps macro and multi-company stories", () => {
+  const out = assembleBriefing([
+    scoredItem("Apple updates its trade-in prices", 2, "a"),          // single-company churn — out even at impact 2
+    scoredItem("Fed signals a rate decision next week", 2, "b"),      // macro — stays
+    scoredItem("Apple and Microsoft spar over AI hires", 2, "c"),     // two companies — stays
+  ], NAMES, 12);
+  assert.deepEqual(out.map((it) => it.link).sort(), ["b", "c"]);
+});
+
+test("assembleBriefing exempts mega-cap earnings from the churn filter", () => {
+  const out = assembleBriefing([
+    scoredItem("Nvidia earnings crush estimates", 2, "a"), // single company, but THE story the tab exists for
+    scoredItem("Nvidia opens a new office lobby", 2, "b"), // single company, not earnings — churn
+  ], NAMES, 12);
+  assert.deepEqual(out.map((it) => it.link), ["a"]);
+});
+
+test("assembleBriefing backfills a thin day without readmitting churn", () => {
+  const scored = [
+    scoredItem("Fed signals a rate decision next week", 3, "keep"),
+    // Genuinely below the bar: impact 1, no macro keyword, no company name —
+    // the ONLY road in is the thin-day backfill. (An earlier fixture said
+    // "Treasury auction", which is a macro keyword and passed the primary
+    // filter — the backfill branch went untested without anyone noticing.)
+    scoredItem("Copper futures drift lower in quiet trading", 1, "fill"),
+    scoredItem("Apple updates its trade-in prices", 1, "churn"),
+  ];
+  const out = assembleBriefing(scored, NAMES, 12);
+  assert.deepEqual(out.map((it) => it.link), ["keep", "fill"]); // fill arrives AFTER the kept items — proof it came via backfill
+  assert.ok(!out.some((it) => it.link === "churn")); // churn stays out even on a thin day
+});
+
+// ---------- front-page assembly: photo slots + reconciliation ----------
+
+test("assembleMarketList reconciles a photo story's covered count with the deeper lane", () => {
+  const merged = [
+    { headline: "Fed holds interest rates steady in September decision", link: "m1", covered: 4, summary: "The full story.", feed: "finnhub", date: D0 },
+    { headline: "Oracle stock surges on cloud revenue outlook", link: "m2", covered: 1, feed: "google", date: D0 },
+  ];
+  const photos = [
+    { headline: "Fed holds rates steady at September decision", link: "p1", covered: 1, summary: "", image: "x.jpg", feed: "finnhub", date: D0 },
+  ];
+  const out = assembleMarketList(merged, photos, 10);
+  const photo = out.find((it) => it.link === "p1");
+  assert.equal(photo.covered, 4); // the lane's undercount never reaches the page
+  assert.equal(photo.summary, "The full story.");
+  assert.ok(!out.some((it) => it.link === "m1")); // its twin doesn't appear twice
+});
+
+test("assembleMarketList caps any single feed and backfills to the limit", () => {
+  const heads = [
+    "Oil prices whipsaw after surprise OPEC supply cut",
+    "Treasury auction draws weakest demand since spring",
+    "Gold miners rally as bullion clears a record",
+    "Regional banks slump on commercial real estate fears",
+    "Chipmakers extend gains on data center orders",
+    "Automakers warn tariffs will raise sticker prices",
+  ];
+  const merged = heads.map((headline, i) => ({ headline, link: `g${i}`, covered: 1, feed: "google", date: D0 }));
+  const out = assembleMarketList(merged, [], 5);
+  assert.equal(out.length, 5); // backfill fills the page even when one feed dominates
 });

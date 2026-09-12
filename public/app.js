@@ -1660,6 +1660,26 @@ function renderMacro(rows) {
   card.hidden = false;
 }
 
+// Tooltips are hover-only, which means invisible on touch. Any non-link row
+// carrying a title explains itself inline on tap/click instead — same text,
+// toggled under the row. Repaints clear it, which is fine: it's a glance.
+for (const cardId of ["economyCard", "worldCard", "sectorCard", "cryptoCard", "ipoCard", "calendarCard", "macroStrip"]) {
+  document.getElementById(cardId)?.addEventListener("click", (e) => {
+    const row = e.target.closest("[title]");
+    if (!row || !row.title || e.target.closest("[data-t], a, button")) return;
+    const next = row.nextElementSibling;
+    if (next?.classList.contains("row-hint")) {
+      next.remove();
+      return;
+    }
+    row.parentElement.querySelectorAll(".row-hint").forEach((h) => h.remove()); // one open hint per card
+    const hint = document.createElement("div");
+    hint.className = "row-hint";
+    hint.textContent = row.title;
+    row.after(hint);
+  });
+}
+
 function renderCalendar(events) {
   const card = $("calendarCard");
   if (!events.length) {
@@ -1729,7 +1749,7 @@ function renderEconomy(rows) {
   }
   card.innerHTML = `
     <h2>The economy right now</h2>
-    <p class="sub">The backdrop every stock trades against. Straight from FRED, the St. Louis Fed's public data service — hover any row for what it means.</p>
+    <p class="sub">The backdrop every stock trades against. Straight from FRED, the St. Louis Fed's public data service — hover or tap any row for what it means.</p>
     ${rows.map((r) => `
       <div class="econ-row" title="${esc(r.hint ?? "")}">
         <div class="econ-main">
