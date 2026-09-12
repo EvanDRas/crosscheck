@@ -1644,3 +1644,8 @@ input.pick-note:focus { outline: 1px solid var(--accent); outline-offset: -1px; 
 
 /* tap-to-reveal row hints — the tooltip text, readable without a mouse */
 .row-hint { font-size: 11.5px; color: var(--muted); line-height: 1.45; padding: 2px 0 8px; max-width: 300px; }
+
+/* anchors must clear the sticky topbar — without this, every #term-* and
+   lesson link lands with its heading hidden under the bar. 96px because the
+   bar wraps to two lines at narrow widths (~88px tall). */
+html { scroll-padding-top: 96px; }

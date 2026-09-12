@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Learn — Crosscheck</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%234f86c6%22/><path d=%22M24 55 L42 72 L77 31%22 fill=%22none%22 stroke=%22%23ffffff%22 stroke-width=%2213%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
-  <link rel="stylesheet" href="style.css?v=71" />
+  <link rel="stylesheet" href="style.css?v=72" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0c0d0f" />
 </head>
@@ -196,7 +196,7 @@
     how to read public data; they are not recommendations. Always do your own research.
   </footer>
 
-  <script src="glossary.js?v=71"></script>
+  <script src="glossary.js?v=72"></script>
   <script>
 
     // P/E calculator: turns the ratio into years and a PEG.
@@ -207,10 +207,17 @@
         const e = Number($("calcEps").value);
         const g = Number($("calcGrowth").value);
         $("calcGrowthOut").textContent = `${g}%`;
-        if (!(p > 0) || !(e > 0)) { $("calcOut").textContent = "Enter a positive price and EPS."; return; }
         const pe = p / e;
+        // Finiteness too, not just positivity: typed scientific notation
+        // ("1e999") passes > 0 and would render literal "Infinity".
+        if (!Number.isFinite(p) || !Number.isFinite(e) || !(p > 0) || !(e > 0) || !Number.isFinite(pe)) {
+          $("calcOut").textContent = "Enter a positive price and EPS.";
+          return;
+        }
         const peg = g > 0 ? pe / g : null;
-        $("calcOut").innerHTML = `P/E <b>${pe.toFixed(1)}×</b> — at today's profit it takes about <b>${Math.round(pe)} year${Math.round(pe) === 1 ? "" : "s"}</b> of earnings to pay back the price.
+        const yrs = Math.round(pe);
+        const payback = pe < 1 ? "<b>under a year</b>" : `about <b>${yrs} year${yrs === 1 ? "" : "s"}</b>`;
+        $("calcOut").innerHTML = `P/E <b>${pe.toFixed(1)}×</b> — at today's profit it takes ${payback} of earnings to pay back the price.
           ${peg != null ? `With ${g}% growth the PEG is <b>${peg.toFixed(2)}</b> — ${peg < 1 ? "growth more than covers the price." : peg < 2 ? "a fair price for the growth, if it happens." : "you are paying a lot for growth that has to show up."}` : "With no growth, the P/E is the whole story."}`;
       };
       ["calcPrice", "calcEps", "calcGrowth"].forEach((id) => $(id).addEventListener("input", run));

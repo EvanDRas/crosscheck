@@ -120,6 +120,11 @@ app.post("/api/setup", async (req, res) => {
         process.env.TIINGO_API_KEY = tiingo;
         return res.json({ ok: true, tiingoOnly: true });
       }
+      // A Tiingo-only submit when Tiingo ALREADY exists must not tell the
+      // user to do exactly what they just did — name the real situation.
+      if (!finnhub && tiingo && process.env.TIINGO_API_KEY) {
+        return res.status(409).json({ error: "A Tiingo key is already configured — to change it, edit the .env file directly." });
+      }
       return res.status(409).json({ error: "A Finnhub key is already configured — to add a Tiingo key, fill in ONLY the Tiingo field. To change existing keys, edit the .env file directly." });
     }
     // Every field is validated before it touches .env — values are written
@@ -135,6 +140,12 @@ app.post("/api/setup", async (req, res) => {
     }
     if (contact && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
       return res.status(400).json({ error: "That doesn't look like an email address — leave the field empty if you'd rather not give one." });
+    }
+    // '#' starts a dotenv comment and '"' breaks its quoting — a legal-but-
+    // exotic address containing either would be silently mangled on the next
+    // server start. Refuse now rather than truncate later.
+    if (/[#"]/.test(contact)) {
+      return res.status(400).json({ error: "The email can't contain # or \" — those break the .env file it's stored in." });
     }
     let q;
     try {
@@ -191,7 +202,10 @@ app.get("/api/search", async (req, res) => {
       // Keyless: the SEC's own ticker map covers name-to-ticker just fine.
       try {
         const results = await searchCompanies(q);
-        if (results.length) searchCache.set(q.toLowerCase(), { at: Date.now(), results });
+        if (results.length) {
+          searchCache.set(q.toLowerCase(), { at: Date.now(), results });
+          if (searchCache.size > 200) searchCache.delete(searchCache.keys().next().value); // same FIFO cap as the keyed path — this branch grew forever
+        }
         return res.json({ results });
       } catch {
         return res.json({ results: [] });
@@ -855,7 +869,13 @@ app.get("/api/timemachine", async (req, res) => {
 
 // The evidence, served in-app so the product carries its own test results.
 app.get("/api/evidence", (_req, res) => {
-  res.type("text/plain").send(fs.readFileSync(path.join(__dirname, "EVIDENCE.md"), "utf8"));
+  try {
+    res.type("text/plain").send(fs.readFileSync(path.join(__dirname, "EVIDENCE.md"), "utf8"));
+  } catch {
+    // Without this, Express's default 500 page (with the absolute file path
+    // in the stack) rendered INTO the evidence page as if it were the doc.
+    res.status(500).type("text/plain").send("Evidence document unavailable.");
+  }
 });
 
 app.get("/api/analyze", async (req, res) => {

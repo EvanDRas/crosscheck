@@ -1294,6 +1294,11 @@ function render(d) {
 // and priced by that day — graded against everything since. The honesty
 // claim, made interactive.
 async function timeMachine(ticker, date) {
+  // The view owns a URL (#tm=NVDA@2023-01-03) so reload, share, and Back
+  // behave. pushState creates the history entry WITHOUT firing hashchange,
+  // so the route handler calling us back can't double-fetch.
+  const h = `tm=${ticker}@${date}`;
+  if (location.hash.slice(1) !== h) history.pushState(null, "", `#${h}`);
   setLoading(`${ticker} on ${date}`);
   const seq = viewSeq;
   el.statusText.textContent = `Rewinding to ${date} — filings and prices as known that day…`;
@@ -1663,7 +1668,7 @@ function renderMacro(rows) {
 // Tooltips are hover-only, which means invisible on touch. Any non-link row
 // carrying a title explains itself inline on tap/click instead — same text,
 // toggled under the row. Repaints clear it, which is fine: it's a glance.
-for (const cardId of ["economyCard", "worldCard", "sectorCard", "cryptoCard", "ipoCard", "calendarCard", "macroStrip"]) {
+for (const cardId of ["economyCard", "worldCard", "sectorCard", "cryptoCard", "ipoCard", "calendarCard", "macroStrip", "recordCard"]) {
   document.getElementById(cardId)?.addEventListener("click", (e) => {
     const row = e.target.closest("[title]");
     if (!row || !row.title || e.target.closest("[data-t], a, button")) return;
@@ -1995,15 +2000,22 @@ function parseBrokerCsv(text) {
   };
   const iSym = col("symbol");
   const iQty = col("quantity", "shares", "qty");
-  const iAvg = col("average cost basis", "average cost", "avg cost", "average price", "cost/share");
+  const iAvg = col("average cost basis", "average cost", "avg cost", "average price", "cost/share", "price paid");
   const iTot = col("cost basis total", "cost basis", "total cost");
+  // A recognizable positions file with an UNrecognizable cost column must
+  // say so — "No usable positions found" blamed the rows, not the headers.
+  if (iSym !== -1 && iQty !== -1 && iAvg === -1 && iTot === -1) {
+    return { lots: [], error: `Found positions but no cost column I recognize — the headers were: ${head.filter(Boolean).join(", ")}` };
+  }
   const lots = [];
   for (const line of lines.slice(headIdx + 1)) {
     if (!line.trim()) continue;
     const f = splitCsvLine(line);
     const rawSym = String(f[iSym] ?? "").trim();
     if (/\*\*$/.test(rawSym)) continue; // Fidelity core/money-market position
-    const t = rawSym.replace(/[^A-Za-z0-9.\-]/g, "").toUpperCase();
+    // Brokers write class shares as BRK/B; every API here wants BRK.B —
+    // translate the slash before stripping, or it imports as dead "BRKB".
+    const t = rawSym.replace(/\//g, ".").replace(/[^A-Za-z0-9.\-]/g, "").toUpperCase();
     if (!STORABLE_TICKER_RE.test(t)) continue;
     const sh = money(f[iQty]);
     if (!(sh > 0)) continue;
@@ -2021,8 +2033,18 @@ function parseBrokerCsv(text) {
 $("portfolioCard").addEventListener("change", async (e) => {
   const input = e.target.closest?.("#pfImportFile");
   if (!input || !input.files?.length) return;
-  const text = await input.files[0].text();
-  input.value = ""; // so re-selecting the same file fires change again
+  // Snapshot then clear BEFORE the await: a failed read must not leave the
+  // input holding the file, or the same file can never be re-picked.
+  const file = input.files[0];
+  input.value = "";
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    pfImportMsg = "Could not read that file — it may have moved or changed. Pick it again.";
+    renderPortfolio();
+    return;
+  }
   const { lots: found, error } = parseBrokerCsv(text);
   if (error || !found.length) {
     pfImportMsg = error ?? "No usable positions found in that file.";
@@ -2915,7 +2937,12 @@ function renderRecord(s) {
     ["Calls logged", String(s.calls), ""],
     ["Days with calls", String(s.days), ""], // distinct call dates — the ledger's "over N days" is the calendar span, a different number
     ["Graded so far", String(s.graded), ""],
-    ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}%` : s.seasoned > 0 ? `only ${s.seasoned} of the 30 calls needed` : "no calls 30d old yet", isNum(s.rightPct) && s.rightPct >= 53 ? "pos" : ""],
+    // The hit rate names its sample and its noise band: at n calls, a true
+    // coin flip lands within ±1.96·√(.25/n) of 50% — green at 57% of 30 would
+    // otherwise read as proof when it's inside that band.
+    ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}% of ${s.seasoned}` : s.seasoned > 0 ? `only ${s.seasoned} of the 30 calls needed` : "no calls 30d old yet",
+      isNum(s.rightPct) && (s.rightPct - 50) > 196 * Math.sqrt(0.25 / s.seasoned) ? "pos" : "",
+      isNum(s.rightPct) ? `${s.seasoned} calls — a coin flip lands anywhere within ±${Math.round(196 * Math.sqrt(0.25 / s.seasoned))} points of 50% at this sample size; judge it in months` : ""],
     s.best && s.graded >= 5 ? ["Best aged call", callLabel(s.best), (callEdge(s.best) ?? 0) > 0 ? "pos" : ""] : null,
     s.worst && s.graded >= 5 ? ["Worst aged call", callLabel(s.worst), (callEdge(s.worst) ?? 0) < 0 ? "neg" : ""] : null,
   ].filter(Boolean);
@@ -2925,8 +2952,8 @@ function renderRecord(s) {
       Right = a buy that beat SPY or a sell that trailed it; HOLDs abstain.
       Young calls read like a coin flip; that matches the <a href="/evidence.html">backtests</a>.${s.source === "official" ? " Calls are the project's official published log, graded locally by this app." : ""}</p>
     <div class="mkt-strip record-strip">
-      ${tiles.map(([label, val, cls]) => `
-        <div class="mkt-tile">
+      ${tiles.map(([label, val, cls, hint]) => `
+        <div class="mkt-tile"${hint ? ` title="${esc(hint)}"` : ""}>
           <div class="mkt-label">${label}</div>
           <div class="mkt-price record-val ${cls}">${val}</div>
         </div>`).join("")}
@@ -3076,15 +3103,32 @@ setInterval(() => {
   else checkAlerts();
 }, 120_000);
 
-window.addEventListener("hashchange", () => {
-  let t = location.hash.slice(1);
-  try { t = decodeURIComponent(t); } catch { /* malformed % — use raw */ }
-  if (!t) showHome();
-  else if (/^[A-Za-z0-9.\-^]{1,10}$/.test(t)) analyze(t);
+// One route parser for hashchange AND the boot deep-link: a bare ticker
+// analyzes today, tm=TICKER@DATE restores a time-machine view (with the
+// header controls armed to match), anything else is a name search.
+function routeTo(t) {
+  const tm = t.match(/^tm=([A-Za-z0-9.\-^]{1,10})@(\d{4}-\d{2}-\d{2})$/);
+  if (tm) {
+    const [, ticker, date] = tm;
+    el.input.value = ticker.toUpperCase();
+    el.dateInput.hidden = false;
+    el.dateInput.value = date;
+    $("tmToggle")?.classList.add("active");
+    timeMachine(ticker.toUpperCase(), date);
+    return;
+  }
+  if (/^[A-Za-z0-9.\-^]{1,10}$/.test(t)) analyze(t);
   else {
     setLoading(t);
     suggestFor(t, { foundMsg: `Matches for "${t}":` });
-  } // browser back from #TICKER lands on the market overview
+  }
+}
+
+window.addEventListener("hashchange", () => {
+  let t = location.hash.slice(1);
+  try { t = decodeURIComponent(t); } catch { /* malformed % — use raw */ }
+  if (!t) showHome(); // browser back from #TICKER lands on the market overview
+  else routeTo(t);
 });
 
 // ---------- recently viewed ----------
@@ -3297,15 +3341,12 @@ $("tmToggle")?.addEventListener("click", () => {
   else el.dateInput.value = "";
 });
 
-// Deep link: /#AAPL analyzes on load; otherwise land on the market overview.
+// Deep link: /#AAPL analyzes on load, /#tm=NVDA@2023-01-03 restores a
+// time-machine view; otherwise land on the market overview.
 if (location.hash.length > 1) {
   let t = location.hash.slice(1);
   try { t = decodeURIComponent(t); } catch { /* malformed % — use raw */ }
-  if (/^[A-Za-z0-9.\-^]{1,10}$/.test(t)) analyze(t);
-  else {
-    setLoading(t);
-    suggestFor(t, { foundMsg: `Matches for "${t}":` });
-  }
+  routeTo(t);
 }
 else {
   el.input.focus();
