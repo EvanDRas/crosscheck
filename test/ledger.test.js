@@ -51,3 +51,17 @@ test("aggregates bucket by verdict in band order and skip ungraded rows", () => 
 test("empty ledger aggregates to an empty list", () => {
   assert.deepEqual(aggregateLedger([]), []);
 });
+
+test("aggregateLedger excludes same-day and raw-basis rows from the published stats", () => {
+  const rows = [
+    { verdict: "BUY", ret: 0.05, excess: 0.05, ageDays: 0, basis: "tr" },   // same day — no time has passed
+    { verdict: "BUY", ret: 0.09, excess: 0.09, ageDays: 10, basis: "raw" }, // price-only — breaks across splits
+    { verdict: "BUY", ret: 0.01, excess: 0.01, ageDays: 10, basis: "tr" },  // the only honest row
+  ];
+  const agg = aggregateLedger(rows);
+  assert.equal(agg.length, 1);
+  assert.equal(agg[0].verdict, "BUY");
+  assert.equal(agg[0].n, 1); // the excluded rows never inflate the count
+  assert.equal(agg[0].avgExcess, 0.01);
+  assert.equal(agg[0].winRateVsSpy, 1);
+});

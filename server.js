@@ -15,7 +15,7 @@ import { updateSnapshot } from "./lib/snapshots.js";
 import { getQuoteCached, hasFreshQuote } from "./lib/quotes.js";
 import { getSpyTrSeries, spyTrReturn } from "./lib/spy.js";
 import { tiingoGradeMany, hasTiingoKey, getTiingoDaily } from "./lib/tiingo.js";
-import { pointInTimeCall } from "./lib/timemachine.js";
+import { pointInTimeCall, PitError } from "./lib/timemachine.js";
 import { marketNews, feedNews } from "./lib/news.js";
 import { searchCompanies, getRecentFilings } from "./lib/edgar.js";
 import { getMacro, getWorld, getSectors, getCrypto, nextEvents } from "./lib/macro.js";
@@ -25,6 +25,13 @@ import { getEarningsCalendarRange, getIpoCalendarRange, getInsiderTransactions }
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = path.join(__dirname, ".env");
 dotenv.config({ path: ENV_FILE });
+
+// tmp+rename: .env holds the only copies of the user's keys — a crash
+// mid-write must never truncate it.
+function writeEnvAtomic(lines) {
+  fs.writeFileSync(`${ENV_FILE}.tmp`, lines.join("\n") + "\n");
+  fs.renameSync(`${ENV_FILE}.tmp`, ENV_FILE);
+}
 
 // A copied-but-unedited .env.example leaves placeholder "keys" that would
 // hide the in-app setup while every API call 401s — treat them as no key.
@@ -43,8 +50,11 @@ const HOST = process.env.HOST || "127.0.0.1";
 // 127.0.0.1 and become same-origin with this app; requiring a localhost
 // Host header shuts that down.
 app.use((req, res, next) => {
-  const host = String(req.headers.host ?? "").split(":")[0];
-  if (HOST === "127.0.0.1" && !["localhost", "127.0.0.1", "[::1]"].includes(host)) {
+  // Brackets first: "[::1]:3000" must parse to "::1", not "[".
+  const raw = String(req.headers.host ?? "");
+  const m = raw.match(/^\[([^\]]+)\]/);
+  const host = m ? m[1] : raw.split(":")[0];
+  if (["127.0.0.1", "localhost", "::1"].includes(HOST) && !["localhost", "127.0.0.1", "::1"].includes(host)) {
     return res.status(403).send("Forbidden");
   }
   next();
@@ -52,12 +62,14 @@ app.use((req, res, next) => {
 
 // Browsers stamp Sec-Fetch-Site on requests; a cross-site value means some
 // other website's page initiated the call (drive-by <img> tricks against
-// localhost). Block those for state-changing or quota-burning routes —
-// curl and same-origin app requests are unaffected.
+// localhost). The whole /api/ surface either writes ledgers or spends API
+// quota, so it is allowlist-by-default: a prefix test can't be dodged with
+// a trailing slash or letter case the way exact path equality could.
+// curl (no header) and same-origin app requests are unaffected.
 app.use((req, res, next) => {
   const sfs = req.headers["sec-fetch-site"];
   if (sfs && sfs !== "none" && sfs !== "same-origin"
-      && (req.method === "POST" || req.path === "/api/analyze" || req.path === "/api/timemachine")) {
+      && (req.method === "POST" || req.path.toLowerCase().startsWith("/api/"))) {
     return res.status(403).json({ error: "Cross-site requests are not allowed." });
   }
   next();
@@ -104,7 +116,7 @@ app.post("/api/setup", async (req, res) => {
           keepLines = fs.readFileSync(ENV_FILE, "utf8").split(/\r?\n/)
             .filter((l) => l.trim() && !l.startsWith("TIINGO_API_KEY="));
         } catch { /* no .env yet */ }
-        fs.writeFileSync(ENV_FILE, [...keepLines, `TIINGO_API_KEY=${tiingo}`].join("\n") + "\n");
+        writeEnvAtomic([...keepLines, `TIINGO_API_KEY=${tiingo}`]);
         process.env.TIINGO_API_KEY = tiingo;
         return res.json({ ok: true, tiingoOnly: true });
       }
@@ -154,7 +166,7 @@ app.post("/api/setup", async (req, res) => {
     if (tiingo) lines.push(`TIINGO_API_KEY=${tiingo}`);
     if (contact) lines.push(`SEC_EDGAR_CONTACT=${contact}`);
     if (String(PORT) !== "3000" && !existing.some((l) => l.startsWith("PORT="))) lines.push(`PORT=${PORT}`);
-    fs.writeFileSync(ENV_FILE, lines.join("\n") + "\n");
+    writeEnvAtomic(lines);
     process.env.FINNHUB_API_KEY = finnhub;
     if (tiingo) process.env.TIINGO_API_KEY = tiingo;
     if (contact) process.env.SEC_EDGAR_CONTACT = contact;
@@ -831,7 +843,13 @@ app.get("/api/timemachine", async (req, res) => {
     if (tmCache.size > 100) tmCache.delete(tmCache.keys().next().value);
     res.json(payload);
   } catch (err) {
-    res.status(422).json({ error: `Time Machine couldn't grade that one: ${err.message}` });
+    // Intentional refusals explain themselves; anything else is an upstream
+    // fault whose internals don't belong in the user's face.
+    if (err instanceof PitError) {
+      return res.status(422).json({ error: `Time Machine couldn't grade that one: ${err.message}` });
+    }
+    console.error("timemachine failed:", err);
+    res.status(502).json({ error: "A historical data source failed — try again in a moment." });
   }
 });
 
@@ -994,7 +1012,9 @@ function readGradeStore() {
 }
 function writeGradeStore(s) {
   try {
-    fs.writeFileSync(GRADE_STORE, JSON.stringify(s));
+    // tmp+rename: a crash mid-write must never leave a torn checkpoint file.
+    fs.writeFileSync(`${GRADE_STORE}.tmp`, JSON.stringify(s));
+    fs.renameSync(`${GRADE_STORE}.tmp`, GRADE_STORE);
   } catch {
     /* disk trouble — grading still works, just without the checkpoint */
   }
@@ -1009,7 +1029,9 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
       warnings.push(`Panel grading unavailable (${err.message}) — falling back to raw quotes.`);
       return null;
     }),
-    getSpyTrSeries(),
+    // 'max' range: the default 5y window would silently drop the SPY anchor
+    // for entries older than ~5 years, ungrading them without a trace.
+    getSpyTrSeries("max"),
   ]);
   const grades = panelR?.grades ?? {};
   const latestPanelDate = panelR?.latestPanelDate ?? null;
@@ -1022,13 +1044,17 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
     // grades the entire ledger from disk with zero API calls, and the
     // per-load fetch cap only throttles first-ever warmup.
     const store = readGradeStore();
+    store.noData ??= {}; // tickers Tiingo doesn't know, stamped per market day
     const todayMkt = marketDate();
     for (const e of entries) {
       const k = `${e.ticker}|${e.date}`;
       if (grades[k] || tGrades[k]) continue;
       const a = store.anchors[k];
       const l = store.latest[e.ticker];
-      if (a && l && l.day === todayMkt) tGrades[k] = { ...a, latestDate: l.latestDate, latestClose: l.latestClose };
+      // Both legs must come from the same fetch generation: Tiingo rescales
+      // the whole adjusted series on a split/dividend, and pairing an old
+      // anchor with a fresh latest would misgrade by the adjustment factor.
+      if (a && l && l.day === todayMkt && a.day === l.day) tGrades[k] = { ...a, latestDate: l.latestDate, latestClose: l.latestClose };
     }
     // Group still-missing pairs by ticker: one series fetch grades every
     // date for that ticker at once. Newest tickers first, so a capped load
@@ -1037,6 +1063,7 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
     for (const e of [...entries].reverse()) {
       const k = `${e.ticker}|${e.date}`;
       if (grades[k] || tGrades[k]) continue;
+      if (store.noData[e.ticker] === todayMkt) continue; // known-dead today — don't let it hold a fetch slot
       if (!byTicker.has(e.ticker)) byTicker.set(e.ticker, new Set());
       byTicker.get(e.ticker).add(e.date);
     }
@@ -1047,9 +1074,13 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
     let storeDirty = false;
     capped.forEach(([t], i) => {
       if (settled[i].status === "fulfilled") {
+        if (!Object.keys(settled[i].value).length) {
+          store.noData[t] = todayMkt; // fetched fine, no data — stop re-spending a slot on it today
+          storeDirty = true;
+        }
         for (const [date, g] of Object.entries(settled[i].value)) {
           tGrades[`${t}|${date}`] = g;
-          store.anchors[`${t}|${date}`] = { anchorDate: g.anchorDate, anchorClose: g.anchorClose };
+          store.anchors[`${t}|${date}`] = { anchorDate: g.anchorDate, anchorClose: g.anchorClose, day: todayMkt };
           store.latest[t] = { latestDate: g.latestDate, latestClose: g.latestClose, day: todayMkt };
           storeDirty = true;
         }
@@ -1067,7 +1098,10 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
   const MAX_QUOTES = 50;
   const needsQuote = [...new Set(
     [...entries].reverse()
-      .filter((e) => !grades[`${e.ticker}|${e.date}`] && !tGrades[`${e.ticker}|${e.date}`])
+      // No logged price → the raw fallback can't compute a return anyway;
+      // quoting those tickers burned up to 51 calls for guaranteed nulls.
+      .filter((e) => typeof e.price === "number" && e.price > 0
+        && !grades[`${e.ticker}|${e.date}`] && !tGrades[`${e.ticker}|${e.date}`])
       .map((e) => e.ticker)
   )];
   // Callers that only use total-return rows (homepage stats) skip the raw
@@ -1075,7 +1109,7 @@ async function gradeEntries(entries, { rawQuotes = true } = {}) {
   const toQuote = rawQuotes ? needsQuote.slice(0, MAX_QUOTES) : [];
   const quotes = {};
   let spyNow = null;
-  if (apiKey && (toQuote.length || !spySeries)) {
+  if (apiKey && toQuote.length) {
     // Budget-aware: on a no-Tiingo install this fallback can need dozens of
     // quotes — chunk them under the shared rolling-minute guard so grading
     // never starves an interactive analyze (same pattern as the sweeps).

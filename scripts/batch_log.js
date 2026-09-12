@@ -59,6 +59,14 @@ async function main() {
     logRun("SKIP batch: no trading session in New York today (weekend or market holiday).");
     return;
   }
+  // The holiday table is finite; past its horizon a holiday run would pass
+  // the guard and freeze the prior close as 50 dated duplicates. Refuse
+  // loudly rather than pollute the append-only ledger.
+  const maxYear = Math.max(...[...HOLIDAYS].map((d) => Number(d.slice(0, 4))));
+  if (Number(today.slice(0, 4)) > maxYear) {
+    logRun(`ABORT: HOLIDAY TABLE EXPIRED (ends ${maxYear}) — extend HOLIDAYS in scripts/batch_log.js before running.`);
+    process.exit(1);
+  }
   const apiKey = process.env.FINNHUB_API_KEY;
   if (!apiKey) {
     logRun("ABORT: no FINNHUB_API_KEY in .env — nothing can be logged without live quotes.");
@@ -75,11 +83,28 @@ async function main() {
   let logged = 0;
   let already = 0;
   let noVerdict = 0;
+  let degraded = 0;
   const failures = [];
+
+  // Heartbeat: the server's rolling-minute budget can't see this process's
+  // calls — the file's fresh mtime tells its guards the minute is spoken for.
+  const HEARTBEAT = path.join(ROOT, "data", "batch_active");
+  const beat = () => { try { fs.writeFileSync(HEARTBEAT, String(Date.now())); } catch {} };
+  const unbeat = () => { try { fs.unlinkSync(HEARTBEAT); } catch {} };
+  process.on("exit", unbeat);
+  beat();
 
   for (let i = 0; i < tickers.length; i++) {
     const t = tickers[i];
     if (i > 0) await sleep(DELAY_MS);
+    beat();
+    // Entries are date-stamped per ticker at analyze time: a run that crosses
+    // midnight ET would split one batch across two market dates. Stop instead
+    // — stamping a forced date would log prices from a different session.
+    if (marketDate() !== today) {
+      logRun(`WARN: market date rolled over mid-run (${today} → ${marketDate()}) — stopping after ${i} of ${tickers.length} tickers.`);
+      break;
+    }
 
     let attempt = 0;
     while (true) {
@@ -89,6 +114,15 @@ async function main() {
         if (payload.logged) {
           logged++;
           console.log(`  ${t}: logged ${payload.scoring.verdict} ${payload.scoring.score}`);
+        } else if (payload.degraded && attempt === 1) {
+          // A rate-gutted payload logs nothing — calling it "already logged"
+          // overstated coverage. One paced retry, then count it honestly.
+          console.log(`  ${t}: degraded payload (rate-limited mid-analysis) — waiting 65s, then retrying once`);
+          await sleep(65_000);
+          continue;
+        } else if (payload.degraded) {
+          degraded++;
+          console.log(`  ${t}: still degraded — nothing logged`);
         } else if (payload.scoring?.verdict) {
           already++;
           console.log(`  ${t}: already logged today (${payload.scoring.verdict} ${payload.scoring.score})`);
@@ -110,7 +144,7 @@ async function main() {
     }
   }
 
-  logRun(`DONE batch: ${logged} logged, ${already} already-today, ${noVerdict} no-verdict, ${failures.length} failed${failures.length ? ` [${failures.join("; ")}]` : ""}`);
+  logRun(`DONE batch: ${logged} logged, ${already} already-today, ${noVerdict} no-verdict, ${degraded} degraded, ${failures.length} failed${failures.length ? ` [${failures.join("; ")}]` : ""}`);
 
   // Publish the official forward test: refresh docs/forward-test.json and
   // push it, so every installation's screens show today's calls without
@@ -120,14 +154,24 @@ async function main() {
     const pub = publishForwardTest();
     if (pub.written) {
       logRun(`PUBLISH: forward-test.json refreshed (${pub.count} calls)`);
-      try {
-        execSync("git add docs/forward-test.json", { cwd: ROOT, stdio: "pipe" });
-        execSync(`git commit -m "Forward test: ${marketDate()}" -- docs/forward-test.json`, { cwd: ROOT, stdio: "pipe" });
-        execSync("git push origin main", { cwd: ROOT, stdio: "pipe", timeout: 60_000 });
-        logRun("PUBLISH: pushed to GitHub");
-      } catch (err) {
-        logRun(`PUBLISH: commit/push skipped (${String(err.message ?? err).split("\n")[0]})`);
+      // Only commit from main: on any other branch the commit would land
+      // there while `git push origin main` pushed unchanged main, exited 0,
+      // and produced a false "pushed to GitHub".
+      const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: ROOT, stdio: "pipe" }).toString().trim();
+      if (branch !== "main") {
+        logRun(`PUBLISH: commit/push skipped (HEAD is on ${branch}, not main)`);
+      } else {
+        try {
+          execSync("git add docs/forward-test.json", { cwd: ROOT, stdio: "pipe" });
+          execSync(`git commit -m "Forward test: ${marketDate()}" -- docs/forward-test.json`, { cwd: ROOT, stdio: "pipe" });
+          execSync("git push origin main", { cwd: ROOT, stdio: "pipe", timeout: 60_000 });
+          logRun("PUBLISH: pushed to GitHub");
+        } catch (err) {
+          logRun(`PUBLISH: commit/push skipped (${String(err.message ?? err).split("\n")[0]})`);
+        }
       }
+    } else if (pub.reason) {
+      logRun(`PUBLISH: skipped (${pub.reason})`);
     }
   } catch (err) {
     logRun(`PUBLISH: failed (${err.message})`);

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  coreCompanyName, relevanceTerms, isRelevant,
+  coreCompanyName, relevanceTerms, isRelevant, stripHtml,
   titleTokens, isNearDuplicate, dedupeAndSort, impactScore,
 } from "../lib/news.js";
 
@@ -119,4 +119,19 @@ test("impactScore: mega-cap earnings rate a notch, macro topics rate two", () =>
   assert.equal(impactScore({ headline: "Nvidia earnings beat expectations", source: "SomeBlog" }), 1);
   assert.equal(impactScore({ headline: "CPI inflation cools to 2.9%", source: "SomeBlog" }), 2);
   assert.equal(impactScore({ headline: "CPI inflation cools to 2.9%", source: "Reuters", covered: 4 }), 4); // capped
+});
+
+// ---------- entity decoding on every headline from every feed ----------
+
+test("stripHtml decodes named, decimal, and hex references and drops tags", () => {
+  assert.equal(stripHtml("<b>Fed &amp; markets</b>"), "Fed & markets");
+  assert.equal(stripHtml("&#8220;quote&#8221;"), "\u201Cquote\u201D");
+  assert.equal(stripHtml("it&#x27;s"), "it's");
+  assert.equal(stripHtml("a&nbsp;b"), "a b");
+});
+
+test("stripHtml refuses out-of-range codepoints instead of throwing", () => {
+  assert.equal(stripHtml("x &#0; y"), "x y");
+  assert.equal(stripHtml("x &#1114112; y"), "x y");
+  assert.equal(stripHtml(null), "");
 });

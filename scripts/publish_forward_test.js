@@ -37,6 +37,14 @@ export function publishForwardTest() {
     })),
   };
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  // Same-day re-runs that logged nothing new must not create a commit of
+  // pure publishedAt churn — compare everything except the timestamp.
+  try {
+    const prev = JSON.parse(fs.readFileSync(OUT, "utf8"));
+    if (JSON.stringify(prev.entries) === JSON.stringify(out.entries)) {
+      return { written: false, reason: "unchanged", count: out.entries.length };
+    }
+  } catch { /* no previous file — write it */ }
   fs.writeFileSync(OUT, JSON.stringify(out) + "\n");
   return { written: true, count: out.entries.length };
 }

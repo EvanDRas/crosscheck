@@ -11,3 +11,5 @@ scripts/local_paths.py
 
 # Launch notes are working files, not part of the product.
 launch/
+
+data/batch_active
