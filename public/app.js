@@ -2328,9 +2328,11 @@ function renderHero() {
   }
   const tags = tickersIn(lead.headline);
   // A photo fills the hero; a text-only lead left a big empty box under the
-  // headline. Real front pages fill that space with the next headlines.
+  // headline. Real front pages fill that space with the next headlines —
+  // held to the SAME paywall bar as the lead: the top panel is the site's
+  // most-clicked real estate, and NYT/WSJ links there dead-end at a paywall.
   const more = hasImg(lead) ? [] : (newsData?.items ?? [])
-    .filter((n) => n !== lead && n.link !== lead.link && n.headline !== lead.headline)
+    .filter((n) => n !== lead && n.link !== lead.link && n.headline !== lead.headline && !PAYWALLED.test(n.source ?? ""))
     .slice(0, 3);
   hero.innerHTML = `
     <a class="hero-link" href="${esc(safeHref(lead.link))}" target="_blank" rel="noopener noreferrer">
