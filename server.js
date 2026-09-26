@@ -867,6 +867,90 @@ app.get("/api/timemachine", async (req, res) => {
   }
 });
 
+// The whole market view as paste-ready markdown — pipe your own install
+// into any AI chat or notes app: curl localhost:3000/api/market-brief.
+// Assembled from the same cached payloads the front page uses, so it costs
+// no extra API budget beyond a normal page load.
+app.get("/api/market-brief", async (_req, res) => {
+  try {
+    const m = marketCache && Date.now() - marketCache.at < 120_000
+      ? marketCache.payload
+      : await singleFlight("market", () => buildMarket(false));
+    const s = await singleFlight("homestats", buildHomeStats).catch(() => null);
+    const pct = (v, signed = true) => (typeof v === "number" && Number.isFinite(v) ? `${signed && v > 0 ? "+" : ""}${v.toFixed(2)}%` : "n/a");
+    const L = [];
+    L.push(`# Crosscheck market brief — ${marketDate()}`);
+    L.push("Generated locally by the user's own Crosscheck install. Data can be delayed or wrong; the verdict formula's backtests showed no predictive power. Not financial advice.");
+    L.push("", "## Indices");
+    for (const r of m.indices ?? []) L.push(`- ${r.label} (${r.symbol}): ${r.price} (${pct(r.changePercent)})`);
+    L.push("", "## Macro");
+    for (const r of m.macro ?? []) L.push(`- ${r.label}: ${r.value}${r.kind === "yield" ? "%" : ""} (${pct(r.chgPct)})`);
+    L.push("", "## The economy right now (FRED)");
+    for (const r of m.economy ?? []) L.push(`- ${r.label}: ${r.value} — ${r.sub}`);
+    if (s && !s.empty) {
+      L.push("", "## The forward test (the formula grading itself)");
+      L.push(`- ${s.calls} calls logged over ${s.days} days with calls; ${s.graded} graded`);
+      L.push(typeof s.rightPct === "number"
+        ? `- Right on direction (30d+ calls): ${Math.round(s.rightPct)}% of ${s.seasoned} — a coin flip lands within ±${Math.round(196 * Math.sqrt(0.25 / s.seasoned))} points of 50% at this sample size`
+        : `- Right on direction: too few 30d+ calls to score yet (${s.seasoned ?? 0} of 30)`);
+    }
+    L.push("", "## Today's briefing (attention heuristic, not a prediction)");
+    for (const n of (m.news ?? []).slice(0, 10)) {
+      L.push(`- ${n.impact >= 3 ? "[MARKET-MOVING] " : n.impact === 2 ? "[NOTABLE] " : ""}${n.headline} (${n.source}${(n.covered ?? 1) >= 2 ? `, ${n.covered} outlets` : ""})`);
+    }
+    L.push("", "## Sectors (day)");
+    for (const r of (m.sectors ?? []).slice(0, 11)) L.push(`- ${r.label}: ${pct(r.dayPct)} (1mo ${pct(r.monthPct)})`);
+    res.type("text/markdown; charset=utf-8").send(L.join("\n") + "\n");
+  } catch (err) {
+    console.error("market-brief failed:", err);
+    res.status(500).type("text/plain").send("brief unavailable");
+  }
+});
+
+// The forward test as an RSS feed: one item per batch day, verdict counts
+// in the description — subscribe to the formula's public record without
+// opening the app. Reads only the local ledger; zero API cost.
+app.get("/feed.xml", async (_req, res) => {
+  try {
+    const { entries, source } = await effectiveLedger();
+    const xesc = (s) => String(s ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]));
+    const byDay = new Map();
+    for (const e of entries) {
+      if (!byDay.has(e.date)) byDay.set(e.date, []);
+      byDay.get(e.date).push(e);
+    }
+    const days = [...byDay.keys()].sort().reverse().slice(0, 20);
+    const order = ["STRONG BUY", "BUY", "HOLD", "SELL", "STRONG SELL"];
+    const items = days.map((d) => {
+      const rows = byDay.get(d);
+      const counts = order
+        .map((v) => [v, rows.filter((e) => e.verdict === v).length])
+        .filter(([, n]) => n)
+        .map(([v, n]) => `${v} ${n}`)
+        .join(" · ");
+      return `  <item>
+    <title>Forward test ${xesc(d)} — ${rows.length} call${rows.length === 1 ? "" : "s"} frozen</title>
+    <link>https://github.com/EvanDRas/crosscheck</link>
+    <guid isPermaLink="false">crosscheck-forward-${xesc(d)}</guid>
+    <pubDate>${new Date(`${d}T21:00:00Z`).toUTCString()}</pubDate>
+    <description>${xesc(`${counts || "no directional calls"}. Every call is frozen before outcomes are known and graded against SPY on the track record page. The formula's backtests showed no predictive power — this feed is the live test, wins and losses alike.`)}</description>
+  </item>`;
+    }).join("\n");
+    res.type("application/rss+xml").send(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>Crosscheck forward test${source === "official" ? " (official log)" : ""}</title>
+  <link>https://github.com/EvanDRas/crosscheck</link>
+  <description>Every verdict the formula logs, frozen daily before outcomes are known. Not financial advice.</description>
+${items}
+</channel>
+</rss>`);
+  } catch (err) {
+    console.error("feed failed:", err);
+    res.status(500).type("text/plain").send("feed unavailable");
+  }
+});
+
 // The evidence, served in-app so the product carries its own test results.
 app.get("/api/evidence", (_req, res) => {
   try {

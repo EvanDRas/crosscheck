@@ -152,7 +152,8 @@ function renderCalls(data, showAll = false) {
   notes.push("Returns run from the call date's split/dividend-adjusted close to the latest adjusted close, so they won't match arithmetic on the Price then column — especially across splits.");
   $("callsCard").innerHTML = `
     <h2>All calls — newest first</h2>
-    <p class="sub">Each row froze the moment it was logged; only the "now" columns move.</p>
+    <p class="sub">Each row froze the moment it was logged; only the "now" columns move.
+      <button type="button" id="ledgerCsvBtn" class="linklike">Download graded CSV</button></p>
     ${notes.length ? `<p class="sub">${esc(notes.join(" "))}</p>` : ""}
     <div class="ledger-table-wrap">
       <table class="ledger-table">
@@ -182,6 +183,19 @@ function renderCalls(data, showAll = false) {
       </table>
     </div>`;
   document.getElementById("showAllCalls")?.addEventListener("click", () => renderCalls(data, true));
+  // The graded rows, raw — the same open-data promise as the published log,
+  // but with this install's own grading attached.
+  document.getElementById("ledgerCsvBtn")?.addEventListener("click", () => {
+    const f = (v, d = 2) => (typeof v === "number" && Number.isFinite(v) ? (v * 100).toFixed(d) : "");
+    const csv = ["date,ticker,verdict,score,near_term,long_term,price_then,latest_close,return_pct,vs_spy_pct,age_days,basis,formula_version",
+      ...data.entries.map((e) => [e.date, e.ticker, e.verdict, e.score ?? "", e.ntVerdict ?? "", e.ltVerdict ?? "",
+        e.price ?? "", e.nowPrice ?? "", f(e.ret), f(e.excess), e.ageDays ?? "", e.basis ?? "", e.formulaVersion ?? "v1"].join(","))].join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `crosscheck-ledger-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 }
 
 function renderMyPicks(data) {
