@@ -157,7 +157,9 @@ incomplete, or wrong; the verdict is a mechanical formula, not a recommendation.
   opens with what moved — score, filings, insider activity, earnings date.
 - **Share card**: one click renders the verdict as a PNG with the
   no-predictive-power evidence line baked into the pixels, so a shared
-  screenshot carries its own disclaimer. Press `/` anywhere to search.
+  screenshot carries its own disclaimer. Press `/` anywhere to search, `?`
+for all keyboard shortcuts. Printing an analysis page produces a clean
+light-on-white research note (the print stylesheet strips the chrome).
 - Sources are fetched in parallel; any single source failing degrades that
   section to N/A and adds a warning — it never breaks the page.
 - **Price history chart**: with a Tiingo key, any US ticker gets a live

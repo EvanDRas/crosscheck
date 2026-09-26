@@ -1658,3 +1658,56 @@ html { scroll-padding-top: 96px; }
   .topbar { position: static; }
   html { scroll-padding-top: 0; }
 }
+
+/* ---- accessibility layers ---- */
+
+/* skip link: first tab stop jumps past the topbar straight to content */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--accent-strong);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 0 0 4px 0;
+  font-weight: 600;
+}
+.skip-link:focus { left: 0; text-decoration: none; }
+
+/* vestibular safety: no animation is load-bearing here */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Windows High Contrast / forced-colors: color fills collapse to system
+   colors, so state must survive on borders and text alone */
+@media (forced-colors: active) {
+  .verdict-pill, .pill-sm, .badge, .earn-chip, .impact, .chip, .star, .news-tag { border: 1px solid CanvasText; }
+  .meter-fill, .an-seg, .heat-tile, .swatch { forced-color-adjust: none; }
+  .topbar { border-bottom: 1px solid CanvasText; }
+}
+
+/* ---- print: an analysis page becomes a clean research note ---- */
+@media print {
+  :root {
+    --page: #fff; --surface: #fff; --surface-2: #f3f4f6;
+    --ink: #000; --ink-2: #222; --muted: #555;
+    --hairline: #ddd; --baseline: #bbb; --grid: #ddd;
+  }
+  body { background: #fff; color: #000; }
+  .topbar, .skip-link, .result-actions, .today-bar, .tour-backdrop, .tour-panel,
+  .q-refresh, .star, .pf-rm, .news-pager, .setup-card, #status, .typeahead { display: none !important; }
+  .card { border: 1px solid #ddd; break-inside: avoid; box-shadow: none; }
+  a { color: #000; text-decoration: none; }
+  .card, .intro { background: #fff; }
+}
+
+/* shortcuts panel */
+.kb-table { border-collapse: collapse; margin: 6px 0 10px; }
+.kb-table td { padding: 4px 12px 4px 0; font-size: 13px; color: var(--ink-2); }
+kbd { font-family: var(--mono); font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--baseline); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; color: var(--ink); }

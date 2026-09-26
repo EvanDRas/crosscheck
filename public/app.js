@@ -62,6 +62,9 @@ const pn = (v) => (typeof v === "number" ? String(Math.round(v * 100) / 100) : S
 // follows) — it matches what the CSV importer and the search box accept, so
 // a symbol like BRK.B or MOG-A can't be held but not followed.
 const STORABLE_TICKER_RE = /^[A-Z][A-Z0-9.\-]{0,9}$/;
+// Respect prefers-reduced-motion in every scripted scroll — CSS can't reach
+// scrollIntoView/scrollTo options.
+const SCROLL_BEHAVIOR = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 // On weekends, holidays, and before the open a quote's day-change is the
 // prior session's — calling it "today" is wrong. Shared by the price header
 // and the portfolio total so they can never disagree.
@@ -1285,7 +1288,7 @@ function render(d) {
   renderNews(d);
   startLive(d);
   if (!d.demo && d.ticker) pushRecent(d.ticker);
-  if (!analyze.soft) window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!analyze.soft) window.scrollTo({ top: 0, behavior: SCROLL_BEHAVIOR });
 }
 
 // ---------- time machine ----------
@@ -1392,7 +1395,7 @@ function renderTimeMachine(p) {
       <a href="/evidence.html">Evidence</a>.</p>
     </section>`;
   el.tmResults.hidden = false;
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: SCROLL_BEHAVIOR });
 }
 
 // ---------- fetch & routing ----------
@@ -1951,6 +1954,7 @@ function renderPortfolio() {
       ${isNum(dayChg) && dayChg !== 0 ? `<span class="pf-day ${dayChg >= 0 ? "pos" : "neg"}">${esc(fmtUsd(dayChg))} ${sessionDayLabel()}</span>` : ""}
     </div>${spyLine}${incomeLine}` : hasKey ? `<div class="pf-total-sub">Loading prices…</div>` : `<div class="pf-total-sub">Add a free Finnhub key (top of the page on first run) for live prices.</div>`}
     ${form}
+    <button type="button" class="linklike" data-pf-export>Export positions CSV</button>
     <p class="pf-privacy">Private: positions live in this browser only and are never uploaded.</p>`;
 }
 
@@ -2086,6 +2090,19 @@ $("portfolioCard").addEventListener("submit", (e) => {
 });
 
 $("portfolioCard").addEventListener("click", (e) => {
+  if (e.target.closest?.("[data-pf-export]")) {
+    // Same shape the importer reads, so a round trip is lossless — plus the
+    // buy dates brokers never give you.
+    const lots = readPf();
+    const csv = ["Symbol,Quantity,Average Cost Basis,Buy Date",
+      ...lots.map((l) => `${l.t},${l.sh},${l.cost},${l.date ?? ""}`)].join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `crosscheck-portfolio-${localDay()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return;
+  }
   const rm = e.target.closest?.("[data-rm]")?.dataset?.rm;
   if (rm != null) {
     const lots = readPf();
@@ -2415,7 +2432,7 @@ $("marketNews").addEventListener("click", (e) => {
     renderNewsCard();
     const same = card.querySelector(`[data-pg="${pg}"]`);
     (same && !same.disabled ? same : card.querySelector(".news-pager button:not(:disabled)"))?.focus();
-    document.getElementById("marketNews").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("marketNews").scrollIntoView({ behavior: SCROLL_BEHAVIOR, block: "start" });
   }
 });
 
@@ -2516,7 +2533,7 @@ $("todayBar").addEventListener("click", (e) => {
     return;
   }
   const target = e.target.closest?.("[data-scroll]")?.dataset?.scroll;
-  if (target) document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (target) document.getElementById(target)?.scrollIntoView({ behavior: SCROLL_BEHAVIOR, block: "center" });
 });
 
 // ---------- watchlist ----------
@@ -3364,7 +3381,7 @@ else {
 // installs) are skipped automatically. Honest voice throughout.
 
 const TOUR_STEPS = [
-  { el: "#searchForm", title: "Start anywhere", text: `Type any ticker or company name and hit <b>Analyze</b> — score, evidence, filings, peers, and news on one page. No API key yet? Type <b>DEMO</b>.` },
+  { el: "#searchForm", title: "Start anywhere", text: `Type any ticker or company name and hit <b>Analyze</b> — score, evidence, filings, peers, and news on one page. No API key yet? Type <b>DEMO</b>. Press <kbd>/</kbd> to jump here anytime, <kbd>?</kbd> for all shortcuts.` },
   { el: "#tmToggle", when: () => hasTiingo, title: "The no-hindsight time machine", text: `Pick a past date and see exactly what the formula would have said <i>then</i>, using only what was filed and priced by that day.` },
   { el: "#portfolioCard", title: "Your money, honestly measured", text: `Add what you own (buy dates included) and get the comparison most brokers skip: <b>would the same money in the S&amp;P have done better?</b> It never leaves this browser.` },
   { el: "#watchCard", title: "Follow what you care about", text: `Followed stocks live here with price and verdict — and the news desk's <b>For you</b> tab shows only their stories.` },
@@ -3413,9 +3430,9 @@ function tourShow() {
   if (target) {
     target.classList.add("tour-hi");
     if (target.closest(".topbar")) target.closest(".topbar").classList.add("tour-hi-root");
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.scrollIntoView({ behavior: SCROLL_BEHAVIOR, block: "center" });
   } else {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: SCROLL_BEHAVIOR });
   }
   tourEls.panel.innerHTML = `
     <div class="tour-title">${esc(step.title)}</div>
@@ -3478,4 +3495,48 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   el.dateInput.value = "";
   go(row.dataset.t);
+});
+
+// "?" opens a shortcuts panel — the keyboard paths exist; now they're
+// discoverable without reading the README.
+let kbEls = null;
+function kbClose() {
+  if (!kbEls) return;
+  kbEls.backdrop.remove();
+  kbEls.panel.remove();
+  kbEls.opener?.focus?.();
+  kbEls = null;
+}
+function kbOpen() {
+  if (kbEls) return kbClose();
+  const backdrop = document.createElement("div");
+  backdrop.className = "tour-backdrop";
+  const panel = document.createElement("div");
+  panel.className = "tour-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.setAttribute("aria-label", "Keyboard shortcuts");
+  panel.innerHTML = `
+    <div class="tour-title">Keyboard shortcuts</div>
+    <table class="kb-table">
+      <tr><td><kbd>/</kbd></td><td>jump to the search box</td></tr>
+      <tr><td><kbd>Enter</kbd></td><td>open the focused stock row</td></tr>
+      <tr><td><kbd>&#8593;</kbd> <kbd>&#8595;</kbd></td><td>move through search suggestions</td></tr>
+      <tr><td><kbd>&#8592;</kbd> <kbd>&#8594;</kbd></td><td>previous / next tour step</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>close suggestions, the tour, or this panel</td></tr>
+      <tr><td><kbd>?</kbd></td><td>show or hide this panel</td></tr>
+    </table>
+    <div class="tour-nav"><span></span><span class="tour-btns"><button type="button" data-kb="close">Close</button></span></div>`;
+  document.body.append(backdrop, panel);
+  backdrop.addEventListener("click", kbClose);
+  panel.addEventListener("click", (e) => { if (e.target.closest("[data-kb]")) kbClose(); });
+  kbEls = { backdrop, panel, opener: document.activeElement };
+  panel.querySelector("button")?.focus();
+}
+document.addEventListener("keydown", (e) => {
+  if (kbEls && e.key === "Escape") { kbClose(); return; }
+  if (e.key !== "?" || tourEls) return;
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+  e.preventDefault();
+  kbOpen();
 });
