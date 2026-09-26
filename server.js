@@ -334,20 +334,32 @@ async function buildScreen() {
     const uni = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
     const universe = new Set(uni.tickers ?? []);
     const { entries, source } = await effectiveLedger();
+    // Ledger order is chronological, so the map naturally ends on the newest
+    // entry per ticker — and the one it displaces is the PREVIOUS call,
+    // which powers the screen's "what moved" delta at zero extra cost.
     const latest = new Map();
+    const prior = new Map();
     for (const e of entries) {
-      if (universe.has(e.ticker) && e.formulaVersion === SCORING_VERSION) latest.set(e.ticker, e);
+      if (universe.has(e.ticker) && e.formulaVersion === SCORING_VERSION) {
+        if (latest.has(e.ticker)) prior.set(e.ticker, latest.get(e.ticker));
+        latest.set(e.ticker, e);
+      }
     }
     buildScreen.source = source;
     return [...latest.values()]
       .filter((e) => Number.isFinite(e.score))
       .sort((a, b) => b.score - a.score)
-      .map((e) => ({
-        ticker: e.ticker,
-        score: e.score,
-        verdict: e.verdict,
-        date: e.date,
-      }));
+      .map((e) => {
+        const p = prior.get(e.ticker);
+        return {
+          ticker: e.ticker,
+          score: e.score,
+          verdict: e.verdict,
+          date: e.date,
+          prevScore: p && Number.isFinite(p.score) ? p.score : null,
+          prevDate: p?.date ?? null,
+        };
+      });
   } catch {
     return [];
   }

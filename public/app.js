@@ -2758,10 +2758,13 @@ function renderScreen() {
   }
   const counts = { ALL: screenData.length };
   for (const [g, vs] of Object.entries(SCREEN_GROUPS)) counts[g] = screenData.filter((r) => vs.includes(r.verdict)).length;
+  const dOf = (r) => (isNum(r.score) && isNum(r.prevScore) ? r.score - r.prevScore : null);
   const rows = (screenFilter === "ALL" ? [...screenData] : screenData.filter((r) => SCREEN_GROUPS[screenFilter].includes(r.verdict)))
     .sort((a, b) => (screenSort.key === "ticker"
       ? screenSort.dir * a.ticker.localeCompare(b.ticker)
-      : screenSort.dir * ((a.score ?? 0) - (b.score ?? 0))));
+      : screenSort.key === "delta"
+        ? screenSort.dir * ((dOf(a) ?? 0) - (dOf(b) ?? 0))
+        : screenSort.dir * ((a.score ?? 0) - (b.score ?? 0))));
   const arrow = (k) => (screenSort.key === k ? (screenSort.dir === -1 ? " ↓" : " ↑") : "");
   scr.innerHTML = `
     <h2>Verdict screen</h2>
@@ -2778,7 +2781,7 @@ function renderScreen() {
     <div class="screen-scroll">
       <table class="mkt-table screen-table">
         <thead>
-          <tr><th>#</th><th class="sortable" data-sort="ticker" tabindex="0" role="button" aria-label="Sort by ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score" tabindex="0" role="button" aria-label="Sort by score">Score${arrow("score")}</th><th>Verdict</th></tr>
+          <tr><th>#</th><th class="sortable" data-sort="ticker" tabindex="0" role="button" aria-label="Sort by ticker">Ticker${arrow("ticker")}</th><th class="num sortable" data-sort="score" tabindex="0" role="button" aria-label="Sort by score">Score${arrow("score")}</th><th class="num sortable" data-sort="delta" tabindex="0" role="button" aria-label="Sort by score change" title="Score change vs each ticker's previous logged call">Δ${arrow("delta")}</th><th>Verdict</th></tr>
         </thead>
         <tbody>
           ${(() => { const rank = new Map([...screenData].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).map((r, i) => [r.ticker, i + 1])); return rows.map((r) => `
@@ -2786,6 +2789,7 @@ function renderScreen() {
               <td class="rank">${rank.get(r.ticker) ?? "—"}</td>
               <td class="mkt-sym"><span tabindex="0" role="link">${esc(r.ticker)}</span> ${starBtn(r.ticker)}</td>
               <td class="num">${esc(fmtNum(r.score, 1) ?? "—")}</td>
+              <td class="num">${(() => { const d = dOf(r); return d == null ? "—" : `<span class="${d > 0.05 ? "pos" : d < -0.05 ? "neg" : ""}" title="vs its previous call${r.prevDate ? ` (${esc(r.prevDate)})` : ""}">${d > 0 ? "+" : ""}${fmtNum(d, 1)}</span>`; })()}</td>
               <td><span class="pill-sm ${verdictClass(r.verdict)}">${esc(r.verdict ?? "—")}</span></td>
             </tr>`).join(""); })()}
         </tbody>
@@ -2811,7 +2815,7 @@ $("screenCard").addEventListener("click", (e) => {
   }
   const s = e.target.closest?.("th[data-sort]")?.dataset?.sort;
   if (s) {
-    screenSort = { key: s, dir: screenSort.key === s ? -screenSort.dir : (s === "score" ? -1 : 1) };
+    screenSort = { key: s, dir: screenSort.key === s ? -screenSort.dir : (s === "ticker" ? 1 : -1) }; // numeric columns open biggest-first
     renderScreen();
     $("screenCard").querySelector(`th[data-sort="${s}"]`)?.focus();
   }
