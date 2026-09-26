@@ -5,6 +5,8 @@ $launcher = Join-Path $root "Start Crosscheck app.vbs"
 $icon = Join-Path $root "public\icons\crosscheck.ico"
 if (-not (Test-Path $launcher)) { Write-Host "Launcher not found: $launcher"; exit 1 }
 
+$brief = Join-Path $root "Copy Market Brief.vbs"
+
 $ws = New-Object -ComObject WScript.Shell
 foreach ($dir in @([Environment]::GetFolderPath("Desktop"), (Join-Path ([Environment]::GetFolderPath("StartMenu")) "Programs"))) {
   $lnkPath = Join-Path $dir "Crosscheck.lnk"
@@ -16,4 +18,16 @@ foreach ($dir in @([Environment]::GetFolderPath("Desktop"), (Join-Path ([Environ
   $lnk.Description = "Crosscheck - the honest stock analyzer"
   $lnk.Save()
   Write-Host "Created $lnkPath"
+
+  if (Test-Path $brief) {
+    $blnkPath = Join-Path $dir "Crosscheck Market Brief.lnk"
+    $blnk = $ws.CreateShortcut($blnkPath)
+    $blnk.TargetPath = "$env:WINDIR\System32\wscript.exe"
+    $blnk.Arguments = '"' + $brief + '"'
+    $blnk.WorkingDirectory = $root
+    if (Test-Path $icon) { $blnk.IconLocation = $icon }
+    $blnk.Description = "Copy today's market brief to the clipboard - paste into any AI chat"
+    $blnk.Save()
+    Write-Host "Created $blnkPath"
+  }
 }
