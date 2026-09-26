@@ -78,6 +78,16 @@ async function main() {
     ? only.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean)
     : JSON.parse(fs.readFileSync(UNIVERSE_FILE, "utf8")).tickers;
 
+  // A killed run (shutdown, task manager) can't log its own death — the
+  // 09-21 batch started, logged 4 tickers, and vanished without a trace.
+  // Leave a marker at START; whoever runs next reports the orphan honestly.
+  const MARKER = path.join(ROOT, "data", "batch_inprogress.json");
+  try {
+    const orphan = JSON.parse(fs.readFileSync(MARKER, "utf8"));
+    logRun(`WARN: previous run never finished — started ${orphan.startedAt} for ${orphan.date} and was killed mid-run (machine shutdown?). Any tickers it logged that day stand in the ledger as a partial batch; today's run is unaffected.`);
+  } catch { /* no orphan — the normal case */ }
+  try { fs.writeFileSync(MARKER, JSON.stringify({ startedAt: new Date().toISOString(), date: today })); } catch {}
+
   logRun(`START batch: ${tickers.length} tickers, ${DELAY_MS}ms spacing`);
 
   let logged = 0;
@@ -90,7 +100,10 @@ async function main() {
   // calls — the file's fresh mtime tells its guards the minute is spoken for.
   const HEARTBEAT = path.join(ROOT, "data", "batch_active");
   const beat = () => { try { fs.writeFileSync(HEARTBEAT, String(Date.now())); } catch {} };
-  const unbeat = () => { try { fs.unlinkSync(HEARTBEAT); } catch {} };
+  const unbeat = () => {
+    try { fs.unlinkSync(HEARTBEAT); } catch {}
+    try { fs.unlinkSync(MARKER); } catch {} // a clean exit owes no orphan report
+  };
   process.on("exit", unbeat);
   beat();
 

@@ -13,3 +13,4 @@ scripts/local_paths.py
 launch/
 
 data/batch_active
+data/batch_inprogress.json

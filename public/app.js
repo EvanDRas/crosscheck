@@ -2940,10 +2940,13 @@ function renderRecord(s) {
     ["Days with calls", String(s.days), ""], // distinct call dates — the ledger's "over N days" is the calendar span, a different number
     ["Graded so far", String(s.graded), ""],
     // The hit rate names its sample and its noise band: at n calls, a true
-    // coin flip lands within ±1.96·√(.25/n) of 50% — green at 57% of 30 would
-    // otherwise read as proof when it's inside that band.
+    // coin flip lands within ±1.96·√(.25/n) of 50%. Color only outside the
+    // band — and symmetrically: significantly bad wears red the same way
+    // significantly good wears green, or the tint is marketing.
     ["Right on direction (30d+)", isNum(s.rightPct) ? `${fmtNum(s.rightPct, 0)}% of ${s.seasoned}` : s.seasoned > 0 ? `only ${s.seasoned} of the 30 calls needed` : "no calls 30d old yet",
-      isNum(s.rightPct) && (s.rightPct - 50) > 196 * Math.sqrt(0.25 / s.seasoned) ? "pos" : "",
+      !isNum(s.rightPct) ? ""
+        : (s.rightPct - 50) > 196 * Math.sqrt(0.25 / s.seasoned) ? "pos"
+        : (50 - s.rightPct) > 196 * Math.sqrt(0.25 / s.seasoned) ? "neg" : "",
       isNum(s.rightPct) ? `${s.seasoned} calls — a coin flip lands anywhere within ±${Math.round(196 * Math.sqrt(0.25 / s.seasoned))} points of 50% at this sample size; judge it in months` : ""],
     s.best && s.graded >= 5 ? ["Best aged call", callLabel(s.best), (callEdge(s.best) ?? 0) > 0 ? "pos" : ""] : null,
     s.worst && s.graded >= 5 ? ["Worst aged call", callLabel(s.worst), (callEdge(s.worst) ?? 0) < 0 ? "neg" : ""] : null,

@@ -339,6 +339,7 @@ a:hover { text-decoration: underline; }
 .record-strip .mkt-tile:nth-child(even) { padding-left: 16px; }
 .record-val { font-size: 17px; }
 .record-val.pos { color: var(--good); }
+.record-val.neg { color: var(--down-text); }
 
 /* Recently viewed — quiet one-liner under the intro chips. */
 .recent-row {
