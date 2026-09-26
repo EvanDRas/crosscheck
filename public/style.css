@@ -1715,3 +1715,18 @@ kbd { font-family: var(--mono); font-size: 11.5px; background: var(--surface-2);
 /* verdict-screen delta spans (class sits on the span, not the cell) */
 .mkt-table .num .pos { color: var(--good); }
 .mkt-table .num .neg { color: var(--down-text); }
+
+/* score-history chart: the formula's mind as a line */
+.sh-line { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.sh-dot { fill: var(--muted); }
+.sh-dot.v-strongbuy, .sh-dot.v-buy { fill: var(--good); }
+.sh-dot.v-hold { fill: var(--an-hold); }
+.sh-dot.v-sell, .sh-dot.v-strongsell { fill: var(--critical); }
+.sh-dot.sh-flip { stroke: var(--ink); stroke-width: 1; }
+
+/* outcome-distribution histogram */
+.dist-bar.pos { fill: color-mix(in srgb, var(--good) 70%, var(--surface-2)); }
+.dist-bar.neg { fill: color-mix(in srgb, var(--critical) 70%, var(--surface-2)); }
+.dist-bar.clip { fill: var(--muted); opacity: 0.6; }
+.dist-zero { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 3; }
+.dist-mean { stroke: var(--warning); stroke-width: 1.5; }

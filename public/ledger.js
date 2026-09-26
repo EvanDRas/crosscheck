@@ -249,6 +249,62 @@ function renderMyPicks(data) {
     ${data.entries.some((e) => e.basis === "raw") ? `<p class="sub">* graded price-only (no split/dividend adjustment) — a split can distort these rows; add a free Tiingo key for adjusted grading.</p>` : ""}`;
 }
 
+// The outcome DISTRIBUTION: every graded call's excess return in 2-point
+// bins. Means hide the spread, and the spread is the honesty — one fat tail
+// can pay for (or destroy) a whole strategy, and a histogram is the only
+// chart that shows it.
+function renderDistribution(data) {
+  const card = $("distCard");
+  const era = currentEra(data);
+  const xs = data.entries
+    .filter((e) => (e.formulaVersion ?? "v1") === era && e.excess != null && e.ageDays > 0 && e.basis === "tr")
+    .map((e) => e.excess * 100);
+  if (xs.length < 30) { card.hidden = true; return; }
+  const BIN = 2, LIM = 20; // percent
+  const bins = new Map(); // lower edge -> count
+  let clippedLo = 0, clippedHi = 0;
+  for (const x of xs) {
+    if (x < -LIM) { clippedLo++; continue; }
+    if (x >= LIM) { clippedHi++; continue; }
+    const lo = Math.floor(x / BIN) * BIN;
+    bins.set(lo, (bins.get(lo) ?? 0) + 1);
+  }
+  const edges = [];
+  for (let b = -LIM; b < LIM; b += BIN) edges.push(b);
+  const maxN = Math.max(...edges.map((b) => bins.get(b) ?? 0), clippedLo, clippedHi, 1);
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sorted = [...xs].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const W = 720, H = 170, pad = { l: 10, r: 10, t: 14, b: 24 };
+  const cols = edges.length + 2; // + one clipped bucket each side
+  const bw = (W - pad.l - pad.r) / cols;
+  const Xi = (i) => pad.l + i * bw;
+  const Yh = (n) => (n / maxN) * (H - pad.t - pad.b);
+  const bar = (i, n, lo, label) => n === 0 ? "" : `<rect class="dist-bar ${lo != null ? (lo >= 0 ? "pos" : "neg") : "clip"}"
+      x="${(Xi(i) + 1).toFixed(1)}" y="${(H - pad.b - Yh(n)).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${Yh(n).toFixed(1)}">
+      <title>${label}: ${n} call${n === 1 ? "" : "s"}</title></rect>`;
+  const bars = [
+    bar(0, clippedLo, null, `worse than −${LIM}%`),
+    ...edges.map((lo, i) => bar(i + 1, bins.get(lo) ?? 0, lo, `${lo >= 0 ? "+" : ""}${lo}% to ${lo + BIN >= 0 ? "+" : ""}${lo + BIN}%`)),
+    bar(cols - 1, clippedHi, null, `better than +${LIM}%`),
+  ].join("");
+  const zeroX = Xi(1 + LIM / BIN); // left edge of the 0..+2 bin = the zero line
+  const meanX = Xi(1 + (Math.max(-LIM, Math.min(LIM, mean)) + LIM) / BIN);
+  card.innerHTML = `
+    <h2>Outcome distribution</h2>
+    <p class="sub">Every aged, total-return-graded call's excess vs SPY, in 2-point bins — the spread the averages hide.
+      Mean ${pct(mean / 100)} · median ${pct(median / 100)} · ${xs.length} calls. The dashed line is zero: right of it beat the market.</p>
+    <div class="ledger-table-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribution of excess returns">
+      ${bars}
+      <line class="dist-zero" x1="${zeroX.toFixed(1)}" x2="${zeroX.toFixed(1)}" y1="${pad.t}" y2="${H - pad.b}"></line>
+      <line class="dist-mean" x1="${meanX.toFixed(1)}" x2="${meanX.toFixed(1)}" y1="${pad.t}" y2="${H - pad.b}"><title>mean ${pct(mean / 100)}</title></line>
+      <text class="hist-axis-text" x="${pad.l}" y="${H - 8}">&lt; −${LIM}%</text>
+      <text class="hist-axis-text" x="${zeroX.toFixed(1)}" y="${H - 8}" text-anchor="middle">0</text>
+      <text class="hist-axis-text" x="${W - pad.r}" y="${H - 8}" text-anchor="end">&gt; +${LIM}%</text>
+    </svg></div>`;
+  card.hidden = false;
+}
+
 // Every graded call as a dot: x = when the call was made, y = its excess
 // vs SPY so far. The spread IS the honesty — wins and losses in one glance.
 function renderCallsMap(data) {
@@ -325,6 +381,7 @@ async function load() {
     }
     renderSummary(data);
     renderCallsMap(data);
+    renderDistribution(data);
     renderAggregates(data);
     // Official-source viewers get the statistics, not 585 rows of scroll:
     // the row-level log is still fully public in the repo for anyone who

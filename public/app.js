@@ -905,6 +905,60 @@ function renderNews(d) {
     </ul>`;
 }
 
+// ---------- the formula's opinion over time ----------
+// A chart of the SCORE, not the price: every point is a call frozen in the
+// forward test, so this is the formula's own mind on record — including
+// every time it changed it. No other card can show that honestly, because
+// no other card is append-only.
+async function loadScoreHistory(ticker) {
+  const card = $("scoreHistCard");
+  card.hidden = true;
+  if (!ticker || ticker === "DEMO") return;
+  const seq = viewSeq;
+  let rows = [];
+  try {
+    const res = await fetch(`/api/score-history?ticker=${encodeURIComponent(ticker)}`);
+    rows = (await res.json()).rows ?? [];
+  } catch {
+    return; // the card just stays hidden — it's a bonus, never a blocker
+  }
+  if (seq !== viewSeq) return; // a newer view took over while we fetched
+  if (rows.length < 5) return; // a three-point line invites overreading
+  const W = 720, H = 170, pad = { l: 34, r: 14, t: 10, b: 22 };
+  const t0 = Date.parse(rows[0].date);
+  const t1 = Math.max(Date.parse(rows[rows.length - 1].date), t0 + 1);
+  const X = (d) => pad.l + ((Date.parse(d) - t0) / (t1 - t0)) * (W - pad.l - pad.r);
+  const scores = rows.map((r) => r.score);
+  const lo = Math.max(0, Math.floor(Math.min(...scores)) - 5);
+  const hi = Math.min(100, Math.ceil(Math.max(...scores)) + 5);
+  const Y = (s) => pad.t + (1 - (s - lo) / (hi - lo)) * (H - pad.t - pad.b);
+  // The published band cutoffs, drawn only where they fall inside the view —
+  // a line crossing into BUY territory should be visible as exactly that.
+  const bands = [74, 66, 55, 47].filter((b) => b > lo && b < hi)
+    .map((b) => `<line class="hist-grid" x1="${pad.l}" x2="${W - pad.r}" y1="${Y(b).toFixed(1)}" y2="${Y(b).toFixed(1)}"></line>
+      <text class="hist-axis-text" x="${pad.l - 6}" y="${(Y(b) + 3.5).toFixed(1)}" text-anchor="end">${b}</text>`).join("");
+  const pts = rows.map((r) => `${X(r.date).toFixed(1)},${Y(r.score).toFixed(1)}`).join(" ");
+  const dots = rows.map((r, i) => {
+    const flipped = i > 0 && rows[i - 1].verdict !== r.verdict;
+    return `<circle cx="${X(r.date).toFixed(1)}" cy="${Y(r.score).toFixed(1)}" r="${flipped ? 4 : 2.5}" class="sh-dot ${verdictClass(r.verdict)}${flipped ? " sh-flip" : ""}">
+      <title>${esc(r.date)} — ${esc(fmtNum(r.score, 1))} ${esc(r.verdict)}${flipped ? ` (was ${esc(rows[i - 1].verdict)})` : ""}</title></circle>`;
+  }).join("");
+  const flips = rows.filter((r, i) => i > 0 && rows[i - 1].verdict !== r.verdict).length;
+  card.innerHTML = `
+    <h2>The formula's opinion over time</h2>
+    <p class="sub">A chart of the <b>score</b>, not the price — every point is a call frozen in the
+      <a href="/ledger.html">forward test</a>, so this is the formula's mind on record.
+      ${rows.length} calls since ${esc(rows[0].date)} · ${flips ? `${flips} verdict change${flips === 1 ? "" : "s"} (the bigger dots)` : "no verdict changes yet"} · hover any dot.</p>
+    <div class="ledger-table-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Score history for ${esc(ticker)}">
+      ${bands}
+      <polyline class="sh-line" points="${pts}"></polyline>
+      ${dots}
+      <text class="hist-axis-text" x="${pad.l}" y="${H - 6}">${esc(rows[0].date)}</text>
+      <text class="hist-axis-text" x="${W - pad.r}" y="${H - 6}" text-anchor="end">${esc(rows[rows.length - 1].date)}</text>
+    </svg></div>`;
+  card.hidden = false;
+}
+
 // ---------- AI brief: the whole page as paste-ready markdown ----------
 
 function buildBrief(d) {
@@ -1286,6 +1340,7 @@ function render(d) {
   renderEarnings(d);
   renderPeers(d);
   renderNews(d);
+  loadScoreHistory(d.ticker); // async and non-blocking — the card appears when the ledger answers
   startLive(d);
   if (!d.demo && d.ticker) pushRecent(d.ticker);
   if (!analyze.soft) window.scrollTo({ top: 0, behavior: SCROLL_BEHAVIOR });

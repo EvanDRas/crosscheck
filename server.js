@@ -879,6 +879,26 @@ app.get("/api/timemachine", async (req, res) => {
   }
 });
 
+// The formula's opinion as a time series: every logged call for one ticker,
+// straight from the ledger — zero API cost. Powers the score-history chart
+// on ticker pages ("what did the formula think last week, and when did it
+// change its mind?").
+app.get("/api/score-history", async (req, res) => {
+  try {
+    const ticker = String(req.query.ticker ?? "").trim().toUpperCase();
+    if (!TICKER_RE.test(ticker) || ticker === "DEMO") return res.json({ rows: [] });
+    const { entries } = await effectiveLedger();
+    const rows = entries
+      .filter((e) => e.ticker === ticker && e.formulaVersion === SCORING_VERSION && Number.isFinite(e.score))
+      .map((e) => ({ date: e.date, score: e.score, verdict: e.verdict }))
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    res.json({ rows });
+  } catch (err) {
+    console.error("score-history failed:", err);
+    res.json({ rows: [] });
+  }
+});
+
 // The whole market view as paste-ready markdown — pipe your own install
 // into any AI chat or notes app: curl localhost:3000/api/market-brief.
 // Assembled from the same cached payloads the front page uses, so it costs
