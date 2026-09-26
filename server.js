@@ -879,6 +879,21 @@ app.get("/api/timemachine", async (req, res) => {
   }
 });
 
+// Ticker → sector for the fixed universe — powers the luck test's sector
+// slicing. Static file read, cached forever (the universe is frozen).
+let universeMetaCache = null;
+app.get("/api/universe-meta", (_req, res) => {
+  try {
+    if (!universeMetaCache) {
+      const u = JSON.parse(fs.readFileSync(path.join(__dirname, "data", "universe.json"), "utf8"));
+      universeMetaCache = { sectors: u.sectors ?? {} };
+    }
+    res.json(universeMetaCache);
+  } catch {
+    res.json({ sectors: {} });
+  }
+});
+
 // The formula's opinion as a time series: every logged call for one ticker,
 // straight from the ledger — zero API cost. Powers the score-history chart
 // on ticker pages ("what did the formula think last week, and when did it

@@ -305,6 +305,128 @@ function renderDistribution(data) {
   card.hidden = false;
 }
 
+// ---------- the luck test: is a pattern real, or luck in a costume? ----------
+// Pick a slice of the record; the browser deals 1,000 random hands of the
+// SAME SIZE from the whole eligible deck and shows where the slice lands in
+// that luck distribution. This is a bootstrap significance test — the tool
+// quant desks use to keep themselves honest — running live on the site's
+// own published calls. The direction-aware edge means + is always "the
+// call was right", so buy slices and sell slices are comparable.
+const labState = { verdicts: new Set(["STRONG BUY", "BUY"]), sector: "ALL" };
+let labSectors = null;
+
+async function renderLuckLab(data) {
+  const card = $("labCard");
+  const era = currentEra(data);
+  const isBuy = (v) => /BUY/.test(v ?? "");
+  const isSell = (v) => /SELL/.test(v ?? "");
+  const pool = data.entries.filter((e) => (e.formulaVersion ?? "v1") === era
+    && e.excess != null && e.ageDays > 0 && e.basis === "tr"
+    && (isBuy(e.verdict) || isSell(e.verdict)));
+  if (pool.length < 60) { card.hidden = true; return; } // too small a deck to deal honest hands
+  if (!labSectors) {
+    try { labSectors = (await (await fetch("/api/universe-meta")).json()).sectors ?? {}; } catch { labSectors = {}; }
+  }
+  const edge = (e) => (isSell(e.verdict) ? -e.excess : e.excess) * 100;
+  const sectors = [...new Set(Object.values(labSectors))].sort();
+  const V = ["STRONG BUY", "BUY", "SELL", "STRONG SELL"];
+
+  card.innerHTML = `
+    <h2>The luck test — is a pattern real?</h2>
+    <p class="sub">Pick a slice of the record. The browser deals <b>1,000 random hands of the same size</b> from all
+      ${pool.length} aged directional calls and shows where your slice lands. If random hands beat it often,
+      the pattern is luck wearing a costume. Edge is direction-aware: positive always means the call was right.</p>
+    <div class="lab-controls">
+      ${V.map((v) => `<button type="button" class="chip lab-v${labState.verdicts.has(v) ? " on" : ""}" data-lv="${esc(v)}" aria-pressed="${labState.verdicts.has(v)}">${esc(v)}</button>`).join("")}
+      <select id="labSector" aria-label="Sector filter">
+        <option value="ALL">All sectors</option>
+        ${sectors.map((s) => `<option value="${esc(s)}"${labState.sector === s ? " selected" : ""}>${esc(s)}</option>`).join("")}
+      </select>
+    </div>
+    <div id="labOut" role="status"></div>`;
+  card.hidden = false;
+
+  const draw = () => {
+    const out = document.getElementById("labOut");
+    const sel = pool.filter((e) => labState.verdicts.has(e.verdict)
+      && (labState.sector === "ALL" || labSectors[e.ticker] === labState.sector));
+    if (!labState.verdicts.size) { out.innerHTML = `<p class="sub">Pick at least one verdict band.</p>`; return; }
+    if (sel.length < 15) {
+      out.innerHTML = `<p class="sub">Only ${sel.length} aged call${sel.length === 1 ? "" : "s"} match — fewer than 15 can't tell luck from anything.</p>`;
+      return;
+    }
+    const k = sel.length;
+    const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const realMean = mean(sel.map(edge));
+    const edges = pool.map(edge);
+    const B = 1000;
+    const nulls = new Array(B);
+    const idx = edges.map((_, i) => i);
+    for (let b = 0; b < B; b++) {
+      // partial Fisher–Yates: an honest k-sample WITHOUT replacement
+      let sum = 0;
+      for (let i = 0; i < k; i++) {
+        const j = i + Math.floor(Math.random() * (idx.length - i));
+        const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+        sum += edges[idx[i]];
+      }
+      nulls[b] = sum / k;
+    }
+    nulls.sort((a, b) => a - b);
+    const below = nulls.filter((n) => n < realMean).length;
+    const pctile = (below / B) * 100;
+    // add-one smoothing so the p-value can never claim impossible certainty
+    const pTwo = Math.min(1, (2 * (Math.min(below, B - below) + 1)) / (B + 1));
+    const lo = nulls[Math.floor(B * 0.025)], hi = nulls[Math.ceil(B * 0.975) - 1];
+    const readout = pctile >= 97.5
+      ? `outside the luck band on the <b>good</b> side — random hands almost never did this well`
+      : pctile <= 2.5
+        ? `outside the luck band on the <b>bad</b> side — random hands almost always did better`
+        : `inside the luck band — indistinguishable from dealing ${k} calls at random`;
+    // histogram of the null means, the real mean as a marker
+    const W = 720, H = 140, pad = { l: 10, r: 10, t: 12, b: 22 };
+    const min = Math.min(nulls[0], realMean), max = Math.max(nulls[B - 1], realMean);
+    const span = (max - min) || 1;
+    const BINS = 36;
+    const counts = new Array(BINS).fill(0);
+    for (const n of nulls) counts[Math.min(BINS - 1, Math.floor(((n - min) / span) * BINS))]++;
+    const maxC = Math.max(...counts, 1);
+    const bw = (W - pad.l - pad.r) / BINS;
+    const bars = counts.map((c, i) => c === 0 ? "" :
+      `<rect class="lab-bar" x="${(pad.l + i * bw + 0.5).toFixed(1)}" y="${(H - pad.b - (c / maxC) * (H - pad.t - pad.b)).toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${((c / maxC) * (H - pad.t - pad.b)).toFixed(1)}"><title>${c} of 1,000 luck-worlds</title></rect>`).join("");
+    const xOf = (v) => pad.l + ((v - min) / span) * (W - pad.l - pad.r);
+    out.innerHTML = `
+      <p class="sub"><b>${k} calls</b> match · their average edge is <b>${realMean > 0 ? "+" : ""}${realMean.toFixed(2)}%</b> vs SPY ·
+        1,000 random hands landed between ${lo.toFixed(2)}% and ${hi.toFixed(2)}% (95% of them) —
+        your slice beat <b>${pctile.toFixed(0)}%</b> of them (p ≈ ${pTwo.toFixed(2)}), ${readout}.</p>
+      <div class="ledger-table-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Your slice against 1,000 random hands">
+        ${bars}
+        <line class="dist-mean" x1="${xOf(realMean).toFixed(1)}" x2="${xOf(realMean).toFixed(1)}" y1="${pad.t}" y2="${H - pad.b}"><title>your slice: ${realMean.toFixed(2)}%</title></line>
+        <text class="hist-axis-text" x="${pad.l}" y="${H - 6}">${min.toFixed(1)}%</text>
+        <text class="hist-axis-text" x="${W - pad.r}" y="${H - 6}" text-anchor="end">${max.toFixed(1)}%</text>
+      </svg></div>
+      <p class="sub">Printed on purpose: if you chose this slice <b>after</b> looking at the tables above, the test flatters
+        you — trying slices until one looks special is <b>data snooping</b>, and some slice always wins by chance.
+        And these calls overlap in time under one market backdrop, so even a clean pass can be one regime in costume.
+        A pattern counts when you name it first and it keeps working on calls that haven't happened yet.</p>`;
+  };
+
+  card.addEventListener("click", (e) => {
+    const v = e.target.closest?.("[data-lv]")?.dataset?.lv;
+    if (!v) return;
+    if (labState.verdicts.has(v)) labState.verdicts.delete(v); else labState.verdicts.add(v);
+    const b = e.target.closest("[data-lv]");
+    b.classList.toggle("on", labState.verdicts.has(v));
+    b.setAttribute("aria-pressed", String(labState.verdicts.has(v)));
+    draw();
+  });
+  card.querySelector("#labSector").addEventListener("change", (e) => {
+    labState.sector = e.target.value;
+    draw();
+  });
+  draw();
+}
+
 // Every graded call as a dot: x = when the call was made, y = its excess
 // vs SPY so far. The spread IS the honesty — wins and losses in one glance.
 function renderCallsMap(data) {
@@ -382,6 +504,7 @@ async function load() {
     renderSummary(data);
     renderCallsMap(data);
     renderDistribution(data);
+    renderLuckLab(data);
     renderAggregates(data);
     // Official-source viewers get the statistics, not 585 rows of scroll:
     // the row-level log is still fully public in the repo for anyone who

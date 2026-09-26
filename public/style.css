@@ -1730,3 +1730,9 @@ kbd { font-family: var(--mono); font-size: 11.5px; background: var(--surface-2);
 .dist-bar.clip { fill: var(--muted); opacity: 0.6; }
 .dist-zero { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 3; }
 .dist-mean { stroke: var(--warning); stroke-width: 1.5; }
+
+/* the luck test */
+.lab-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 10px; }
+.lab-v.on { border-color: var(--accent); color: var(--ink); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.lab-controls select { background: var(--surface-2); border: 1px solid var(--baseline); border-radius: 3px; color: var(--ink); padding: 5px 6px; font-size: 12.5px; }
+.lab-bar { fill: color-mix(in srgb, var(--muted) 55%, var(--surface-2)); }
