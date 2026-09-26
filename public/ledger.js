@@ -63,12 +63,15 @@ function renderSummary(data) {
   // at the day boundary — Date.now() on the left made it roll at 8 AM ET.
   const todayEt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
   const daysRunning = dates.length ? Math.max(1, Math.round((Date.parse(todayEt) - Date.parse(dates[0])) / 86_400_000)) : 0;
+  // The reading scales with the sample: a coin flip lands within
+  // ±1.96·√(.25/n) of 50%, so the words say "noise" or "signal" by the same
+  // rule the homepage tile uses to color itself — never fixed thresholds
+  // that flatter small samples and shrug off large ones.
+  const band = called.length ? 196 * Math.sqrt(0.25 / called.length) : 0;
   const read = called.length < 20 ? "too few aged directional calls to judge yet"
-    : rp >= 57 ? "better than a coin flip so far — but these calls overlap in time and share one market backdrop, so it only counts if it holds for months"
-    : rp >= 53 ? "a shade better than a coin flip so far — treat that as noise until it lasts"
-    : rp <= 43 ? "worse than a coin flip so far — the same caution applies before reading anything into it"
-    : rp <= 47 ? "a shade worse than a coin flip so far — also within noise"
-    : "about a coin flip, which is exactly what the backtests predicted";
+    : rp - 50 > band ? `better than a coin flip and outside the ±${Math.round(band)}-point noise band for this sample — but these calls overlap in time and share one market backdrop, so it only counts if it holds for months`
+    : 50 - rp > band ? `worse than a coin flip and outside the ±${Math.round(band)}-point noise band for this sample — the backtests predicted a coin flip, and honesty cuts both ways: right now the formula is losing on direction`
+    : "within the noise band of a coin flip, which is exactly what the backtests predicted";
   const headline = graded.length
     ? `<p class="sub"><b>The story so far:</b> after ${data.entries.length} calls over ${daysRunning} days, the formula is right on
        direction ${called.length ? `${Math.round(rp)}% of the time (${right} of ${called.length})` : "— (no directional calls aged yet — HOLDs abstain)"} and its average

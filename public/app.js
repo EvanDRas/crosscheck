@@ -2955,7 +2955,7 @@ function renderRecord(s) {
     <h2>The forward test</h2>
     <p class="sub">Every call frozen and graded vs the S&amp;P — <a href="/ledger.html">full ledger</a>.
       Right = a buy that beat SPY or a sell that trailed it; HOLDs abstain.
-      Young calls read like a coin flip; that matches the <a href="/evidence.html">backtests</a>.${s.source === "official" ? " Calls are the project's official published log, graded locally by this app." : ""}</p>
+      The <a href="/evidence.html">backtests</a> predicted a coin flip; color appears only when the rate leaves the noise band — in either direction.${s.source === "official" ? " Calls are the project's official published log, graded locally by this app." : ""}</p>
     <div class="mkt-strip record-strip">
       ${tiles.map(([label, val, cls, hint]) => `
         <div class="mkt-tile"${hint ? ` title="${esc(hint)}"` : ""}>
