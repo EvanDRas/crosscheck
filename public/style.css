@@ -1650,3 +1650,11 @@ input.pick-note:focus { outline: 1px solid var(--accent); outline-offset: -1px; 
    lesson link lands with its heading hidden under the bar. 96px because the
    bar wraps to two lines at narrow widths (~88px tall). */
 html { scroll-padding-top: 96px; }
+
+/* phones: the bar is ~121px tall there — pinning it costs 13% of the screen
+   forever. Let it scroll away; search is one flick up. Anchors then need no
+   clearance either. */
+@media (max-width: 760px) {
+  .topbar { position: static; }
+  html { scroll-padding-top: 0; }
+}

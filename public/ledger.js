@@ -68,9 +68,19 @@ function renderSummary(data) {
   // rule the homepage tile uses to color itself — never fixed thresholds
   // that flatter small samples and shrug off large ones.
   const band = called.length ? 196 * Math.sqrt(0.25 / called.length) : 0;
+  // When the rate leaves the band, name WHICH side is doing it — "the
+  // formula is losing" invites the question, so answer it in the same line.
+  const sideBreakdown = () => {
+    const buys = called.filter((e) => isBuy(e.verdict));
+    const sells = called.filter((e) => isSell(e.verdict));
+    if (buys.length < 10 || sells.length < 10) return "";
+    const bPct = Math.round((buys.filter((e) => e.excess > 0).length / buys.length) * 100);
+    const sPct = Math.round((sells.filter((e) => e.excess < 0).length / sells.length) * 100);
+    return ` (buys ${bPct}% right of ${buys.length}, sells ${sPct}% of ${sells.length})`;
+  };
   const read = called.length < 20 ? "too few aged directional calls to judge yet"
-    : rp - 50 > band ? `better than a coin flip and outside the ±${Math.round(band)}-point noise band for this sample — but these calls overlap in time and share one market backdrop, so it only counts if it holds for months`
-    : 50 - rp > band ? `worse than a coin flip and outside the ±${Math.round(band)}-point noise band for this sample — the backtests predicted a coin flip, and honesty cuts both ways: right now the formula is losing on direction`
+    : rp - 50 > band ? `better than a coin flip and outside the ±${Math.round(band)}-point noise band for this sample${sideBreakdown()} — but these calls overlap in time and share one market backdrop, so it only counts if it holds for months`
+    : 50 - rp > band ? `worse than a coin flip and outside the ±${Math.round(band)}-point noise band for this sample${sideBreakdown()} — the backtests predicted a coin flip, and honesty cuts both ways: right now the formula is losing on direction`
     : "within the noise band of a coin flip, which is exactly what the backtests predicted";
   const headline = graded.length
     ? `<p class="sub"><b>The story so far:</b> after ${data.entries.length} calls over ${daysRunning} days, the formula is right on
