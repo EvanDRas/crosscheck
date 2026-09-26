@@ -19,7 +19,10 @@ foreach ($dir in @([Environment]::GetFolderPath("Desktop"), (Join-Path ([Environ
   $lnk.Save()
   Write-Host "Created $lnkPath"
 
-  if (Test-Path $brief) {
+  # The brief launcher stays out of the Desktop — one app icon is enough;
+  # the in-app "Copy market brief" button covers everyday use, and the Start
+  # Menu entry remains for Task Scheduler / power users.
+  if ((Test-Path $brief) -and $dir -ne [Environment]::GetFolderPath("Desktop")) {
     $blnkPath = Join-Path $dir "Crosscheck Market Brief.lnk"
     $blnk = $ws.CreateShortcut($blnkPath)
     $blnk.TargetPath = "$env:WINDIR\System32\wscript.exe"

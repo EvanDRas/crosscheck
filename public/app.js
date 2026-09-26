@@ -2504,6 +2504,7 @@ function renderToday() {
     <span class="today-upd">${ago == null ? "loading…" : `updated ${ago}s ago`}</span>
     ${s.current > 1 ? `<span class="today-streak">${s.current}-day streak${s.best > s.current ? ` · best ${s.best}` : ""}</span>` : ""}
     <button type="button" id="tourBtn" class="today-daily${readJSON("cc_tour_done", false) ? "" : " pulse"}">New here? Tour the site</button>
+    <button type="button" id="briefBtn" class="today-daily" title="Copy today's whole market view as markdown — paste it into any AI chat">Copy market brief</button>
     <span class="today-tag">The analyzer that backtested itself and published the null — graded live below.</span>`;
 }
 // The 5s tick must not rebuild the bar out from under a focused tour button.
@@ -2530,6 +2531,18 @@ $("companyCard").addEventListener("click", (e) => {
 $("todayBar").addEventListener("click", (e) => {
   if (e.target.closest?.("#tourBtn")) {
     tourStart();
+    return;
+  }
+  const bb = e.target.closest?.("#briefBtn");
+  if (bb) {
+    // While the button holds focus, the 5s bar tick skips repaints — so the
+    // flipped label survives long enough to read.
+    fetch("/api/market-brief")
+      .then((r) => { if (!r.ok) throw new Error(); return r.text(); })
+      .then((t) => navigator.clipboard.writeText(t))
+      .then(() => { bb.textContent = "Copied — paste into any AI chat"; })
+      .catch(() => { bb.textContent = "Copy failed — try again"; })
+      .finally(() => setTimeout(() => { bb.textContent = "Copy market brief"; }, 2600));
     return;
   }
   const target = e.target.closest?.("[data-scroll]")?.dataset?.scroll;
