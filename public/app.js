@@ -1124,7 +1124,10 @@ const ASK_CHIPS = {
 };
 
 function briefForAsk() {
-  return lastPayload ? buildBrief(lastPayload).replace(/ \(https?:[^)]*\)/g, "").slice(0, 8000) : "";
+  // 9000 chars ≈ 4k tokens of dense tables — comfortable inside the model's
+  // 8k window with charter, record, and history, and the whole JSON body
+  // still clears the server's 16kb cap after escaping.
+  return lastPayload ? buildBrief(lastPayload).replace(/ \(https?:[^)]*\)/g, "").slice(0, 9000) : "";
 }
 
 function askCardsReady() {

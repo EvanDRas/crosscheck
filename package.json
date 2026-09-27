@@ -13,6 +13,7 @@
     "dev": "node --watch server.js",
     "batch": "node scripts/batch_log.js",
     "test": "node --test \"test/*.test.js\"",
+    "ask-eval": "node scripts/ask_eval.mjs",
     "publish-forward": "node scripts/publish_forward_test.js"
   },
   "dependencies": {

@@ -214,7 +214,7 @@ light-on-white research note (the print stylesheet strips the chrome).
   questions about whatever page you're reading, grounded in that page's own
   brief plus the site's forward-test record. It runs on a brain you supply —
   free and fully local via [Ollama](https://ollama.com), which Crosscheck
-  detects on its own (`ollama pull qwen2.5:14b` on a 12GB-VRAM GPU,
+  detects on its own (`ollama pull qwen3:14b` on a 12GB-VRAM GPU,
   `llama3.1:8b` or `llama3.2:3b` on lighter machines; `OLLAMA_MODEL` pins
   the choice) — or `ANTHROPIC_API_KEY=…` in `.env` for the strongest
   answers (`ANTHROPIC_MODEL` overrides the default Haiku). The system
@@ -225,10 +225,14 @@ light-on-white research note (the print stylesheet strips the chrome).
   30 graded questions (grounding of every cited number, advice and
   prediction refusals under emotional pressure and roleplay, planted-
   headline and forged-history injection, missing-data honesty, the
-  correlation hedge on per-stock records, plain-text style). qwen2.5:14b
-  passes 30/30; llama3.1:8b, the light fallback, passes 29 — its one miss
-  is dodging rather than explicitly refusing an implied prediction. Run it
-  after changing the charter or model. The explainer also answers from the
+  correlation hedge on per-stock records, plain-text style). Benchmarked:
+  qwen3:14b, qwen2.5:14b, and llama3.1:8b all pass 30/30 (qwen3:14b is the
+  recommended pick — tightest answers); phi4:14b fails on verbosity and
+  markdown, and qwen3:30b-a3b ignores the charter at this quantization —
+  bigger is not stronger here. The chat runs with an explicit 8k context
+  window because Ollama's default silently truncates the front of an
+  oversized prompt — the rules go first; this was measured, not assumed.
+  Run the eval after changing the charter or model. The explainer also answers from the
   ledger: ticker pages carry that stock's own forward-test record, and the
   Track record page has its own card whose context the server builds from
   the graded ledger. No provider configured → the card explains setup and

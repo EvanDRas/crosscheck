@@ -127,7 +127,7 @@ window.CCAsk = (() => {
       ${notRunning}
       <ul class="ask-setup">
         <li><b>Ollama</b> (free, recommended) — nothing ever leaves your PC. Install from ollama.com, then run
-          <code>ollama pull qwen2.5:14b</code> in a terminal (that model wants a gaming GPU with 12GB VRAM —
+          <code>ollama pull qwen3:14b</code> in a terminal (that model wants a gaming GPU with 12GB VRAM —
           on lighter machines pull <code>llama3.1:8b</code> or <code>llama3.2:3b</code> instead).
           Crosscheck finds it on its own.</li>
         <li><b>Anthropic API key</b> — the strongest answers; a question costs a fraction of a cent, and each
