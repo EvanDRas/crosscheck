@@ -210,6 +210,16 @@ light-on-white research note (the print stylesheet strips the chrome).
   and the news feed with summaries and links — as markdown, ready to paste into
   an AI chat (Claude, etc.) as context for a deeper discussion. The same data is
   available raw at `/api/analyze?ticker=SYMBOL` for programmatic use.
+- **Ask the data** (optional) skips the copy-paste: an AI explainer answers
+  questions about whatever page you're reading, grounded in that page's own
+  brief plus the site's forward-test record. It runs on a brain you supply —
+  either `ANTHROPIC_API_KEY=…` in `.env` (best answers; `ANTHROPIC_MODEL`
+  overrides the default Haiku), or a local [Ollama](https://ollama.com)
+  install, which Crosscheck detects on its own (`OLLAMA_MODEL` picks the
+  model). The system prompt forbids predictions, price targets, and buy/sell
+  advice, and requires "the data doesn't show that" over guessing — an AI
+  with the same manners as the rest of the site. No provider configured →
+  the card explains setup and everything else works untouched.
 
 ## Setup
 

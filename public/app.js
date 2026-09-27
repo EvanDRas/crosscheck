@@ -1111,6 +1111,150 @@ async function copyBrief() {
   }, 2200);
 }
 
+// ---------- Ask the data: the optional AI explainer ----------
+// Same idea as "Copy AI brief", minus the copy-paste: the question and the
+// page's own brief go to a model the owner configured (their Anthropic key,
+// or a local Ollama), under a charter that forbids predictions and advice.
+// No provider set up → the front card explains how, the ticker card hides.
+
+let askStatus = null; // null until /api/ask/status answers
+
+const ASK_CHIPS = {
+  market: ["What's moving the market today?", "Sum up the economy numbers in plain English"],
+  ticker: ["Why did the formula land on this verdict?", "What are the weakest numbers on this page?"],
+};
+
+function askProviderLabel() {
+  if (!askStatus?.enabled) return "";
+  return askStatus.provider === "anthropic" ? `Claude (${askStatus.model})` : `${askStatus.model} via Ollama, local`;
+}
+
+// The same brief a human would copy, with bare URLs stripped (they spend
+// context and answer nothing) and clamped under the server's body limit.
+function briefForAsk() {
+  return lastPayload ? buildBrief(lastPayload).replace(/ \(https?:[^)]*\)/g, "").slice(0, 9000) : "";
+}
+
+function buildAskCard(card, view) {
+  card.innerHTML = `
+    <h2>Ask the data</h2>
+    <p class="sub">Answers come only from ${view === "ticker" ? "this page's data plus the site's own track record" : "the market view on this page"} — the AI is told to refuse predictions and advice, and it can still be wrong. Model: ${esc(askProviderLabel())}.</p>
+    <div class="ask-log" aria-live="polite"></div>
+    <div class="ask-chips">${ASK_CHIPS[view].map((q) => `<button type="button" class="ask-chip">${esc(q)}</button>`).join("")}</div>
+    <form class="ask-form">
+      <input type="text" maxlength="1500" placeholder="Ask about what's on this page…" aria-label="Ask about the data on this page" />
+      <button type="submit">Ask</button>
+    </form>`;
+  const log = card.querySelector(".ask-log");
+  const form = card.querySelector(".ask-form");
+  const input = form.querySelector("input");
+  const btn = form.querySelector("button");
+  const history = [];
+  let busy = false;
+
+  const push = (role, text, cls = "") => {
+    const div = document.createElement("div");
+    div.className = `ask-msg ${role}${cls ? ` ${cls}` : ""}`;
+    div.textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    return div;
+  };
+
+  async function submit(q) {
+    if (busy) return;
+    const question = String(q ?? "").trim();
+    if (!question) return;
+    if (view === "ticker" && !lastPayload) return;
+    busy = true;
+    btn.disabled = true;
+    input.value = "";
+    push("user", question);
+    const bubble = push("ai", "Thinking…", "pending");
+    try {
+      const body = { question, view, history: history.slice(-6) };
+      if (view === "ticker") body.context = briefForAsk();
+      const r = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `The explainer failed (${r.status}).`);
+      bubble.classList.remove("pending");
+      bubble.textContent = data.answer;
+      history.push({ role: "user", text: question.slice(0, 700) },
+                    { role: "assistant", text: String(data.answer).slice(0, 700) });
+    } catch (err) {
+      bubble.classList.remove("pending");
+      bubble.classList.add("ask-err");
+      bubble.textContent = err.message || "The explainer failed — try again.";
+    } finally {
+      busy = false;
+      btn.disabled = false;
+    }
+  }
+
+  form.addEventListener("submit", (e) => { e.preventDefault(); submit(input.value); });
+  card.querySelectorAll(".ask-chip").forEach((b) => b.addEventListener("click", () => submit(b.textContent)));
+  card.hidden = false;
+}
+
+function renderAskSetupHint(card) {
+  card.innerHTML = `
+    <h2>Ask the data</h2>
+    <p class="sub">An optional AI explainer can answer questions about whatever page you're reading —
+    grounded in the app's own data, told to refuse predictions and advice. It's off until you give
+    it a brain (your key, your machine, your choice):</p>
+    <ul class="ask-setup">
+      <li><b>Anthropic API key</b> — best answers; a question costs a fraction of a cent. Get a key at
+        console.anthropic.com, add <code>ANTHROPIC_API_KEY=sk-ant-…</code> to the <code>.env</code> file
+        next to server.js, and restart the app.</li>
+      <li><b>Ollama</b> — free and fully local. Install from ollama.com, run
+        <code>ollama pull llama3.2</code>, and Crosscheck finds it on its own.</li>
+    </ul>
+    <p class="sub" style="margin-bottom:0"><button type="button" class="ask-recheck">Check again</button></p>`;
+  card.querySelector(".ask-recheck").addEventListener("click", async () => {
+    await loadAskStatus(true);
+    initAskFront();
+    if (lastPayload && !el.results.hidden) setupTickerAsk(lastPayload);
+  });
+  card.hidden = false;
+}
+
+async function loadAskStatus(fresh = false) {
+  try {
+    const r = await fetch(`/api/ask/status${fresh ? "?fresh=1" : ""}`);
+    askStatus = r.ok ? await r.json() : { enabled: false };
+  } catch {
+    askStatus = { enabled: false };
+  }
+}
+
+function initAskFront() {
+  const card = $("askCard");
+  if (!card) return;
+  if (askStatus?.enabled) buildAskCard(card, "market");
+  else renderAskSetupHint(card);
+}
+
+function setupTickerAsk(d) {
+  const card = $("askTickerCard");
+  if (!card) return;
+  if (!askStatus?.enabled) { card.hidden = true; return; }
+  // A soft refresh of the same ticker keeps the conversation; a new ticker
+  // starts a fresh one (the old context no longer describes the page).
+  if (card.dataset.ticker === d.ticker && !card.hidden) return;
+  card.dataset.ticker = d.ticker;
+  buildAskCard(card, "ticker");
+}
+
+loadAskStatus().then(() => {
+  initAskFront();
+  // A deep-linked ticker (/#AAPL) can render before the status answers.
+  if (lastPayload && !el.results.hidden) setupTickerAsk(lastPayload);
+});
+
 // ---------- live price stream ----------
 
 let liveStream = null;
@@ -1341,6 +1485,7 @@ function render(d) {
   renderPeers(d);
   renderNews(d);
   loadScoreHistory(d.ticker); // async and non-blocking — the card appears when the ledger answers
+  setupTickerAsk(d);
   startLive(d);
   if (!d.demo && d.ticker) pushRecent(d.ticker);
   if (!analyze.soft) window.scrollTo({ top: 0, behavior: SCROLL_BEHAVIOR });
@@ -3459,6 +3604,7 @@ const TOUR_STEPS = [
   { el: "#watchCard", title: "Follow what you care about", text: `Followed stocks live here with price and verdict — and the news desk's <b>For you</b> tab shows only their stories.` },
   { el: "#marketNews", title: "The news desk", text: `<b>Briefing</b> ranks today's market-wide stories by likely impact. <b>Filings</b> shows what your companies legally told the SEC — often before the news writes it up. The pager at the bottom flips pages.` },
   { el: "#recordCard", title: "The forward test", text: `The formula's live, unfixable track record: every call frozen the day it's made, then graded against the S&amp;P. A sell only counts as right when the stock <i>trails</i> the market.` },
+  { el: "#askCard", title: "Ask the data", text: `An optional AI explainer — bring your own Anthropic key, or a free local Ollama, and ask questions about any page. It answers only from the data in front of you and is told to refuse predictions and advice: the honest reflex, automated.` },
   { el: "#economyCard", title: "The backdrop", text: `Inflation, jobs, the Fed's rate, and the classic recession gauge — pulled straight from the Fed's own public data, not from anyone's opinion.` },
   { el: "#alertCard", title: "Price alerts", text: `Set a level and the card lights up when it crosses — while the app is open. A tool that runs on your own PC can't watch while it's closed, and it tells you so.` },
   { el: "#screenCard", title: "The frozen 50", text: `Fifty household-name stocks across all 11 sectors, locked in before the forward test began so the record can never be cherry-picked. Everyone who downloads Crosscheck sees the same 50.` },

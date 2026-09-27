@@ -1736,3 +1736,23 @@ kbd { font-family: var(--mono); font-size: 11.5px; background: var(--surface-2);
 .lab-v.on { border-color: var(--accent); color: var(--ink); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .lab-controls select { background: var(--surface-2); border: 1px solid var(--baseline); border-radius: 3px; color: var(--ink); padding: 5px 6px; font-size: 12.5px; }
 .lab-bar { fill: color-mix(in srgb, var(--muted) 55%, var(--surface-2)); }
+
+/* ask the data — the optional AI explainer */
+.ask-log { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; margin: 10px 0 4px; }
+.ask-log:empty { display: none; }
+.ask-msg { max-width: 92%; padding: 8px 11px; border-radius: 6px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
+.ask-msg.user { align-self: flex-end; background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.ask-msg.ai { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--baseline); }
+.ask-msg.pending { color: var(--muted); font-style: italic; }
+.ask-msg.ask-err { border-left: 3px solid var(--warning); color: var(--warning-text); font-style: normal; }
+.ask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.ask-chip { border: 1px solid var(--baseline); background: var(--surface-2); color: var(--ink-2); border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer; }
+.ask-chip:hover { border-color: var(--accent); color: inherit; }
+.ask-form { display: flex; gap: 8px; }
+.ask-form input { flex: 1; min-width: 0; padding: 8px 11px; border-radius: 3px; border: 1px solid var(--baseline); background: var(--surface-2); color: inherit; font-size: 13.5px; }
+.ask-form button { padding: 8px 16px; border-radius: 3px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: inherit; font-weight: 700; cursor: pointer; }
+.ask-form button:disabled { opacity: 0.55; cursor: default; }
+.ask-setup { margin: 8px 0 10px 18px; padding: 0; font-size: 13px; color: var(--ink-2); display: flex; flex-direction: column; gap: 8px; }
+.ask-setup code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.ask-recheck { border: 1px solid var(--baseline); background: var(--surface-2); color: inherit; border-radius: 3px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.ask-recheck:hover { border-color: var(--accent); }
