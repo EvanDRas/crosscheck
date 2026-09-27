@@ -1130,9 +1130,11 @@ function askProviderLabel() {
 }
 
 // The same brief a human would copy, with bare URLs stripped (they spend
-// context and answer nothing) and clamped under the server's body limit.
+// context and answer nothing) and clamped so the whole request — brief,
+// history, question — stays safely under the server's 16kb body limit
+// even after JSON escaping inflates it.
 function briefForAsk() {
-  return lastPayload ? buildBrief(lastPayload).replace(/ \(https?:[^)]*\)/g, "").slice(0, 9000) : "";
+  return lastPayload ? buildBrief(lastPayload).replace(/ \(https?:[^)]*\)/g, "").slice(0, 8000) : "";
 }
 
 function buildAskCard(card, view) {
@@ -1186,8 +1188,8 @@ function buildAskCard(card, view) {
       if (!r.ok) throw new Error(data.error || `The explainer failed (${r.status}).`);
       bubble.classList.remove("pending");
       bubble.textContent = data.answer;
-      history.push({ role: "user", text: question.slice(0, 700) },
-                    { role: "assistant", text: String(data.answer).slice(0, 700) });
+      history.push({ role: "user", text: question.slice(0, 500) },
+                    { role: "assistant", text: String(data.answer).slice(0, 500) });
     } catch (err) {
       bubble.classList.remove("pending");
       bubble.classList.add("ask-err");
