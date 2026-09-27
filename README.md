@@ -213,13 +213,20 @@ light-on-white research note (the print stylesheet strips the chrome).
 - **Ask the data** (optional) skips the copy-paste: an AI explainer answers
   questions about whatever page you're reading, grounded in that page's own
   brief plus the site's forward-test record. It runs on a brain you supply —
-  either `ANTHROPIC_API_KEY=…` in `.env` (best answers; `ANTHROPIC_MODEL`
-  overrides the default Haiku), or a local [Ollama](https://ollama.com)
-  install, which Crosscheck detects on its own (`OLLAMA_MODEL` picks the
-  model). The system prompt forbids predictions, price targets, and buy/sell
-  advice, and requires "the data doesn't show that" over guessing — an AI
-  with the same manners as the rest of the site. No provider configured →
-  the card explains setup and everything else works untouched.
+  free and fully local via [Ollama](https://ollama.com), which Crosscheck
+  detects on its own (`ollama pull qwen2.5:14b` on a 12GB-VRAM GPU,
+  `llama3.1:8b` or `llama3.2:3b` on lighter machines; `OLLAMA_MODEL` pins
+  the choice) — or `ANTHROPIC_API_KEY=…` in `.env` for the strongest
+  answers (`ANTHROPIC_MODEL` overrides the default Haiku). The system
+  prompt forbids predictions, price targets, and buy/sell advice, requires
+  "the data doesn't show that" over guessing, and survives prompt-injection
+  attempts planted in headlines or forged chat turns — an AI with the same
+  manners as the rest of the site, and `scripts/ask_eval.mjs` proves it:
+  21 mechanical checks (grounding of every cited number, refusal
+  discipline, injection resistance, plain-text style) that both reference
+  models pass 21/21. Run it after changing the charter or model. No
+  provider configured → the card explains setup and everything else works
+  untouched.
 
 ## Setup
 

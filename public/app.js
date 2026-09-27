@@ -1176,6 +1176,13 @@ function buildAskCard(card, view) {
     input.value = "";
     push("user", question);
     const bubble = push("ai", "Thinking…", "pending");
+    // A local model's first question includes loading it into the GPU —
+    // honest waiting beats a silent stall.
+    const slow = setTimeout(() => {
+      if (bubble.classList.contains("pending")) {
+        bubble.textContent = "Thinking… (the first question loads the model — up to half a minute; after that it's seconds)";
+      }
+    }, 6000);
     try {
       const body = { question, view, history: history.slice(-6) };
       if (view === "ticker") body.context = briefForAsk();
@@ -1195,6 +1202,7 @@ function buildAskCard(card, view) {
       bubble.classList.add("ask-err");
       bubble.textContent = err.message || "The explainer failed — try again.";
     } finally {
+      clearTimeout(slow);
       busy = false;
       btn.disabled = false;
     }
@@ -1212,12 +1220,14 @@ function renderAskSetupHint(card) {
     grounded in the app's own data, told to refuse predictions and advice. It's off until you give
     it a brain (your key, your machine, your choice):</p>
     <ul class="ask-setup">
-      <li><b>Anthropic API key</b> — best answers; a question costs a fraction of a cent, and each
+      <li><b>Ollama</b> (free, recommended) — nothing ever leaves your PC. Install from ollama.com, then run
+        <code>ollama pull qwen2.5:14b</code> in a terminal (that model wants a gaming GPU with 12GB VRAM —
+        on lighter machines pull <code>llama3.1:8b</code> or <code>llama3.2:3b</code> instead).
+        Crosscheck finds it on its own.</li>
+      <li><b>Anthropic API key</b> — the strongest answers; a question costs a fraction of a cent, and each
         question sends that page's data to Anthropic under your key. Get a key at
         console.anthropic.com, add <code>ANTHROPIC_API_KEY=sk-ant-…</code> to the <code>.env</code> file
         next to server.js, and restart the app.</li>
-      <li><b>Ollama</b> — free, and nothing ever leaves your PC. Install from ollama.com, run
-        <code>ollama pull llama3.2</code>, and Crosscheck finds it on its own.</li>
     </ul>
     <p class="sub" style="margin-bottom:0"><button type="button" class="ask-recheck">Check again</button></p>`;
   card.querySelector(".ask-recheck").addEventListener("click", async () => {

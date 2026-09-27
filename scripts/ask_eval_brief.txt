@@ -1,0 +1,89 @@
+# Democo Systems (sample data) (DEMO) — research brief
+
+Generated 9/26/2026, 9:31:52 PM by Crosscheck (github.com/EvanDRas/crosscheck) — sources: Finnhub API, SEC EDGAR filings; news merged from Google News RSS, Yahoo Finance RSS, Finnhub. Data may be delayed, incomplete, or wrong. Research/education only — not financial advice.
+
+**WARNING: this is the app's DEMO ticker — every number and headline below is fictional sample data.**
+
+## Company
+- Exchange / industry: DEMO EXCHANGE / Technology
+- Market cap: $2.87T
+- IPO: 2004-08-19
+- Website: N/A
+
+## Quote
+- Price: $187.42 (+2.31 / +1.25% today, prev close $185.11)
+- 52-week range: $141.35 (2025-09-03) to $199.62 (2026-06-12) — price at 79% of the range
+- Price history on file: 369 points through 2026-09-26 (demo)
+
+## App verdict (mechanical formula, not advice)
+- Overall 71.4/100 → BUY (data coverage High, 6/6 categories)
+- Bands (percentile-calibrated vs 16,497 historical S&P scores; a verdict states rank among large caps): >=74 STRONG BUY (top ~10%), >=66 BUY (top ~30%), >=55 HOLD, >=47 SELL, <47 STRONG SELL. Weights renormalize over categories with data.
+- Valuation (weight 20%): 54/100 — P/E 24.6× (sub-score 51), P/S 5.8× (sub-score 46), PEG 1.6× (sub-score 64)
+- Profitability (weight 20%): 92/100 — Net margin +23.4% (sub-score 85), ROE +38.1% (sub-score 98)
+- Growth (weight 20%): 68/100 — Revenue YoY +12.7% (sub-score 67), EPS YoY +17.9% (sub-score 69)
+- Financial health (weight 15%): 62/100 — Current ratio 1.4× (sub-score 65), Debt/equity 0.9× (sub-score 59)
+- Momentum (weight 10%): 82/100 — 52-week position 79% of range (sub-score 82)
+- Analyst view (weight 15%): 74/100 — Rating tilt +0.95 on −2…+2 (sells→buys) (sub-score 74)
+
+### Horizon views (same inputs regrouped by horizon — not independent forecasts)
+- Near-term (weeks–months): 76.5/100 → STRONG BUY (confidence High) — Momentum 82 (w 40), Analyst view 74 (w 35), Earnings execution 71 (w 25)
+- Long-term (years): 70.1/100 → BUY (confidence High) — Valuation 54 (w 30), Profitability 92 (w 30), Growth 68 (w 25), Financial health 62 (w 15)
+
+## Key numbers
+- P/E (TTM): 24.6×
+- P/S: 5.8×
+- P/B: 11.2×
+- PEG: 1.6×
+- Net margin: 23.4%
+- ROE: 38.1%
+- ROA: 16.2%
+- Revenue growth YoY: +12.7%
+- EPS growth YoY: +17.9%
+- Current ratio: 1.4
+- Debt/equity: 0.9
+- Dividend yield: 0.6%
+- Beta: 1.18
+
+## Trajectory — SEC quarterly filings
+- 2024-09-28: revenue $21.4B, net margin 21.2%
+- 2024-12-28: revenue $23.8B, net margin 22%
+- 2025-03-29: revenue $22.6B, net margin 21.6%
+- 2025-06-28: revenue $24.9B, net margin 22.4%
+- 2025-09-27: revenue $24.1B, YoY +12.6%, net margin 22.8%
+- 2025-12-27: revenue $26.7B, YoY +12.2%, net margin 23.1%
+- 2026-03-28: revenue $25.4B, YoY +12.4%, net margin 23%
+- 2026-06-27: revenue $28.1B, YoY +12.9%, net margin 23.4%
+- Share count shrank 1.8%/yr (2024-06-29 → 2026-06-27)
+
+## Insider activity (open market, last 92 days)
+- Buys: 1 ($1M) · Sells: 4 ($22M)
+- 2026-08-05 SELL SAMPLE CFO JANE: 45,000 sh @ 183.1
+- 2026-07-30 BUY SAMPLE DIRECTOR RAJ: 6,000 sh @ 181.7
+- 2026-07-21 SELL SAMPLE CEO ALEX: 40,000 sh @ 179.9
+- 2026-07-08 SELL SAMPLE VP DANA: 22,500 sh @ 176.4
+
+## Recent SEC filings
+- 2026-07-28 10-Q — Quarterly report
+- 2026-07-28 8-K — Material event report
+- 2026-07-15 4 — Insider trade disclosure
+- 2026-05-02 DEF 14A — Proxy statement (pay, board, votes)
+- 2026-02-06 10-K — Annual report
+
+## Analyst ratings
+- 44 analysts (2026-07): 14 strong buy, 18 buy, 9 hold, 2 sell, 1 strong sell
+
+## Earnings — last 4 quarters (EPS actual vs estimate)
+- Q2 2026 (2026-06-30): 1.62 vs 1.55 est. — BEAT +4.5%
+- Q1 2026 (2026-03-31): 1.48 vs 1.50 est. — MISS -1.3%
+- Q4 2025 (2025-12-31): 2.11 vs 1.98 est. — BEAT +6.6%
+- Q3 2025 (2025-09-30): 1.39 vs 1.36 est. — BEAT +2.2%
+
+## Peers
+- AAPL, MSFT, GOOGL, NVDA, META
+
+## Recent news (5 items, multiple sources, deduped, newest first)
+- [Demo Wire, 2026-09-26] Democo Systems beats Q2 estimates on cloud strength — Fictional sample story: revenue grew 12.7% year over year, led by the cloud segment.
+- [Sample Post, 2026-09-25] Analysts raise Democo price targets after earnings — Fictional sample story: several banks lifted targets citing margin expansion.
+- [Placeholder Times, 2026-09-24] Democo announces $5B buyback program — Fictional sample story: the board authorized a new repurchase program.
+- [Demo Wire, 2026-09-22] What Democo's AI roadmap means for the sector — Fictional sample story: an opinion piece on the product pipeline.
+- [Sample Post, 2026-09-20] Democo faces new competition in enterprise software — Fictional sample story: rivals are cutting prices in the mid-market.
