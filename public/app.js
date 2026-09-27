@@ -1136,9 +1136,12 @@ function briefForAsk() {
 }
 
 function buildAskCard(card, view) {
+  const where = askStatus.provider === "anthropic"
+    ? "Each question sends this page's data to Anthropic under your key — nothing is sent until you ask."
+    : "Everything stays on this PC — the model runs locally.";
   card.innerHTML = `
     <h2>Ask the data</h2>
-    <p class="sub">Answers come only from ${view === "ticker" ? "this page's data plus the site's own track record" : "the market view on this page"} — the AI is told to refuse predictions and advice, and it can still be wrong. Model: ${esc(askProviderLabel())}.</p>
+    <p class="sub">Answers come only from ${view === "ticker" ? "this page's data plus the site's own track record" : "the market view on this page"} — the AI is told to refuse predictions and advice, and it can still be wrong. ${where} Model: ${esc(askProviderLabel())}.</p>
     <div class="ask-log" aria-live="polite"></div>
     <div class="ask-chips">${ASK_CHIPS[view].map((q) => `<button type="button" class="ask-chip">${esc(q)}</button>`).join("")}</div>
     <form class="ask-form">
@@ -1207,10 +1210,11 @@ function renderAskSetupHint(card) {
     grounded in the app's own data, told to refuse predictions and advice. It's off until you give
     it a brain (your key, your machine, your choice):</p>
     <ul class="ask-setup">
-      <li><b>Anthropic API key</b> — best answers; a question costs a fraction of a cent. Get a key at
+      <li><b>Anthropic API key</b> — best answers; a question costs a fraction of a cent, and each
+        question sends that page's data to Anthropic under your key. Get a key at
         console.anthropic.com, add <code>ANTHROPIC_API_KEY=sk-ant-…</code> to the <code>.env</code> file
         next to server.js, and restart the app.</li>
-      <li><b>Ollama</b> — free and fully local. Install from ollama.com, run
+      <li><b>Ollama</b> — free, and nothing ever leaves your PC. Install from ollama.com, run
         <code>ollama pull llama3.2</code>, and Crosscheck finds it on its own.</li>
     </ul>
     <p class="sub" style="margin-bottom:0"><button type="button" class="ask-recheck">Check again</button></p>`;

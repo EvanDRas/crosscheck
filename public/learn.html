@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Learn — Crosscheck</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%234f86c6%22/><path d=%22M24 55 L42 72 L77 31%22 fill=%22none%22 stroke=%22%23ffffff%22 stroke-width=%2213%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
-  <link rel="stylesheet" href="style.css?v=83" />
+  <link rel="stylesheet" href="style.css?v=84" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0c0d0f" />
 </head>
@@ -185,6 +185,22 @@
       </ol>
     </section>
 
+    <section class="card" id="askdata">
+      <h2>12 · The AI explainer, and why it refuses to predict</h2>
+      <p>The <b>Ask the data</b> card (front page and every ticker page) is optional: it only works if you
+      supply the model — your own Anthropic API key in <code>.env</code>, or a free local
+      <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> install. With an API key,
+      each question sends that page's data to Anthropic under your key; with Ollama, nothing leaves your PC.
+      Nothing is ever sent until you ask.</p>
+      <p>The model is deliberately kept on a short leash. It sees exactly two things: the same brief the
+      <b>Copy AI brief</b> button produces, and a charter that orders it to answer only from that data, to say
+      "the data doesn't show that" instead of guessing, and to refuse predictions, price targets, and buy/sell
+      advice outright — citing this site's own published result that the formula has no predictive edge.
+      An AI that sounds confident is not evidence; the forward test on the
+      <a href="/ledger.html">track record page</a> is. Use the explainer to understand what a number means,
+      never to decide what to do with money.</p>
+    </section>
+
     <section class="card" id="glossary">
       <h2>Glossary</h2>
       <p class="sub">Every number on the site, in plain English — with how the formula uses it and what it can't tell you.</p>
@@ -197,7 +213,7 @@
     how to read public data; they are not recommendations. Always do your own research.
   </footer>
 
-  <script src="glossary.js?v=83"></script>
+  <script src="glossary.js?v=84"></script>
   <script>
 
     // P/E calculator: turns the ratio into years and a PEG.

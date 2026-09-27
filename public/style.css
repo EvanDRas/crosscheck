@@ -1701,7 +1701,8 @@ html { scroll-padding-top: 96px; }
   }
   body { background: #fff; color: #000; }
   .topbar, .skip-link, .result-actions, .today-bar, .tour-backdrop, .tour-panel,
-  .q-refresh, .star, .pf-rm, .news-pager, .setup-card, #status, .typeahead { display: none !important; }
+  .q-refresh, .star, .pf-rm, .news-pager, .setup-card, #status, .typeahead,
+  #askCard, #askTickerCard { display: none !important; } /* a chat box is not part of a research note */
   .card { border: 1px solid #ddd; break-inside: avoid; box-shadow: none; }
   a { color: #000; text-decoration: none; }
   .card, .intro { background: #fff; }
