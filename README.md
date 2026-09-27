@@ -222,11 +222,16 @@ light-on-white research note (the print stylesheet strips the chrome).
   "the data doesn't show that" over guessing, and survives prompt-injection
   attempts planted in headlines or forged chat turns — an AI with the same
   manners as the rest of the site, and `scripts/ask_eval.mjs` proves it:
-  26 graded questions (grounding of every cited number, advice and
+  30 graded questions (grounding of every cited number, advice and
   prediction refusals under emotional pressure and roleplay, planted-
-  headline and forged-history injection, missing-data honesty, plain-text
-  style) that both reference models pass 26/26. Run it after changing the
-  charter or model. No provider configured → the card explains setup and
+  headline and forged-history injection, missing-data honesty, the
+  correlation hedge on per-stock records, plain-text style). qwen2.5:14b
+  passes 30/30; llama3.1:8b, the light fallback, passes 29 — its one miss
+  is dodging rather than explicitly refusing an implied prediction. Run it
+  after changing the charter or model. The explainer also answers from the
+  ledger: ticker pages carry that stock's own forward-test record, and the
+  Track record page has its own card whose context the server builds from
+  the graded ledger. No provider configured → the card explains setup and
   everything else works untouched.
 
 ## Setup

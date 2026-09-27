@@ -1112,164 +1112,55 @@ async function copyBrief() {
 }
 
 // ---------- Ask the data: the optional AI explainer ----------
-// Same idea as "Copy AI brief", minus the copy-paste: the question and the
-// page's own brief go to a model the owner configured (their Anthropic key,
-// or a local Ollama), under a charter that forbids predictions and advice.
-// No provider set up → the front card explains how, the ticker card hides.
-
-let askStatus = null; // null until /api/ask/status answers
+// The card component lives in ask.js (shared with the Track record page);
+// this file wires the front page's market view and the ticker view. The
+// ticker context is the same brief a human could copy, minus URLs, clamped
+// so the request stays under the server's 16kb body limit after escaping;
+// the server adds that stock's own forward-test record by ticker.
 
 const ASK_CHIPS = {
   market: ["What's moving the market today?", "Sum up the economy numbers in plain English"],
-  ticker: ["Why did the formula land on this verdict?", "What are the weakest numbers on this page?"],
+  ticker: ["Why did the formula land on this verdict?", "Has the formula been right about this stock before?"],
 };
 
-function askProviderLabel() {
-  if (!askStatus?.enabled) return "";
-  return askStatus.provider === "anthropic" ? `Claude (${askStatus.model})` : `${askStatus.model} via Ollama, local`;
-}
-
-// The same brief a human would copy, with bare URLs stripped (they spend
-// context and answer nothing) and clamped so the whole request — brief,
-// history, question — stays safely under the server's 16kb body limit
-// even after JSON escaping inflates it.
 function briefForAsk() {
   return lastPayload ? buildBrief(lastPayload).replace(/ \(https?:[^)]*\)/g, "").slice(0, 8000) : "";
 }
 
-function buildAskCard(card, view) {
-  const where = askStatus.provider === "anthropic"
-    ? "Each question sends this page's data to Anthropic under your key — nothing is sent until you ask."
-    : "Everything stays on this PC — the model runs locally.";
-  card.innerHTML = `
-    <h2>Ask the data</h2>
-    <p class="sub">Answers come only from ${view === "ticker" ? "this page's data plus the site's own track record" : "the market view on this page"} — the AI is told to refuse predictions and advice, and it can still be wrong. ${where} Model: ${esc(askProviderLabel())}.</p>
-    <div class="ask-log" aria-live="polite"></div>
-    <div class="ask-chips">${ASK_CHIPS[view].map((q) => `<button type="button" class="ask-chip">${esc(q)}</button>`).join("")}</div>
-    <form class="ask-form">
-      <input type="text" maxlength="1500" placeholder="Ask about what's on this page…" aria-label="Ask about the data on this page" />
-      <button type="submit">Ask</button>
-    </form>`;
-  const log = card.querySelector(".ask-log");
-  const form = card.querySelector(".ask-form");
-  const input = form.querySelector("input");
-  const btn = form.querySelector("button");
-  const history = [];
-  let busy = false;
-
-  const push = (role, text, cls = "") => {
-    const div = document.createElement("div");
-    div.className = `ask-msg ${role}${cls ? ` ${cls}` : ""}`;
-    div.textContent = text;
-    log.appendChild(div);
-    log.scrollTop = log.scrollHeight;
-    return div;
-  };
-
-  async function submit(q) {
-    if (busy) return;
-    const question = String(q ?? "").trim();
-    if (!question) return;
-    if (view === "ticker" && !lastPayload) return;
-    busy = true;
-    btn.disabled = true;
-    input.value = "";
-    push("user", question);
-    const bubble = push("ai", "Thinking…", "pending");
-    // A local model's first question includes loading it into the GPU —
-    // honest waiting beats a silent stall.
-    const slow = setTimeout(() => {
-      if (bubble.classList.contains("pending")) {
-        bubble.textContent = "Thinking… (the first question loads the model — up to half a minute; after that it's seconds)";
-      }
-    }, 6000);
-    try {
-      const body = { question, view, history: history.slice(-6) };
-      if (view === "ticker") body.context = briefForAsk();
-      const r = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || `The explainer failed (${r.status}).`);
-      bubble.classList.remove("pending");
-      bubble.textContent = data.answer;
-      history.push({ role: "user", text: question.slice(0, 500) },
-                    { role: "assistant", text: String(data.answer).slice(0, 500) });
-    } catch (err) {
-      bubble.classList.remove("pending");
-      bubble.classList.add("ask-err");
-      bubble.textContent = err.message || "The explainer failed — try again.";
-    } finally {
-      clearTimeout(slow);
-      busy = false;
-      btn.disabled = false;
-    }
-  }
-
-  form.addEventListener("submit", (e) => { e.preventDefault(); submit(input.value); });
-  card.querySelectorAll(".ask-chip").forEach((b) => b.addEventListener("click", () => submit(b.textContent)));
-  card.hidden = false;
-}
-
-function renderAskSetupHint(card) {
-  card.innerHTML = `
-    <h2>Ask the data</h2>
-    <p class="sub">An optional AI explainer can answer questions about whatever page you're reading —
-    grounded in the app's own data, told to refuse predictions and advice. It's off until you give
-    it a brain (your key, your machine, your choice):</p>
-    <ul class="ask-setup">
-      <li><b>Ollama</b> (free, recommended) — nothing ever leaves your PC. Install from ollama.com, then run
-        <code>ollama pull qwen2.5:14b</code> in a terminal (that model wants a gaming GPU with 12GB VRAM —
-        on lighter machines pull <code>llama3.1:8b</code> or <code>llama3.2:3b</code> instead).
-        Crosscheck finds it on its own.</li>
-      <li><b>Anthropic API key</b> — the strongest answers; a question costs a fraction of a cent, and each
-        question sends that page's data to Anthropic under your key. Get a key at
-        console.anthropic.com, add <code>ANTHROPIC_API_KEY=sk-ant-…</code> to the <code>.env</code> file
-        next to server.js, and restart the app.</li>
-    </ul>
-    <p class="sub" style="margin-bottom:0"><button type="button" class="ask-recheck">Check again</button></p>`;
-  card.querySelector(".ask-recheck").addEventListener("click", async () => {
-    await loadAskStatus(true);
-    initAskFront();
-    if (lastPayload && !el.results.hidden) setupTickerAsk(lastPayload);
-  });
-  card.hidden = false;
-}
-
-async function loadAskStatus(fresh = false) {
-  try {
-    const r = await fetch(`/api/ask/status${fresh ? "?fresh=1" : ""}`);
-    askStatus = r.ok ? await r.json() : { enabled: false };
-  } catch {
-    askStatus = { enabled: false };
-  }
+function askCardsReady() {
+  initAskFront();
+  // A deep-linked ticker (/#AAPL) can render before the status answers.
+  if (lastPayload && !el.results.hidden) setupTickerAsk(lastPayload);
 }
 
 function initAskFront() {
   const card = $("askCard");
   if (!card) return;
-  if (askStatus?.enabled) buildAskCard(card, "market");
-  else renderAskSetupHint(card);
+  if (CCAsk.getStatus()?.enabled) {
+    CCAsk.buildCard(card, { view: "market", scope: "the market view on this page", chips: ASK_CHIPS.market });
+  } else {
+    CCAsk.setupHint(card, askCardsReady);
+  }
 }
 
 function setupTickerAsk(d) {
   const card = $("askTickerCard");
   if (!card) return;
-  if (!askStatus?.enabled) { card.hidden = true; return; }
+  if (!CCAsk.getStatus()?.enabled) { card.hidden = true; return; }
   // A soft refresh of the same ticker keeps the conversation; a new ticker
   // starts a fresh one (the old context no longer describes the page).
   if (card.dataset.ticker === d.ticker && !card.hidden) return;
   card.dataset.ticker = d.ticker;
-  buildAskCard(card, "ticker");
+  CCAsk.buildCard(card, {
+    view: "ticker",
+    scope: "this page's data plus the site's own track record",
+    chips: ASK_CHIPS.ticker,
+    getContext: briefForAsk,
+    getTicker: () => (lastPayload && !lastPayload.demo ? lastPayload.ticker : null),
+  });
 }
 
-loadAskStatus().then(() => {
-  initAskFront();
-  // A deep-linked ticker (/#AAPL) can render before the status answers.
-  if (lastPayload && !el.results.hidden) setupTickerAsk(lastPayload);
-});
+CCAsk.loadStatus().then(askCardsReady);
 
 // ---------- live price stream ----------
 

@@ -472,6 +472,26 @@ function renderCallsMap(data) {
     </svg></div>`;
 }
 
+// Ask the data, record edition: the server builds this view's context from
+// its own graded ledger, so the card sends only the question. Hidden when
+// no AI is configured — the front page already carries the setup card.
+function initAskRecord() {
+  const card = document.getElementById("askRecordCard");
+  if (!card || typeof CCAsk === "undefined") return;
+  const mount = () => {
+    if (!CCAsk.getStatus()?.enabled) { card.hidden = true; return; }
+    if (card.dataset.ready) return; // keep the conversation across re-renders
+    card.dataset.ready = "1";
+    CCAsk.buildCard(card, {
+      view: "record",
+      scope: "the graded forward test on this page",
+      chips: ["Which verdict band has done worst?", "Is this record skill or luck?"],
+    });
+  };
+  if (CCAsk.getStatus()) mount();
+  else CCAsk.loadStatus().then(mount);
+}
+
 async function load() {
   try {
     const [res, picksRes] = await Promise.all([fetch("/api/ledger"), fetch("/api/picks")]);
@@ -505,6 +525,7 @@ async function load() {
     renderCallsMap(data);
     renderDistribution(data);
     renderLuckLab(data);
+    initAskRecord();
     renderAggregates(data);
     // Official-source viewers get the statistics, not 585 rows of scroll:
     // the row-level log is still fully public in the repo for anyone who

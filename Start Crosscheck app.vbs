@@ -13,6 +13,12 @@ url = "http://localhost:3000"
 ' a long-lived hidden server otherwise serves stale endpoints after updates.
 sh.Run "powershell -NoProfile -WindowStyle Hidden -Command ""$c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if ($c) { $p = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $c[0].OwningProcess); if ($p.CommandLine -match 'server') { Stop-Process -Id $c[0].OwningProcess -Force } }""", 0, True
 sh.Run """" & root & "\scripts\serve_hidden.bat""", 0, False
+
+' If a local Ollama is installed but not answering, start its server too —
+' one icon boots the whole stack (Crosscheck plus the free AI behind "Ask
+' the data"). "ollama serve" is used instead of the tray app because the
+' tray, launched headlessly, does not reliably bind the API port.
+sh.Run "powershell -NoProfile -WindowStyle Hidden -Command ""$o = Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'; if (Test-Path $o) { $up = $false; try { $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', 11434); $up = $true; $c.Close() } catch {}; if (-not $up) { Start-Process -FilePath $o -ArgumentList 'serve' -WindowStyle Hidden } }""", 0, False
 WScript.Sleep 2200
 
 ' Prefer Chrome, fall back to Edge — both support --app windows.
