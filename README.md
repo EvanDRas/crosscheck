@@ -222,11 +222,12 @@ light-on-white research note (the print stylesheet strips the chrome).
   "the data doesn't show that" over guessing, and survives prompt-injection
   attempts planted in headlines or forged chat turns — an AI with the same
   manners as the rest of the site, and `scripts/ask_eval.mjs` proves it:
-  21 mechanical checks (grounding of every cited number, refusal
-  discipline, injection resistance, plain-text style) that both reference
-  models pass 21/21. Run it after changing the charter or model. No
-  provider configured → the card explains setup and everything else works
-  untouched.
+  26 graded questions (grounding of every cited number, advice and
+  prediction refusals under emotional pressure and roleplay, planted-
+  headline and forged-history injection, missing-data honesty, plain-text
+  style) that both reference models pass 26/26. Run it after changing the
+  charter or model. No provider configured → the card explains setup and
+  everything else works untouched.
 
 ## Setup
 
